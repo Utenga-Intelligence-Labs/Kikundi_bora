@@ -1,0 +1,40 @@
+# Credentials / secrets
+.env
+*.env
+!*.env.example
+
+# Backend
+kikundi-api
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+_local/
+uploads/*
+!uploads/.gitkeep
+backups/
+*.db
+*.sql
+
+# Frontend
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

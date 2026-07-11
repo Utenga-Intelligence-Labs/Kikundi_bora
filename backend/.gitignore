@@ -1,0 +1,9 @@
+kikundi-api
+.env
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
