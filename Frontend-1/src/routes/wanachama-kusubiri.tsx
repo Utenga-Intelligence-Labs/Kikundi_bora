@@ -1,12 +1,11 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { usePendingUsers, useApproveUser, useRejectUser } from "@/hooks/use-user-management";
 import { roleMap } from "@/api/types";
 import type { User } from "@/api/types";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole, blockAdminFromPage } from "@/lib/role-guards";
-import { tokenStorage } from "@/lib/auth-storage";
+import { hasRole, blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
 import { Clock, CheckCircle2, XCircle, User as UserIcon, Phone, Calendar } from "lucide-react";
 
 export const Route = createFileRoute("/wanachama-kusubiri")({
@@ -17,9 +16,8 @@ export const Route = createFileRoute("/wanachama-kusubiri")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
+    requireRole("secretary", "chair");
     blockAdminFromPage();
   },
   component: PendingUsersPage,

@@ -18,10 +18,12 @@ export function useAdminUsers(params?: AdminUserListParams) {
   });
 }
 
-export function useAdminLogs(params?: { page?: number; limit?: number }) {
+export function useAdminLogs(params?: { page?: number; limit?: number; enabled?: boolean }) {
+  const { enabled = true, ...queryParams } = params ?? {};
   return useQuery({
-    queryKey: adminKeys.logs(params as Record<string, unknown>),
-    queryFn: () => adminApi.getLogs(params),
+    queryKey: adminKeys.logs(queryParams as Record<string, unknown>),
+    queryFn: () => adminApi.getLogs(queryParams),
+    enabled,
   });
 }
 

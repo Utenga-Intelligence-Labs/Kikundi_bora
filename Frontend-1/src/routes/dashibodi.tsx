@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { useMembers } from "@/hooks/use-members";
 import { useLoans } from "@/hooks/use-loans";
@@ -7,8 +7,8 @@ import { AppShell } from "@/components/AppShell";
 import { tzs } from "@/lib/format";
 import { useAuth } from "@/lib/auth-provider";
 import { roleMap } from "@/api/types";
-import { tokenStorage } from "@/lib/auth-storage";
 import { roleSubtitle } from "@/lib/roles";
+import { requireAuth } from "@/lib/role-guards";
 import { useSystemHealth } from "@/hooks/use-admin";
 import { ArrowRight, Users, PiggyBank, Banknote, Receipt, TrendingUp, AlertCircle, ShieldCheck, Wallet, ClipboardList, CheckCircle2, Loader2, Shield, Activity, Settings } from "lucide-react";
 
@@ -20,9 +20,7 @@ export const Route = createFileRoute("/dashibodi")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
   },
   component: Dashibodi,
 });
@@ -173,26 +171,24 @@ function SecretaryView() {
 // ---------- MWANACHAMA ----------
 function MemberView({ userId, userName }: { userId: string; userName: string }) {
   const { data: membersData, isLoading: membersLoading } = useMembers({ page: 1, limit: 1, user_id: userId });
-  const { data: dash, isLoading: dashLoading } = useDashboard();
-
-  if (dashLoading || membersLoading) return <LoadingSkeleton />;
-
   const members = membersData?.data ?? [];
   const me = members[0] ?? null;
+  const memberId = me?.id;
 
-  if (!me) {
-    return (
-      <div className="card-surface p-6 text-center">
-        <AlertCircle className="mx-auto h-10 w-10 text-warning" />
-        <h2 className="mt-3 font-display text-lg font-bold">Jisajili kama mwanachama</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Karibu <span className="font-semibold">{userName}</span> — kamilisha usajili wako kupitia ukurasa wa wasifu ili uweze kuomba mikopo na kuona michango yako.
-        </p>
-        <Link to="/wasifu" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
-          Nenda kwenye Wasifu <ArrowRight className="h-4 w-4" />
-        </Link>
-      </div>
-    );
+  // Personal totals only — never show group dashboard as "Akiba Yangu"
+  const { data: contribsData, isLoading: contribsLoading } = useContributions({
+    member_id: memberId,
+    limit: 200,
+    enabled: !!memberId,
+  });
+  const { data: loansData, isLoading: loansLoading } = useLoans({
+    member_id: memberId,
+    limit: 200,
+    enabled: !!memberId,
+  });
+
+  if (membersLoading || (!!memberId && (contribsLoading || loansLoading))) {
+    return <LoadingSkeleton />;
   }
 
   if (!me) {
@@ -209,14 +205,21 @@ function MemberView({ userId, userName }: { userId: string; userName: string }) 
       </div>
     );
   }
+
+  const myContributions = contribsData?.data ?? [];
+  const myLoans = loansData?.data ?? [];
+  const totalContributions = myContributions.reduce((s, c) => s + c.amount, 0);
+  const outstandingLoans = myLoans.filter((l) => l.status === "OUTSTANDING");
+  const outstandingBalance = outstandingLoans.reduce((s, l) => s + (l.balance_remaining ?? 0), 0);
+  const closedLoans = myLoans.filter((l) => l.status === "CLOSED").length;
 
   return (
     <>
-      <HeroBalance label="Akiba Yangu" value={tzs(dash?.total_contributions ?? 0)} stats={[
-        ["Michango", String(dash?.members_paid_this_month ?? 0)],
-        ["Mikopo wazi", String(dash?.count_outstanding_loans ?? 0)],
-        ["Deni bado", tzs(dash?.total_outstanding_balance ?? 0)],
-        ["Marejesho", String(dash?.total_repayments ?? 0)],
+      <HeroBalance label="Akiba Yangu" value={tzs(totalContributions)} stats={[
+        ["Michango", String(myContributions.length)],
+        ["Mikopo wazi", String(outstandingLoans.length)],
+        ["Deni bado", tzs(outstandingBalance)],
+        ["Mikopo iliyofungwa", String(closedLoans)],
       ]} />
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -235,9 +238,23 @@ function MemberView({ userId, userName }: { userId: string; userName: string }) 
       </div>
 
       <SectionTitle>Michango Yangu</SectionTitle>
-      <div className="card-surface p-6 text-center text-sm text-muted-foreground">
-        Maelezo ya michango yako yatapatikana hivi karibuni.
-      </div>
+      {myContributions.length === 0 ? (
+        <div className="card-surface p-6 text-center text-sm text-muted-foreground">
+          Hakuna michango iliyorekodiwa bado.
+        </div>
+      ) : (
+        <div className="card-surface divide-y divide-border">
+          {myContributions.slice(0, 6).map((c) => (
+            <div key={c.id} className="flex items-center justify-between px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">{tzs(c.amount)}</p>
+                <p className="text-xs text-muted-foreground">{c.month?.slice?.(0, 7) ?? c.month}</p>
+              </div>
+              <span className="chip bg-success/15 text-success">{c.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

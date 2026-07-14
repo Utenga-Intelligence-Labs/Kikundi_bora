@@ -31,6 +31,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       onUnauthorized: () => {
         tokenStorage.clear();
         qc.setQueryData(["auth", "me"], null);
+        qc.clear();
+        if (typeof window !== "undefined") {
+          const path = window.location.pathname;
+          if (path !== "/ingia" && path !== "/sajili" && path !== "/sahau") {
+            window.location.assign("/ingia");
+          }
+        }
       },
     });
   }, [qc]);

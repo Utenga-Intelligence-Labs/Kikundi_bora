@@ -1,13 +1,12 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { useMembers } from "@/hooks/use-members";
 import { useLoans } from "@/hooks/use-loans";
 import { tzs } from "@/lib/format";
-import { tokenStorage } from "@/lib/auth-storage";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole, blockAdminFromPage } from "@/lib/role-guards";
+import { hasRole, blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
 import { Users, PiggyBank, Banknote, Receipt, AlertCircle, Wallet, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/ripoti")({
@@ -18,9 +17,8 @@ export const Route = createFileRoute("/ripoti")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
+    requireRole("chair", "secretary", "treasurer");
     blockAdminFromPage();
   },
   component: RipotiPage,

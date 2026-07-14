@@ -1,8 +1,7 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { tokenStorage } from "@/lib/auth-storage";
-import { blockAdminFromPage } from "@/lib/role-guards";
+import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
 import { useMembers } from "@/hooks/use-members";
 import {
@@ -51,7 +50,7 @@ export const Route = createFileRoute("/mfuko-kijamii")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) throw redirect({ to: "/ingia" });
+    requireAuth();
     blockAdminFromPage();
   },
   component: MfukoKijamiiPage,

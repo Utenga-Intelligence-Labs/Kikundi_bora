@@ -1,7 +1,7 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { tokenStorage } from "@/lib/auth-storage";
+import { requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
 import { useMembers } from "@/hooks/use-members";
 import {
@@ -40,9 +40,7 @@ export const Route = createFileRoute("/mipangilio")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
   },
   component: MipangilioPage,
 });

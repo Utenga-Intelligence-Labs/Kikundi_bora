@@ -1,12 +1,12 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useContributions, useCreateContribution } from "@/hooks/use-contributions";
 import { useMembers } from "@/hooks/use-members";
 import { Field } from "@/components/Field";
 import { tzs, mwezi } from "@/lib/format";
-import { tokenStorage } from "@/lib/auth-storage";
-import { blockAdminFromPage } from "@/lib/role-guards";
+import { useAuth } from "@/lib/auth-provider";
+import { blockAdminFromPage, hasRole, requireAuth } from "@/lib/role-guards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -19,9 +19,7 @@ export const Route = createFileRoute("/michango")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
     blockAdminFromPage();
   },
   component: MichangoPage,
@@ -38,6 +36,9 @@ function generateMonthOptions(n: number) {
 }
 
 function MichangoPage() {
+  const { user } = useAuth();
+  // Backend requires treasurer position for create; UI matches
+  const canRecord = hasRole(user, "treasurer");
   const [open, setOpen] = useState(false);
   const [quickPayMember, setQuickPayMember] = useState<{ id: string; full_name: string } | null>(null);
   const monthOptions = generateMonthOptions(24);
@@ -66,9 +67,11 @@ function MichangoPage() {
       title="Michango"
       subtitle="Kumbuka michango ya kila mwezi"
       action={
-        <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground">
-          <Plus className="h-4 w-4" /> Ingiza
-        </button>
+        canRecord ? (
+          <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground">
+            <Plus className="h-4 w-4" /> Ingiza
+          </button>
+        ) : undefined
       }
     >
       <div className="card-surface p-5">
@@ -154,13 +157,15 @@ function MichangoPage() {
                     <p className="text-xs text-muted-foreground">{w.phone}</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setQuickPayMember(w)}
-                  disabled={createContribution.isPending}
-                  className="text-xs font-semibold text-primary disabled:opacity-50"
-                >
-                  + Lipa
-                </button>
+                {canRecord && (
+                  <button
+                    onClick={() => setQuickPayMember(w)}
+                    disabled={createContribution.isPending}
+                    className="text-xs font-semibold text-primary disabled:opacity-50"
+                  >
+                    + Lipa
+                  </button>
+                )}
               </div>
             ))}
             {wadaiwa.length === 0 && <p className="px-4 py-6 text-center text-sm text-muted-foreground">Wote wamelipa mwezi huu 🎉</p>}
@@ -168,9 +173,9 @@ function MichangoPage() {
         </>
       )}
 
-      {open && <Form onClose={() => setOpen(false)} defaultMonth={mk} members={activeMembers} />}
+      {canRecord && open && <Form onClose={() => setOpen(false)} defaultMonth={mk} members={activeMembers} />}
 
-      {quickPayMember && (
+      {canRecord && quickPayMember && (
         <QuickPayDialog
           member={quickPayMember}
           defaultMonth={mk}

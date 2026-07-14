@@ -1,4 +1,4 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useLoans, useApplyLoan, useApproveLoan, useRejectLoan, useDisburseLoan } from "@/hooks/use-loans";
@@ -7,8 +7,7 @@ import { Field } from "@/components/Field";
 import { tzs, tarehe } from "@/lib/format";
 import { X, Check, Ban, Send, Wallet, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-provider";
-import { tokenStorage } from "@/lib/auth-storage";
-import { blockAdminFromPage } from "@/lib/role-guards";
+import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { roleMap, type LoanStatus } from "@/api/types";
 
 export const Route = createFileRoute("/mikopo")({
@@ -19,7 +18,7 @@ export const Route = createFileRoute("/mikopo")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) throw redirect({ to: "/ingia" });
+    requireAuth();
     blockAdminFromPage();
   },
   component: MikopoPage,
@@ -58,8 +57,8 @@ function MikopoPage() {
 
   const loans = loansData?.data ?? [];
   const members = membersData?.data ?? [];
-  const me = members.find((m) => m.user_id === user.id) ||
-    members.find((m) => m.full_name.toLowerCase() === user.name.toLowerCase());
+  // Money identity: require user_id linkage only — never match by full_name
+  const me = members.find((m) => m.user_id === user.id);
 
   const visible = isMember && me
     ? loans.filter((l) => l.member_id === me.id)

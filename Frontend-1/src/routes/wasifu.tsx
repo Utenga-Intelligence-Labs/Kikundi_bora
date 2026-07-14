@@ -1,8 +1,8 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth-provider";
-import { tokenStorage } from "@/lib/auth-storage";
+import { requireAuth } from "@/lib/role-guards";
 import { roleMap, type Jukumu } from "@/api/types";
 import { useMembers, useCreateMember } from "@/hooks/use-members";
 import { User, Phone, Shield, KeyRound, Check, Palette, Camera, Trash2, MapPin, IdCard, Loader2 } from "lucide-react";
@@ -14,9 +14,7 @@ import { useQueryClient } from "@tanstack/react-query";
 export const Route = createFileRoute("/wasifu")({
   head: () => ({ meta: [{ title: "Wasifu wangu — Money Seeking" }] }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
   },
   component: WasifuPage,
 });

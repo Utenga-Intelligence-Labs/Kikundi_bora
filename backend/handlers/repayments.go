@@ -28,6 +28,8 @@ func (h *RepaymentHandler) List(c *fiber.Ctx) error {
 
 	loanID := c.Query("loan_id")
 	memberID := c.Query("member_id")
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
 
 	query := database.DB.
 		Preload("Member", func(db *gorm.DB) *gorm.DB {
@@ -37,11 +39,18 @@ func (h *RepaymentHandler) List(c *fiber.Ctx) error {
 			return db.Select("id, name, role")
 		})
 
+	// Members only see their own repayments
+	if role == models.RoleMember {
+		var ownMember models.Member
+		if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&ownMember).Error; err != nil {
+			return c.JSON(fiber.Map{"data": []models.Repayment{}, "total": 0, "page": pq.Page, "limit": pq.Limit})
+		}
+		query = query.Where("member_id = ?", ownMember.ID)
+	} else if memberID != "" {
+		query = query.Where("member_id = ?", memberID)
+	}
 	if loanID != "" {
 		query = query.Where("loan_id = ?", loanID)
-	}
-	if memberID != "" {
-		query = query.Where("member_id = ?", memberID)
 	}
 
 	var total int64

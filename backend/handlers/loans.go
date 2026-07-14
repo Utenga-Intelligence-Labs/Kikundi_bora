@@ -28,6 +28,8 @@ func (h *LoanHandler) List(c *fiber.Ctx) error {
 
 	status := c.Query("status")
 	memberID := c.Query("member_id")
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
 
 	query := database.DB.
 		Preload("Member", func(db *gorm.DB) *gorm.DB {
@@ -37,11 +39,19 @@ func (h *LoanHandler) List(c *fiber.Ctx) error {
 			return db.Select("id, name, role")
 		})
 
+	// Members only see loans for their linked member record
+	if role == models.RoleMember {
+		var ownMember models.Member
+		if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&ownMember).Error; err != nil {
+			return c.JSON(fiber.Map{"data": []models.Loan{}, "total": 0, "page": pq.Page, "limit": pq.Limit})
+		}
+		query = query.Where("member_id = ?", ownMember.ID)
+	} else if memberID != "" {
+		query = query.Where("member_id = ?", memberID)
+	}
+
 	if status != "" {
 		query = query.Where("status = ?", status)
-	}
-	if memberID != "" {
-		query = query.Where("member_id = ?", memberID)
 	}
 
 	var total int64
@@ -92,9 +102,22 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
 	var member models.Member
 	if err := database.DB.Where("id = ? AND deleted_at IS NULL AND is_active = TRUE", req.MemberID).First(&member).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama huyu hayupo au si hai"})
+	}
+
+	// Members may only apply for their own linked member record; staff may apply on behalf
+	canApplyOnBehalf := role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer || role == models.RoleAdmin
+	if !canApplyOnBehalf {
+		if member.UserID == nil || *member.UserID != userID {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"message": "Unaweza kuomba mkopo kwa akaunti yako tu. Hakikisha akaunti yako imeunganishwa na rekodi ya mwanachama.",
+			})
+		}
 	}
 
 	if req.Amount <= 0 {
@@ -117,8 +140,6 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 	if activeCount > 0 {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mwanachama ana mkopo unaoendelea. Lazima ulipwe kwanza"})
 	}
-
-	userID := middleware.GetUserID(c)
 
 	loan := models.Loan{
 		MemberID: req.MemberID,

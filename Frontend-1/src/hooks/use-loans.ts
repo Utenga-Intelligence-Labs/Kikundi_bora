@@ -19,10 +19,13 @@ export function useLoans(params?: {
   limit?: number;
   status?: string;
   member_id?: string;
+  enabled?: boolean;
 }) {
+  const { enabled = true, ...queryParams } = params ?? {};
   return useQuery({
-    queryKey: loanKeys.list(params as Record<string, unknown>),
-    queryFn: () => loansApi.list(params),
+    queryKey: loanKeys.list(queryParams as Record<string, unknown>),
+    queryFn: () => loansApi.list(queryParams),
+    enabled,
   });
 }
 

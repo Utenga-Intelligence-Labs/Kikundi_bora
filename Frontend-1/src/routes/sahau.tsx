@@ -1,67 +1,69 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { authApi } from "@/api/auth";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { AuthLayout } from "@/components/AuthLayout";
-import { Field } from "@/components/Field";
-import { Mail, KeyRound, ArrowRight } from "lucide-react";
+import { KeyRound, Phone } from "lucide-react";
 
 export const Route = createFileRoute("/sahau")({
   head: () => ({
     meta: [
-      { title: "Umesahau Nenosiri — Money Seeking" },
-      { name: "description", content: "Rejesha nenosiri lako la Money Seeking." },
+      { title: "Umesahau Nenosiri — Kikundi" },
+      { name: "description", content: "Omba msaada wa kurejesha nenosiri lako." },
     ],
   }),
   component: SahauPage,
 });
 
+/**
+ * Backend has no public self-service reset (only admin POST /admin/auth/reset-password
+ * and admin user reset). Do not present an email+new_password form that claims to reset.
+ */
 function SahauPage() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [pwd, setPwd] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [ok, setOk] = useState(false);
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (pwd !== confirm) return setError("Nenosiri haziendani.");
-    setLoading(true);
-    try {
-      await authApi.resetPassword({ email: email.trim().toLowerCase(), new_password: pwd });
-      setOk(true);
-      setTimeout(() => navigate({ to: "/ingia" }), 1500);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Imeshindikana kubadilisha nenosiri.";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <AuthLayout
-      title="Rejesha nenosiri"
-      subtitle="Weka barua pepe yako na nenosiri jipya"
-      footer={<p className="text-sm text-muted-foreground"><Link to="/ingia" className="font-semibold text-primary">Rudi kwenye Ingia</Link></p>}
+      title="Umesahau nenosiri?"
+      subtitle="Hakuna urejesho wa nenosiri wa umma. Wasiliana na uongozi."
+      footer={
+        <p className="text-sm text-muted-foreground">
+          <Link to="/ingia" className="font-semibold text-primary">
+            Rudi kwenye Ingia
+          </Link>
+        </p>
+      }
     >
-      {ok ? (
-        <div className="rounded-xl bg-success/10 p-4 text-center text-sm text-success">
-          Nenosiri limebadilishwa. Inakupeleka kwenye Ingia...
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border bg-muted/40 p-4">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary/10">
+              <KeyRound className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 space-y-2 text-sm">
+              <p className="font-medium text-foreground">
+                Omba msimamizi au Katibu/Mwenyekiti akuweke nenosiri upya.
+              </p>
+              <p className="text-muted-foreground">
+                Baada ya kuwekewa nenosiri la muda, utaingia na utakazwa kuweka nenosiri jipya mwenyewe.
+              </p>
+            </div>
+          </div>
         </div>
-      ) : (
-        <form onSubmit={onSubmit} className="space-y-3">
-          <Field icon={Mail} label="Barua pepe" type="email" value={email} onChange={setEmail} placeholder="jina@mfano.com" autoComplete="email" />
-          <Field icon={KeyRound} label="Nenosiri jipya" type="password" value={pwd} onChange={setPwd} placeholder="••••••••" autoComplete="new-password" />
-          <Field icon={KeyRound} label="Thibitisha" type="password" value={confirm} onChange={setConfirm} placeholder="••••••••" autoComplete="new-password" />
-          {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
-          <button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
-            {loading ? "Inatumwa..." : "Badilisha Nenosiri"} <ArrowRight className="h-4 w-4" />
-          </button>
-        </form>
-      )}
+
+        <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+          <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
+            <Phone className="h-4 w-4" />
+            Nani wa kuwasiliana naye
+          </div>
+          <ul className="list-inside list-disc space-y-1">
+            <li>Mwenyekiti (anayeweza kuunda akaunti / kuomba msaada)</li>
+            <li>Msimamizi wa mfumo (anayeweza kuweka nenosiri upya)</li>
+          </ul>
+        </div>
+
+        <Link
+          to="/ingia"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+        >
+          Rudi kwenye Ingia
+        </Link>
+      </div>
     </AuthLayout>
   );
 }

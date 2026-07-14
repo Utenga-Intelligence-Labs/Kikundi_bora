@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useAdminLogs } from "@/hooks/use-admin";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole } from "@/lib/role-guards";
+import { hasRole, requireRole } from "@/lib/role-guards";
 import { Activity, ChevronLeft, ChevronRight, Clock } from "lucide-react";
 
 export const Route = createFileRoute("/admin-logs")({
@@ -13,15 +13,20 @@ export const Route = createFileRoute("/admin-logs")({
       { name: "description", content: "Kumbukumbu za vitendo vya msimamizi." },
     ],
   }),
+  beforeLoad: () => {
+    requireRole("admin");
+  },
   component: AdminLogsPage,
 });
 
 function AdminLogsPage() {
   const { user } = useAuth();
   const [page, setPage] = useState(1);
-  const { data, isLoading } = useAdminLogs({ page, limit: 30 });
+  const isAdmin = hasRole(user, "admin");
+  // Do not fetch privileged data until auth confirms admin
+  const { data, isLoading } = useAdminLogs({ page, limit: 30, enabled: isAdmin });
 
-  if (!hasRole(user, "admin")) {
+  if (!isAdmin) {
     return (
       <AppShell title="Kumbukumbu za Mfumo">
         <div className="flex items-center justify-center py-20">

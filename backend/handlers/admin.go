@@ -172,11 +172,13 @@ func (h *AdminHandler) ResetUserPassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
 	}
 
-	// Use provided password or default
+	// Generate once (or use provided password); return plaintext once to admin
 	newPwd := models.DefaultTempPassword()
+	providedPwd := false
 	var req models.AdminResetPasswordRequest
 	if err := c.BodyParser(&req); err == nil && req.NewPassword != "" {
 		newPwd = req.NewPassword
+		providedPwd = true
 	}
 
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(newPwd), bcrypt.DefaultCost)
@@ -212,13 +214,20 @@ func (h *AdminHandler) ResetUserPassword(c *fiber.Ctx) error {
 		"action": "reset_password",
 	})
 
-	// Notify user
+	// Notify user — do not include plaintext password in notifications
 	services.NotifyUser(user.ID, models.NotifSystem,
 		"Nenosiri Limewekwa Upya",
-		"Nenosiri lako limewekwa upya na msimamizi. Tumia nenosiri la mfumo \"1-9\" kuingia na utakazwa kuweka jipya.",
+		"Nenosiri lako limewekwa upya na msimamizi. Tumia nenosiri la muda ulilopewa na msimamizi kuingia; utakazwa kuweka nenosiri jipya.",
 	)
 
-	return c.JSON(fiber.Map{"message": "Nenosiri limewekwa upya. Mtumiaji atatumia \"1-9\" kuingia."})
+	resp := fiber.Map{
+		"message": "Nenosiri limewekwa upya. Mpe mtumiaji nenosiri la muda moja kwa moja (halitaonekana tena).",
+	}
+	// Only return generated temp password (not admin-supplied password) once
+	if !providedPwd {
+		resp["temp_password"] = newPwd
+	}
+	return c.JSON(resp)
 }
 
 // GetSystemHealth returns system statistics (Admin only).

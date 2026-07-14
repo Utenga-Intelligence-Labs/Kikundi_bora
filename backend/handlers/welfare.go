@@ -298,29 +298,15 @@ func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurekodi malipo"})
 	}
 
-	// Check if all contributions for this event are paid
-	var event models.WelfareEvent
-	if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+	// Shared completion check (pay path)
+	if err := h.maybeCompleteWelfareEvent(tx, eventID); err != nil {
 		tx.Rollback()
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio halijapatikana"})
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukamilisha tukio"})
 	}
 
-	var unpaidCount int64
-	tx.Model(&models.WelfareContribution{}).
-		Where("event_id = ? AND status = ?", eventID, models.WelfareContribPending).
-		Count(&unpaidCount)
-
-	// If all member contributions are paid and treasury portion is handled, mark event completed
-	if unpaidCount == 0 {
-		if event.FundingSource == models.FundMemberContribution || event.FundingSource == models.FundBoth {
-			event.Status = models.WelfareCompleted
-			event.CompletedAt = &now
-			if err := tx.Save(&event).Error; err != nil {
-				tx.Rollback()
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukamilisha tukio"})
-			}
-		}
-	}
+	// Reload event for completion notifications
+	var event models.WelfareEvent
+	tx.First(&event, "id = ?", eventID)
 
 	tx.Commit()
 
@@ -377,17 +363,34 @@ func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
 	memberID := c.Params("memberId")
 	userID := middleware.GetUserID(c)
 
+	tx := database.DB.Begin()
+
 	var contrib models.WelfareContribution
-	if err := database.DB.Where("event_id = ? AND member_id = ?", eventID, memberID).First(&contrib).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("event_id = ? AND member_id = ?", eventID, memberID).
+		First(&contrib).Error; err != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mchango haujapatikana"})
 	}
 
 	if contrib.Status != models.WelfareContribPending {
+		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango huu hauwezi kusamehewa. Hali yake ni: " + string(contrib.Status)})
 	}
 
 	contrib.Status = models.WelfareContribWaived
-	if err := database.DB.Save(&contrib).Error; err != nil {
+	if err := tx.Save(&contrib).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusamehe"})
+	}
+
+	// Same completion check as pay path: no PENDING remaining → COMPLETED
+	if err := h.maybeCompleteWelfareEvent(tx, eventID); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukamilisha tukio"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusamehe"})
 	}
 
@@ -397,6 +400,32 @@ func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
 	)
 
 	return c.JSON(fiber.Map{"message": "Mchango umesamehewa", "data": contrib})
+}
+
+// maybeCompleteWelfareEvent marks the event COMPLETED when no PENDING contributions remain.
+// Shared by pay and waive paths.
+func (h *WelfareHandler) maybeCompleteWelfareEvent(tx *gorm.DB, eventID string) error {
+	var event models.WelfareEvent
+	if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+		return err
+	}
+
+	var unpaidCount int64
+	tx.Model(&models.WelfareContribution{}).
+		Where("event_id = ? AND status = ?", eventID, models.WelfareContribPending).
+		Count(&unpaidCount)
+
+	if unpaidCount == 0 {
+		if event.FundingSource == models.FundMemberContribution || event.FundingSource == models.FundBoth {
+			if event.Status == models.WelfareApproved {
+				now := time.Now()
+				event.Status = models.WelfareCompleted
+				event.CompletedAt = &now
+				return tx.Save(&event).Error
+			}
+		}
+	}
+	return nil
 }
 
 // ---------- LIST: Events (role-filtered) ----------

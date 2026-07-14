@@ -21,7 +21,8 @@ func NewUserManagementHandler() *UserManagementHandler {
 }
 
 // CreateUser creates a new user with minimal details (Chair only).
-// User is created in PENDING status with default temp password.
+// User is created in PENDING status with a one-time temp password returned to the chair.
+// Breaking response field: temp_password (plaintext, shown once to chair only).
 func (h *UserManagementHandler) CreateUser(c *fiber.Ctx) error {
 	actorID := middleware.GetUserID(c)
 
@@ -61,8 +62,9 @@ func (h *UserManagementHandler) CreateUser(c *fiber.Ctx) error {
 		})
 	}
 
-	// Hash default temp password
-	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(models.DefaultTempPassword()), bcrypt.DefaultCost)
+	// Generate temp password once; hash only that value; return plaintext to chair once
+	tempPassword := models.DefaultTempPassword()
+	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Hitilafu ya mfumo"})
 	}
@@ -78,7 +80,20 @@ func (h *UserManagementHandler) CreateUser(c *fiber.Ctx) error {
 		CreatedBy:          &actorID,
 	}
 
-	if err := database.DB.Create(&user).Error; err != nil {
+	tx := database.DB.Begin()
+
+	if err := tx.Create(&user).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunda mtumiaji"})
+	}
+
+	// Sync UserPosition for leadership roles so RequirePosition money routes work
+	if err := upsertUserPosition(tx, user.ID, role); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuweka nafasi ya mtumiaji"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunda mtumiaji"})
 	}
 
@@ -95,8 +110,9 @@ func (h *UserManagementHandler) CreateUser(c *fiber.Ctx) error {
 	)
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Mtumiaji ameundwa. Anasubiri kuidhinishwa na Katibu.",
-		"data":    user,
+		"message":       "Mtumiaji ameundwa. Anasubiri kuidhinishwa na Katibu. Mpe nenosiri la muda moja kwa moja (halitaonekana tena).",
+		"data":          user,
+		"temp_password": tempPassword,
 	})
 }
 
@@ -186,14 +202,23 @@ func (h *UserManagementHandler) ApproveUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mtumiaji hana hali ya kusubiri. Hali ya sasa: " + user.Status})
 	}
 
+	tx := database.DB.Begin()
+
 	// Update user status
 	updates := map[string]interface{}{
 		"status":      models.UserStatusActive,
 		"approved_by": actorID,
 		"is_active":   true,
 	}
-	if err := database.DB.Model(&user).Updates(updates).Error; err != nil {
+	if err := tx.Model(&user).Updates(updates).Error; err != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	// Ensure leadership positions exist for elevated roles (covers legacy users)
+	if err := upsertUserPosition(tx, user.ID, user.Role); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuweka nafasi ya mtumiaji"})
 	}
 
 	// Create approval record
@@ -204,17 +229,24 @@ func (h *UserManagementHandler) ApproveUser(c *fiber.Ctx) error {
 		Remarks:    req.Remarks,
 		ApprovedAt: time.Now(),
 	}
-	database.DB.Create(&approval)
+	if err := tx.Create(&approval).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi idhini"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
 
 	// Log audit
 	services.LogAudit(c, &actorID, models.AuditUserApproved, "users", &user.ID, nil, map[string]interface{}{
 		"user_id": user.ID, "name": user.Name, "approved_by": actorID,
 	})
 
-	// Notify user that they are approved
+	// Notify user — temp password was provided by chair at create time
 	services.NotifyUser(user.ID, models.NotifUserApproved,
 		"Akaunti Yako Imeidhinishwa",
-		"Akaunti yako imeidhinishwa na Katibu. Ingia kwa nenosiri la mfumo \"1-9\" na utakazwa kuweka nenosiri jipya.",
+		"Akaunti yako imeidhinishwa na Katibu. Ingia kwa nenosiri la muda ulilopewa na Mwenyekiti wakati wa kuunda akaunti, kisha utakazwa kuweka nenosiri jipya.",
 	)
 
 	return c.JSON(fiber.Map{"message": "Mtumiaji ameidhinishwa"})

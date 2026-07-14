@@ -1,13 +1,12 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useMembers, useCreateMember, useUpdateMember } from "@/hooks/use-members";
 import { useCreateUser } from "@/hooks/use-user-management";
 import { useAdminResetPassword } from "@/hooks/use-admin";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole, blockAdminFromPage } from "@/lib/role-guards";
+import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { tarehe } from "@/lib/format";
-import { tokenStorage } from "@/lib/auth-storage";
 import { Field } from "@/components/Field";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
@@ -30,9 +29,7 @@ export const Route = createFileRoute("/wanachama")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
     blockAdminFromPage();
   },
   component: WanachamaPage,
@@ -48,6 +45,7 @@ function WanachamaPage() {
   const [openCreateUser, setOpenCreateUser] = useState(false);
   const [editMember, setEditMember] = useState<typeof members[number] | null>(null);
   const [resetMember, setResetMember] = useState<typeof members[number] | null>(null);
+  const [lifecycleMember, setLifecycleMember] = useState<{ id: string; full_name: string; is_active: boolean } | null>(null);
   const isChair = hasRole(user, "chair");
   const resetPwd = useAdminResetPassword();
   const [resetLoading, setResetLoading] = useState(false);
@@ -73,7 +71,12 @@ function WanachamaPage() {
     setResetMsg(null);
     try {
       const res = await resetPwd.mutateAsync({ id: resetMember.user_id });
-      setResetMsg(res.message || "Nenosiri limewekwa upya.");
+      const temp = (res as { temp_password?: string }).temp_password;
+      setResetMsg(
+        temp
+          ? `${res.message || "Nenosiri limewekwa upya."} Nenosiri la muda: ${temp}`
+          : res.message || "Nenosiri limewekwa upya.",
+      );
     } catch (e: unknown) {
       setResetMsg(e instanceof Error ? e.message : "Imeshindikana kuweka upya nenosiri");
     } finally {
@@ -180,17 +183,25 @@ function WanachamaPage() {
                       <Pencil className="h-4 w-4" />
                     </button>
                   )}
-                  <button
-                    onClick={() => updateMember.mutate({ id: w.id, data: { is_active: !w.is_active } })}
-                    disabled={updateMember.isPending}
-                    className={`text-xs font-medium disabled:opacity-50 rounded-lg px-2.5 py-1.5 ${
-                      w.is_active
-                        ? "text-destructive hover:bg-destructive/10"
-                        : "text-success hover:bg-success/10"
-                    }`}
-                  >
-                    {w.is_active ? "Zima" : "Amilisha"}
-                  </button>
+                  {isChair && (
+                    <button
+                      onClick={() => {
+                        if (w.is_active) {
+                          setLifecycleMember({ id: w.id, full_name: w.full_name, is_active: w.is_active });
+                        } else {
+                          updateMember.mutate({ id: w.id, data: { is_active: true } });
+                        }
+                      }}
+                      disabled={updateMember.isPending}
+                      className={`text-xs font-medium disabled:opacity-50 rounded-lg px-2.5 py-1.5 ${
+                        w.is_active
+                          ? "text-destructive hover:bg-destructive/10"
+                          : "text-success hover:bg-success/10"
+                      }`}
+                    >
+                      {w.is_active ? "Zima" : "Amilisha"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -244,6 +255,41 @@ function WanachamaPage() {
           member={editMember}
           onClose={() => setEditMember(null)}
         />
+      )}
+
+      {/* Deactivate confirmation (chair only) */}
+      {lifecycleMember && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={() => setLifecycleMember(null)}>
+          <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="font-display text-lg font-semibold">Zima mwanachama?</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Una uhakika unataka kuzima <span className="font-semibold text-foreground">{lifecycleMember.full_name}</span>?
+              Hataweza kushiriki shughuli za kikundi hadi aamilishwe tena.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setLifecycleMember(null)}
+                className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold"
+              >
+                Ghairi
+              </button>
+              <button
+                type="button"
+                disabled={updateMember.isPending}
+                onClick={() => {
+                  updateMember.mutate(
+                    { id: lifecycleMember.id, data: { is_active: false } },
+                    { onSettled: () => setLifecycleMember(null) },
+                  );
+                }}
+                className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {updateMember.isPending ? "Inafanyika..." : "Ndio, zima"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Reset Password Confirmation Modal */}
@@ -356,16 +402,19 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
   });
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setErr(null);
     setSuccess(null);
+    setTempPassword(null);
     try {
       const res = await createUser.mutateAsync({
         full_name: f.full_name,
         phone: f.phone,
       });
       setSuccess(res.message || "Mtumiaji ameundwa. Anasubiri kuidhinishwa na Katibu.");
+      if (res.temp_password) setTempPassword(res.temp_password);
       setF({ full_name: "", phone: "" });
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Imeshindikana kuunda mtumiaji");
@@ -380,10 +429,17 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Mtumiaji ataundwa kwa nenosiri la mfumo &quot;1-9&quot; na atahitaji kuidhinishwa na Katibu kabla ya kuingia.
+          Nenosiri la muda litatolewa mara moja baada ya kuunda — liandike na umpe mtumiaji. Atalazimika kulibadilisha baada ya kuidhinishwa.
         </p>
         {err && <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</p>}
         {success && <p className="mb-3 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{success}</p>}
+        {tempPassword && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+            <p className="font-semibold text-amber-900">Nenosiri la muda (onyesha mara moja):</p>
+            <p className="mt-1 font-mono text-base tracking-wide text-amber-950 select-all">{tempPassword}</p>
+            <p className="mt-1 text-xs text-amber-800">Nakili sasa — haitaonekana tena baada ya kufunga.</p>
+          </div>
+        )}
         <div className="space-y-3">
           <Field label="Jina kamili" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} />
           <Field label="Namba ya simu" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} type="tel" />

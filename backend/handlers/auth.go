@@ -206,14 +206,14 @@ func (h *AuthHandler) FirstLoginSetup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri lazima liwe na angalau herufi 6"})
 	}
 
-	// Prevent reusing default password
-	if req.NewPassword == models.DefaultTempPassword() {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Huwezi kutumia nenosiri la mfumo. Chagua nenosiri jipya."})
-	}
-
 	var user models.User
 	if err := database.DB.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
+	}
+
+	// Prevent reusing the current (temp) password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.NewPassword)); err == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Huwezi kutumia nenosiri la sasa. Chagua nenosiri jipya."})
 	}
 
 	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)

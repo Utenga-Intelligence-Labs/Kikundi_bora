@@ -16,9 +16,15 @@ export interface UserListParams {
   q?: string;
 }
 
+export interface CreateUserResponse extends MessageResponse {
+  data?: User;
+  /** Plaintext temp password returned once to the creating chair — never stored client-side long-term */
+  temp_password?: string;
+}
+
 export const userManagementApi = {
   create: (data: CreateUserRequest) =>
-    api.post<MessageResponse>("/users/create", data),
+    api.post<CreateUserResponse>("/users/create", data),
 
   listPending: (params?: { page?: number; limit?: number }) => {
     const searchParams = new URLSearchParams();

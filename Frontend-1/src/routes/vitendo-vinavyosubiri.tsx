@@ -1,10 +1,9 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { usePendingActions, useApprovePendingAction, useRejectPendingAction } from "@/hooks/use-pending-actions";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole, blockAdminFromPage } from "@/lib/role-guards";
-import { tokenStorage } from "@/lib/auth-storage";
+import { hasRole, blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
 import type { PendingAction } from "@/api/types";
 import { Clock, CheckCircle2, XCircle, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
@@ -16,9 +15,8 @@ export const Route = createFileRoute("/vitendo-vinavyosubiri")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
+    requireRole("chair");
     blockAdminFromPage();
   },
   component: PendingActionsPage,

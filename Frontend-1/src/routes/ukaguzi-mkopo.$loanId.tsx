@@ -1,8 +1,7 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { tokenStorage } from "@/lib/auth-storage";
-import { blockAdminFromPage } from "@/lib/role-guards";
+import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
 import { useCommitteeLoanDetail, useSubmitLoanReview } from "@/hooks/use-loan-committee";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
@@ -31,9 +30,7 @@ export const Route = createFileRoute("/ukaguzi-mkopo/$loanId")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
     blockAdminFromPage();
   },
   component: UkaguziMkopoPage,
@@ -92,13 +89,13 @@ function UkaguziMkopoPage() {
   const myReview = reviews?.find((r) => r.reviewer_id === user?.id);
   const hasReviewed = myReview && myReview.decision !== "PENDING";
 
-  const handleSubmit = async () => {
-    if (!decision) return;
+  const handleSubmit = async (chosen: "APPROVE" | "REJECT") => {
+    setDecision(chosen);
     try {
       await submitReview.mutateAsync({
         loanId: loanId,
         data: {
-          decision,
+          decision: chosen,
           comments: comments || undefined,
         },
       });
@@ -359,10 +356,7 @@ function UkaguziMkopoPage() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => {
-                      setDecision("APPROVE");
-                      setTimeout(handleSubmit, 0);
-                    }}
+                    onClick={() => handleSubmit("APPROVE")}
                     disabled={submitReview.isPending}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
@@ -374,10 +368,7 @@ function UkaguziMkopoPage() {
                     Idhinisha
                   </button>
                   <button
-                    onClick={() => {
-                      setDecision("REJECT");
-                      setTimeout(handleSubmit, 0);
-                    }}
+                    onClick={() => handleSubmit("REJECT")}
                     disabled={submitReview.isPending}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-destructive px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >

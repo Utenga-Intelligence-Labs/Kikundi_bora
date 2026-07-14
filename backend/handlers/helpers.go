@@ -4,8 +4,64 @@ import (
 	"fmt"
 	"strings"
 
+	"kikundibora/models"
+
 	"github.com/go-playground/validator/v10"
+	"gorm.io/gorm"
 )
+
+// roleToPosition maps JWT roles to UserPosition types for dual-authz sync.
+func roleToPosition(role models.Role) (models.PositionType, bool) {
+	switch role {
+	case models.RoleChair:
+		return models.PositionChairperson, true
+	case models.RoleTreasurer:
+		return models.PositionTreasurer, true
+	case models.RoleSecretary:
+		return models.PositionSecretary, true
+	default:
+		return "", false
+	}
+}
+
+// upsertUserPosition ensures the user has an active leadership position matching role.
+// Deactivates other leadership positions for the same user when role maps to a position.
+func upsertUserPosition(db *gorm.DB, userID string, role models.Role) error {
+	posType, ok := roleToPosition(role)
+	if !ok {
+		// Non-leadership role: deactivate any leadership positions
+		return db.Model(&models.UserPosition{}).
+			Where("user_id = ? AND is_active = TRUE AND position_type IN ?",
+				userID, []models.PositionType{models.PositionChairperson, models.PositionSecretary, models.PositionTreasurer}).
+			Update("is_active", false).Error
+	}
+
+	// Deactivate other leadership positions for this user
+	if err := db.Model(&models.UserPosition{}).
+		Where("user_id = ? AND is_active = TRUE AND position_type <> ?", userID, posType).
+		Update("is_active", false).Error; err != nil {
+		return err
+	}
+
+	var existing models.UserPosition
+	err := db.Where("user_id = ? AND position_type = ?", userID, posType).First(&existing).Error
+	if err == nil {
+		if !existing.IsActive {
+			return db.Model(&existing).Update("is_active", true).Error
+		}
+		return nil
+	}
+	if err != gorm.ErrRecordNotFound && err != nil {
+		// First may return other errors
+		return err
+	}
+
+	return db.Create(&models.UserPosition{
+		UserID:       userID,
+		PositionType: posType,
+		IsActive:     true,
+	}).Error
+}
 
 // escapeLike escapes SQL LIKE special characters to prevent wildcard injection.
 // Use this before constructing LIKE search patterns.

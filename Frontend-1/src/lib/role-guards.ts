@@ -1,20 +1,43 @@
 import { redirect } from "@tanstack/react-router";
-import type { User, Jukumu } from "@/api/types";
+import type { User } from "@/api/types";
 import { tokenStorage } from "./auth-storage";
 import { getTokenRole } from "./utils";
 
-export function requireAuth(user: User | null | undefined) {
-  if (!user) {
+/**
+ * beforeLoad guard: require a stored JWT (client-side).
+ * Optionally pass a resolved user (e.g. from /me) to also reject null user.
+ */
+export function requireAuth(user?: User | null) {
+  if (typeof window !== "undefined" && !tokenStorage.exists()) {
+    throw redirect({ to: "/ingia" });
+  }
+  if (user === null) {
     throw redirect({ to: "/ingia" });
   }
 }
 
-export function requireRole(
+/**
+ * beforeLoad guard: require auth + one of the given roles (from JWT payload).
+ * Admin bypasses role checks. Used for /admin, money pages, etc.
+ */
+export function requireRole(...roles: string[]) {
+  requireAuth();
+  if (typeof window === "undefined") return;
+  const role = getTokenRole();
+  if (role === "admin") return;
+  if (!role || !roles.includes(role)) {
+    throw redirect({ to: "/dashibodi" });
+  }
+}
+
+/**
+ * Component-level check against a resolved User from /me.
+ */
+export function requireUserRole(
   user: User | null | undefined,
   ...roles: string[]
 ) {
   requireAuth(user);
-  // Admin bypasses all role checks
   if (user && user.role === "admin") return;
   if (user && !roles.includes(user.role)) {
     throw redirect({ to: "/dashibodi" });

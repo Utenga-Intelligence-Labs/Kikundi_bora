@@ -35,10 +35,6 @@ function WekaNenosiriPage() {
       setError("Nenosiri lazima liwe na angalau herufi 6");
       return;
     }
-    if (newPassword === "1-9") {
-      setError("Huwezi kutumia nenosiri la mfumo. Chagua nenosiri jipya.");
-      return;
-    }
     if (newPassword !== confirmPassword) {
       setError("Nenosiri hazifanani");
       return;

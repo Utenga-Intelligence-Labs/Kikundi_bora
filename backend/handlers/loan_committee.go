@@ -316,16 +316,11 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	role := middleware.GetUserRole(c)
 
-	if role != models.RoleChair && role != models.RoleSecretary && role != models.RoleTreasurer {
-		var count int64
-		database.DB.Model(&models.LoanCommitteeMember{}).
-			Where("user_id = ? AND is_active = TRUE", userID).
-			Count(&count)
-		if count == 0 {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-				"message": "Wanachama wa kamati ya mikopo pekee ndio wanaweza kufanya ukaguzi",
-			})
-		}
+	// Same eligibility as countActiveCommitteeMembers: leadership role/position or appointed
+	if !h.isEligibleCommitteeVoter(database.DB, userID, role) {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"message": "Wanachama wa kamati ya mikopo pekee ndio wanaweza kufanya ukaguzi",
+		})
 	}
 
 	tx := database.DB.Begin()
@@ -421,7 +416,8 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		})
 	}
 
-	totalCommittee := h.countActiveCommitteeMembers()
+	// Count eligible voters inside the same locked transaction
+	totalCommittee := h.countActiveCommitteeMembers(tx)
 	var approveCount int64
 	tx.Model(&models.LoanReview{}).
 		Where("loan_id = ? AND decision = ?", loan.ID, models.ReviewApprove).
@@ -734,21 +730,62 @@ func (h *LoanCommitteeHandler) GetPendingLoansCount(c *fiber.Ctx) error {
 
 // --- Helper functions ---
 
-func (h *LoanCommitteeHandler) countActiveCommitteeMembers() int64 {
-	// Count users with leadership positions
-	var positionCount int64
-	database.DB.Model(&models.UserPosition{}).
-		Where("position_type IN ? AND is_active = TRUE",
-			[]models.PositionType{models.PositionChairperson, models.PositionSecretary, models.PositionTreasurer}).
-		Count(&positionCount)
+var leadershipPositions = []models.PositionType{
+	models.PositionChairperson, models.PositionSecretary, models.PositionTreasurer,
+}
 
-	// Count appointed committee members
-	var appointedCount int64
-	database.DB.Model(&models.LoanCommitteeMember{}).
-		Where("is_active = TRUE").
-		Count(&appointedCount)
+// isEligibleCommitteeVoter matches who may vote: leadership role, leadership position, or appointed.
+func (h *LoanCommitteeHandler) isEligibleCommitteeVoter(db *gorm.DB, userID string, role models.Role) bool {
+	if role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer || role == models.RoleAdmin {
+		return true
+	}
+	var posCount int64
+	db.Model(&models.UserPosition{}).
+		Where("user_id = ? AND position_type IN ? AND is_active = TRUE", userID, leadershipPositions).
+		Count(&posCount)
+	if posCount > 0 {
+		return true
+	}
+	var appointed int64
+	db.Model(&models.LoanCommitteeMember{}).
+		Where("user_id = ? AND is_active = TRUE", userID).
+		Count(&appointed)
+	return appointed > 0
+}
 
-	return positionCount + appointedCount
+// countActiveCommitteeMembers returns distinct eligible voters (positions ∪ role leaders ∪ appointed).
+// Must be called with the same DB/tx used for the review transaction when finalizing.
+func (h *LoanCommitteeHandler) countActiveCommitteeMembers(db *gorm.DB) int64 {
+	if db == nil {
+		db = database.DB
+	}
+	eligible := make(map[string]struct{})
+
+	// Leadership positions
+	var positions []models.UserPosition
+	db.Where("position_type IN ? AND is_active = TRUE", leadershipPositions).Find(&positions)
+	for _, p := range positions {
+		eligible[p.UserID] = struct{}{}
+	}
+
+	// Active users with leadership roles (covers any not yet synced to positions)
+	var leaders []models.User
+	db.Where("role IN ? AND status = ? AND deleted_at IS NULL AND is_active = TRUE",
+		[]models.Role{models.RoleChair, models.RoleSecretary, models.RoleTreasurer},
+		models.UserStatusActive,
+	).Select("id").Find(&leaders)
+	for _, u := range leaders {
+		eligible[u.ID] = struct{}{}
+	}
+
+	// Appointed committee members
+	var appointed []models.LoanCommitteeMember
+	db.Where("is_active = TRUE").Find(&appointed)
+	for _, a := range appointed {
+		eligible[a.UserID] = struct{}{}
+	}
+
+	return int64(len(eligible))
 }
 
 func (h *LoanCommitteeHandler) notifyLoanApplicant(loan models.Loan, notifType models.NotificationType, title, message string) {

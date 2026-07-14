@@ -15,10 +15,13 @@ export function useContributions(params?: {
   limit?: number;
   member_id?: string;
   month?: string;
+  enabled?: boolean;
 }) {
+  const { enabled = true, ...queryParams } = params ?? {};
   return useQuery({
-    queryKey: contributionKeys.list(params as Record<string, unknown>),
-    queryFn: () => contributionsApi.list(params),
+    queryKey: contributionKeys.list(queryParams as Record<string, unknown>),
+    queryFn: () => contributionsApi.list(queryParams),
+    enabled,
   });
 }
 

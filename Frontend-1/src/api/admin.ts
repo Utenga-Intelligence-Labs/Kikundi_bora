@@ -41,7 +41,7 @@ export const adminApi = {
     api.post<MessageResponse>(`/admin/users/${id}/override`, data),
 
   resetPassword: (id: string, data?: AdminResetPasswordRequest) =>
-    api.post<MessageResponse>(`/admin/users/${id}/reset-password`, data ?? {}),
+    api.post<MessageResponse & { temp_password?: string }>(`/admin/users/${id}/reset-password`, data ?? {}),
 
   getHealth: () => api.get<SystemHealth>("/admin/health"),
 };

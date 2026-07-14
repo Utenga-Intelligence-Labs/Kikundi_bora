@@ -5,7 +5,7 @@ import { useSystemHealth, useAdminUsers, useAdminLogs, useOverrideUser, useAdmin
 import { roleMap } from "@/api/types";
 import type { User, AdminLog, UserStatus } from "@/api/types";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole } from "@/lib/role-guards";
+import { hasRole, requireRole } from "@/lib/role-guards";
 import { useDebounce } from "@/hooks/use-debounce";
 import {
   Settings, Users as UsersIcon, Activity, ShieldCheck,
@@ -20,6 +20,9 @@ export const Route = createFileRoute("/admin")({
       { name: "description", content: "Paneli ya msimamizi wa mfumo." },
     ],
   }),
+  beforeLoad: () => {
+    requireRole("admin");
+  },
   component: AdminPage,
 });
 

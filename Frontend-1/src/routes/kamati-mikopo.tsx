@@ -1,8 +1,7 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { tokenStorage } from "@/lib/auth-storage";
-import { blockAdminFromPage } from "@/lib/role-guards";
+import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
 import { roleMap } from "@/api/types";
 import {
@@ -38,9 +37,7 @@ export const Route = createFileRoute("/kamati-mikopo")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
     blockAdminFromPage();
   },
   component: KamatiMikopoPage,
@@ -56,8 +53,10 @@ const tabLabels: Record<Tab, string> = {
 };
 
 function KamatiMikopoPage() {
+  // All hooks must run before any conditional return (Rules of Hooks)
   const { user } = useAuth();
   const { data: committeeCheck, isLoading: checkLoading } = useIsCommitteeMember();
+  const [tab, setTab] = useState<Tab>("dashibodi");
 
   if (checkLoading) {
     return (
@@ -89,8 +88,6 @@ function KamatiMikopoPage() {
   if (!user) return null;
 
   const isChair = user.role === "chair";
-
-  const [tab, setTab] = useState<Tab>("dashibodi");
 
   return (
     <AppShell

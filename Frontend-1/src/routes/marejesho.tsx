@@ -1,12 +1,11 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useRepayments, useRecordRepayment } from "@/hooks/use-repayments";
 import { useLoans } from "@/hooks/use-loans";
 import { Field } from "@/components/Field";
 import { tzs, tarehe } from "@/lib/format";
-import { tokenStorage } from "@/lib/auth-storage";
-import { blockAdminFromPage } from "@/lib/role-guards";
+import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, X, Receipt, Loader2, Wallet } from "lucide-react";
 
@@ -18,9 +17,7 @@ export const Route = createFileRoute("/marejesho")({
     ],
   }),
   beforeLoad: () => {
-    if (typeof window !== "undefined" && !tokenStorage.exists()) {
-      throw redirect({ to: "/ingia" });
-    }
+    requireAuth();
     blockAdminFromPage();
   },
   component: MarejeshoPage,
