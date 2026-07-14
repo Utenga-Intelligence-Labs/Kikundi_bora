@@ -6,7 +6,7 @@ import (
 
 type Contribution struct {
 	ID              string    `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	MemberID        string    `gorm:"type:uuid;not null;index" json:"member_id"`
+	MemberID        string    `gorm:"type:uuid;not null;uniqueIndex:idx_member_month" json:"member_id"`
 	RecordedBy      string    `gorm:"type:uuid;not null" json:"recorded_by"`
 	Amount          float64   `gorm:"type:decimal(15,2);not null" json:"amount"`
 	Month           time.Time `gorm:"type:date;not null;uniqueIndex:idx_member_month" json:"month"`

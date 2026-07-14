@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type WelfareHandler struct{}
@@ -105,7 +106,7 @@ func (h *WelfareHandler) ApproveEvent(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 
 	var event models.WelfareEvent
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&event, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&event, "id = ?", id).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
 	}
@@ -269,7 +270,7 @@ func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 
 	var contrib models.WelfareContribution
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 		Where("event_id = ? AND member_id = ?", eventID, memberID).
 		First(&contrib).Error; err != nil {
 		tx.Rollback()

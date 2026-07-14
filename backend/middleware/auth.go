@@ -43,8 +43,19 @@ func AuthRequired(c *fiber.Ctx) error {
 		})
 	}
 
-	userID := claims["user_id"].(string)
-	role := models.Role(claims["role"].(string))
+	userID, ok := claims["user_id"].(string)
+	if !ok || userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Token haina kitambulisho cha mtumiaji",
+		})
+	}
+	roleStr, ok := claims["role"].(string)
+	if !ok || roleStr == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Token haina jukumu la mtumiaji",
+		})
+	}
+	role := models.Role(roleStr)
 
 	// Check if token session has been revoked (logout)
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(tokenStr)))
@@ -115,6 +126,12 @@ func RequireLoanCommitteeMember() fiber.Handler {
 		}
 
 		userID := GetUserID(c)
+		if userID == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"success": false,
+				"message": "Huna ruhusa ya kufanya hili",
+			})
+		}
 
 		// Check if user has a leadership position
 		var posCount int64
@@ -141,10 +158,20 @@ func RequireLoanCommitteeMember() fiber.Handler {
 	}
 }
 
+// GetUserID returns the authenticated user ID, or "" if missing/invalid.
 func GetUserID(c *fiber.Ctx) string {
-	return c.Locals("user_id").(string)
+	userID, ok := c.Locals("user_id").(string)
+	if !ok {
+		return ""
+	}
+	return userID
 }
 
+// GetUserRole returns the authenticated role, or empty Role if missing/invalid.
 func GetUserRole(c *fiber.Ctx) models.Role {
-	return c.Locals("role").(models.Role)
+	role, ok := c.Locals("role").(models.Role)
+	if !ok {
+		return ""
+	}
+	return role
 }

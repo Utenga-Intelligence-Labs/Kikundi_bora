@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LoanCommitteeHandler struct{}
@@ -330,7 +331,7 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 
 	var loan models.Loan
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&loan, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&loan, "id = ?", id).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
 	}

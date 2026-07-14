@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LoanHandler struct{}
@@ -169,7 +170,7 @@ func (h *LoanHandler) Approve(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 
 	var loan models.Loan
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&loan, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&loan, "id = ?", id).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
 	}
@@ -241,7 +242,7 @@ func (h *LoanHandler) Reject(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 
 	var loan models.Loan
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&loan, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&loan, "id = ?", id).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
 	}
@@ -281,7 +282,7 @@ func (h *LoanHandler) Disburse(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 
 	var loan models.Loan
-	if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&loan, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&loan, "id = ?", id).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
 	}

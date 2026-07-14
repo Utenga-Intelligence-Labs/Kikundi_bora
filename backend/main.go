@@ -72,7 +72,7 @@ func main() {
 	userMgmtHandler := handlers.NewUserManagementHandler()
 	adminHandler := handlers.NewAdminHandler()
 	pendingActionHandler := handlers.NewPendingActionHandler()
-	uploadHandler := handlers.NewUploadHandler(config.AppConfig.CORSOrigins)
+	uploadHandler := handlers.NewUploadHandler(config.AppConfig.PublicBaseURL)
 	backupHandler := handlers.NewBackupHandler()
 	reportHandler := handlers.NewReportHandler()
 
