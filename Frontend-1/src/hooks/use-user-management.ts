@@ -55,3 +55,10 @@ export function useRejectUser() {
     },
   });
 }
+
+/** Chair resets a member/user password; response may include temp_password once */
+export function useChairResetPassword() {
+  return useMutation({
+    mutationFn: (id: string) => userManagementApi.resetPassword(id),
+  });
+}

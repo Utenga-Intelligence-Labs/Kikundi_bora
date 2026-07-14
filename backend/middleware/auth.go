@@ -106,10 +106,11 @@ func RequireRoles(roles ...models.Role) fiber.Handler {
 	}
 }
 
-// RequireLoanCommitteeMember allows access if the user is:
-// - Admin
-// - Has a leadership position (CHAIRPERSON, SECRETARY, TREASURER)
-// - An active appointed committee member in loan_committee_members
+// RequireLoanCommitteeMember allows access if the user is an eligible committee voter:
+// - Admin or leadership role (chair / secretary / treasurer)
+// - Active leadership position (CHAIRPERSON, SECRETARY, TREASURER)
+// - Active appointed committee member in loan_committee_members
+// Matches handlers.LoanCommitteeHandler.isEligibleCommitteeVoter.
 func RequireLoanCommitteeMember() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		role, ok := c.Locals("role").(models.Role)
@@ -120,8 +121,8 @@ func RequireLoanCommitteeMember() fiber.Handler {
 			})
 		}
 
-		// Admin bypasses
-		if role == models.RoleAdmin {
+		// Admin and leadership roles may access (same as review eligibility)
+		if role == models.RoleAdmin || role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer {
 			return c.Next()
 		}
 

@@ -144,12 +144,15 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusasisha mkopo"})
 	}
 
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurekodi malipo"})
+	}
+
+	// Audit and notifications only after successful commit
 	services.LogAudit(c, &userID, models.AuditUpdate, "repayments", &repayment.ID,
 		map[string]interface{}{"balance_before": balance},
 		map[string]interface{}{"amount_paid": req.Amount, "balance_after": newBalance, "loan_status": string(newStatus), "payment_method": req.PaymentMethod},
 	)
-
-	tx.Commit()
 
 	if newStatus == models.LoanClosed {
 		services.NotifyRole(models.RoleChair, models.NotifRepayment, "Mkopo Umefungwa", "Hongera! Mkopo umelipwa kikamilifu.", "")

@@ -149,7 +149,9 @@ func (h *WelfareHandler) ApproveEvent(c *fiber.Ctx) error {
 		}
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditApproveWelfareEvent, "welfare_events", &event.ID,
 		map[string]interface{}{"status": "PENDING"},
@@ -201,12 +203,16 @@ func (h *WelfareHandler) RejectEvent(c *fiber.Ctx) error {
 
 	userID := middleware.GetUserID(c)
 
+	tx := database.DB.Begin()
+
 	var event models.WelfareEvent
-	if err := database.DB.First(&event, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&event, "id = ?", id).Error; err != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
 	}
 
 	if event.Status != models.WelfarePending {
+		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tukio haliwezi kukataliwa. Hali yake ni: " + string(event.Status)})
 	}
 
@@ -214,7 +220,12 @@ func (h *WelfareHandler) RejectEvent(c *fiber.Ctx) error {
 	event.RejectedBy = &userID
 	event.RejectionReason = &req.Reason
 
-	if err := database.DB.Save(&event).Error; err != nil {
+	if err := tx.Save(&event).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
 	}
 
@@ -308,7 +319,9 @@ func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {
 	var event models.WelfareEvent
 	tx.First(&event, "id = ?", eventID)
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurekodi malipo"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditRecordWelfarePayment, "welfare_contributions", &contrib.ID,
 		map[string]interface{}{"status": "PENDING"},
@@ -403,10 +416,10 @@ func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
 }
 
 // maybeCompleteWelfareEvent marks the event COMPLETED when no PENDING contributions remain.
-// Shared by pay and waive paths.
+// Shared by pay and waive paths. Locks the event row so concurrent pay/waive cannot both skip completion.
 func (h *WelfareHandler) maybeCompleteWelfareEvent(tx *gorm.DB, eventID string) error {
 	var event models.WelfareEvent
-	if err := tx.First(&event, "id = ?", eventID).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&event, "id = ?", eventID).Error; err != nil {
 		return err
 	}
 

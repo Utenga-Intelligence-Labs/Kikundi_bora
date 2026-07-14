@@ -142,7 +142,9 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusajili mwanachama"})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusajili mwanachama"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditCreate, "members", &member.ID, nil, map[string]interface{}{
 		"member_no": memberNo, "full_name": member.FullName, "phone": member.Phone,

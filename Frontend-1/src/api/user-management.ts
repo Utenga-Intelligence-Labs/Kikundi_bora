@@ -50,4 +50,8 @@ export const userManagementApi = {
 
   reject: (id: string, data?: RejectUserRequest) =>
     api.post<MessageResponse>(`/users/${id}/reject`, data ?? {}),
+
+  /** Chair-only: generate temp password once for a non-admin user */
+  resetPassword: (id: string) =>
+    api.post<MessageResponse & { temp_password?: string }>(`/users/${id}/reset-password`),
 };

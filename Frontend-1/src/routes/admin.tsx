@@ -156,6 +156,8 @@ function UsersTab() {
   const [overrideAction, setOverrideAction] = useState<"activate" | "deactivate" | "suspend">("activate");
   const [reason, setReason] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const handleOverride = async () => {
     if (!selectedUser) return;
@@ -173,13 +175,30 @@ function UsersTab() {
   const handleResetPassword = async () => {
     if (!selectedUser) return;
     setActionLoading(true);
+    setResetError(null);
+    setResetTempPassword(null);
     try {
-      await resetPwdMutation.mutateAsync({ id: selectedUser.id });
-      setSelectedUser(null);
-      setActionModal(null);
-    } catch { /* handled */ } finally {
+      const res = await resetPwdMutation.mutateAsync({ id: selectedUser.id });
+      const temp = (res as { temp_password?: string }).temp_password;
+      if (temp) {
+        setResetTempPassword(temp);
+      } else {
+        // Provided password path or already shown — allow close
+        setSelectedUser(null);
+        setActionModal(null);
+      }
+    } catch (e: unknown) {
+      setResetError(e instanceof Error ? e.message : "Imeshindikana kuweka upya nenosiri");
+    } finally {
       setActionLoading(false);
     }
+  };
+
+  const closeResetModal = () => {
+    setSelectedUser(null);
+    setActionModal(null);
+    setResetTempPassword(null);
+    setResetError(null);
   };
 
   const users = data?.data ?? [];
@@ -328,18 +347,36 @@ function UsersTab() {
 
       {/* Reset Password Modal */}
       {selectedUser && actionModal === "reset" && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={() => { setSelectedUser(null); setActionModal(null); }}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={resetTempPassword ? undefined : closeResetModal}>
           <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="font-display text-lg font-bold">Weka Upya Nenosiri</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Nenosiri la <strong>{selectedUser.name}</strong> litawekwa kuwa &quot;1-9&quot; na mtumiaji atakazwa kuweka jipya.
-            </p>
-            <div className="mt-4 flex gap-3">
-              <button onClick={() => { setSelectedUser(null); setActionModal(null); }} className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted">Ghairi</button>
-              <button onClick={handleResetPassword} disabled={actionLoading} className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-                {actionLoading ? "Inashughulikiwa..." : "Weka Upya"}
-              </button>
-            </div>
+            {resetTempPassword ? (
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Nenosiri la muda la <strong>{selectedUser.name}</strong> limetengenezwa. Liandike sasa — halitaonekana tena.
+                </p>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-amber-900">Nenosiri la muda:</p>
+                  <p className="mt-1 font-mono text-base tracking-wide text-amber-950 select-all">{resetTempPassword}</p>
+                </div>
+                <button onClick={closeResetModal} className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground">
+                  Nimeinakili — Funga
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Nenosiri la muda nasibu litatolewa kwa <strong>{selectedUser.name}</strong>. Mtumiaji atakazwa kuweka nenosiri jipya atakapoingia. Onyesha nenosiri la muda mara moja baada ya kuthibitisha.
+                </p>
+                {resetError && <p className="mt-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{resetError}</p>}
+                <div className="mt-4 flex gap-3">
+                  <button onClick={closeResetModal} className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted">Ghairi</button>
+                  <button onClick={handleResetPassword} disabled={actionLoading} className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+                    {actionLoading ? "Inashughulikiwa..." : "Weka Upya"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -331,6 +331,7 @@ curl https://api.yourdomain.co.tz/api/v1/admin/health \
 | GET | `/api/v1/users/pending` | List pending users (Secretary) |
 | GET | `/api/v1/users/` | List all users (Chair/Secretary) |
 | POST | `/api/v1/users/:id/approve` | Approve user (Secretary) |
+| POST | `/api/v1/users/:id/reset-password` | Reset user password; returns `temp_password` once (Chair) |
 | POST | `/api/v1/users/:id/reject` | Reject user (Secretary) |
 
 ### Members
@@ -359,10 +360,12 @@ curl https://api.yourdomain.co.tz/api/v1/admin/health \
 | GET | `/api/v1/loans` | List loans |
 | GET | `/api/v1/loans/:id` | Get loan with repayments |
 | POST | `/api/v1/loans/apply` | Apply for loan |
-| POST | `/api/v1/loans/:id/approve` | Approve loan (Chair) |
+| POST | `/api/v1/loans/:id/approve` | Approve loan directly (Chair/Treasurer) — dual path with committee |
 | POST | `/api/v1/loans/:id/reject` | Reject loan (Chair/Treasurer) |
 | POST | `/api/v1/loans/:id/disburse` | Disburse loan (Treasurer) |
 | GET | `/api/v1/loans/outstanding-report` | Outstanding loans report |
+
+**Loan approval dual path:** A PENDING loan can be approved either (1) by unanimous loan-committee reviews (`POST /loan-committee/loans/:id/review`), or (2) by Chair/Treasurer direct approve (`POST /loans/:id/approve`) for fast-track without waiting for all committee votes. Direct reject remains available to Chair/Treasurer.
 
 ### Repayments
 

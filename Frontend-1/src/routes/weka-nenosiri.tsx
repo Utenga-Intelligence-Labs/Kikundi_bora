@@ -80,7 +80,7 @@ function WekaNenosiriPage() {
 
           <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3">
             <p className="text-xs text-amber-800">
-              <strong>Muhimu:</strong> Nenosiri la mfumo &quot;1-9&quot; halitaweza kutumika tena baada ya kuweka jipya.
+              <strong>Muhimu:</strong> Huwezi kutumia tena nenosiri la muda ulilopewa. Chagua nenosiri jipya la kibinafsi.
             </p>
           </div>
 

@@ -60,7 +60,7 @@ function SajiliPage() {
             <div>
               <p className="text-sm font-medium">Hatua ya 3: Weka nenosiri lako</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Baada ya kuidhinishwa, ingia kwa nenosiri la mfumo &quot;1-9&quot; na utakazwa kuweka nenosiri jipya.
+                Baada ya kuidhinishwa na Katibu, ingia kwa nenosiri uliloweka wakati wa kujisajili.
               </p>
             </div>
           </div>

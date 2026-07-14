@@ -1,15 +1,23 @@
 import { redirect } from "@tanstack/react-router";
 import type { User } from "@/api/types";
 import { tokenStorage } from "./auth-storage";
-import { getTokenRole } from "./utils";
+import { getTokenRole, isTokenExpired } from "./utils";
 
 /**
  * beforeLoad guard: require a stored JWT (client-side).
  * Optionally pass a resolved user (e.g. from /me) to also reject null user.
+ * Rejects missing or expired tokens for faster redirect before API 401.
  */
 export function requireAuth(user?: User | null) {
-  if (typeof window !== "undefined" && !tokenStorage.exists()) {
-    throw redirect({ to: "/ingia" });
+  if (typeof window !== "undefined") {
+    if (!tokenStorage.exists()) {
+      throw redirect({ to: "/ingia" });
+    }
+    const token = tokenStorage.get();
+    if (token && isTokenExpired(token)) {
+      tokenStorage.clear();
+      throw redirect({ to: "/ingia" });
+    }
   }
   if (user === null) {
     throw redirect({ to: "/ingia" });

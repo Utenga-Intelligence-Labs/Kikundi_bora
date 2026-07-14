@@ -70,17 +70,30 @@ func (h *LoanHandler) List(c *fiber.Ctx) error {
 
 func (h *LoanHandler) Get(c *fiber.Ctx) error {
 	id := c.Params("id")
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
 
 	var loan models.Loan
 	if err := database.DB.
 		Preload("Member", func(db *gorm.DB) *gorm.DB {
-			return db.Select("id, member_no, full_name, phone")
+			return db.Select("id, member_no, full_name, phone, user_id")
 		}).
 		Preload("Reviewer", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, role")
 		}).
-		First(&loan, id).Error; err != nil {
+		First(&loan, "id = ?", id).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
+	}
+
+	// Members may only read their own linked loan
+	if role == models.RoleMember {
+		var ownMember models.Member
+		if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&ownMember).Error; err != nil {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Huna ruhusa ya kuona mkopo huu"})
+		}
+		if loan.MemberID != ownMember.ID {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Huna ruhusa ya kuona mkopo huu"})
+		}
 	}
 
 	var repayments []models.Repayment
@@ -217,7 +230,9 @@ func (h *LoanHandler) Approve(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditApprove, "loans", &loan.ID, map[string]interface{}{
 		"status": "PENDING",
@@ -285,7 +300,9 @@ func (h *LoanHandler) Reject(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditReject, "loans", &loan.ID, map[string]interface{}{
 		"status": "PENDING",
@@ -332,7 +349,9 @@ func (h *LoanHandler) Disburse(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutolea mkopo"})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutolea mkopo"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditUpdate, "loans", &loan.ID,
 		map[string]interface{}{"status": "APPROVED"},

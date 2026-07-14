@@ -178,7 +178,9 @@ func (h *ContributionHandler) Edit(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurekodi mabadiliko"})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurekodi mabadiliko"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditUpdate, "contributions", &contrib.ID, map[string]interface{}{
 		"amount": oldAmount,

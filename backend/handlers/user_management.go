@@ -243,10 +243,16 @@ func (h *UserManagementHandler) ApproveUser(c *fiber.Ctx) error {
 		"user_id": user.ID, "name": user.Name, "approved_by": actorID,
 	})
 
-	// Notify user — temp password was provided by chair at create time
+	// Self-registered users chose their own password; chair-created users got a temp password
+	var notifBody string
+	if user.MustChangePassword || user.CreatedBy != nil {
+		notifBody = "Akaunti yako imeidhinishwa na Katibu. Ingia kwa nenosiri la muda ulilopewa na Mwenyekiti wakati wa kuunda akaunti, kisha utakazwa kuweka nenosiri jipya."
+	} else {
+		notifBody = "Akaunti yako imeidhinishwa na Katibu. Ingia kwa nenosiri uliloweka wakati wa kujisajili."
+	}
 	services.NotifyUser(user.ID, models.NotifUserApproved,
 		"Akaunti Yako Imeidhinishwa",
-		"Akaunti yako imeidhinishwa na Katibu. Ingia kwa nenosiri la muda ulilopewa na Mwenyekiti wakati wa kuunda akaunti, kisha utakazwa kuweka nenosiri jipya.",
+		notifBody,
 	)
 
 	return c.JSON(fiber.Map{"message": "Mtumiaji ameidhinishwa"})
@@ -299,4 +305,57 @@ func (h *UserManagementHandler) RejectUser(c *fiber.Ctx) error {
 	)
 
 	return c.JSON(fiber.Map{"message": "Mtumiaji amekataliwa"})
+}
+
+// ResetUserPassword lets the Chair reset a non-admin user's password.
+// Generates a one-time temp password, returns plaintext once as temp_password.
+// Does not grant admin override powers — only password reset for group users.
+func (h *UserManagementHandler) ResetUserPassword(c *fiber.Ctx) error {
+	actorID := middleware.GetUserID(c)
+	targetID := c.Params("id")
+
+	if actorID == targetID {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Huwezi kuweka upya nenosiri lako hapa. Tumia badilisha nenosiri kwenye wasifu.",
+		})
+	}
+
+	var user models.User
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", targetID).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
+	}
+
+	// Chairs may not reset system admin accounts
+	if user.Role == models.RoleAdmin {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"message": "Huwezi kuweka upya nenosiri la msimamizi wa mfumo",
+		})
+	}
+
+	tempPassword := models.DefaultTempPassword()
+	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Hitilafu ya mfumo"})
+	}
+
+	if err := database.DB.Model(&user).Updates(map[string]interface{}{
+		"password":             string(hashedPwd),
+		"must_change_password": true,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kubadilisha nenosiri"})
+	}
+
+	services.LogAudit(c, &actorID, models.AuditPasswordSet, "users", &user.ID, nil, map[string]interface{}{
+		"action": "chair_reset_password", "target_name": user.Name,
+	})
+
+	services.NotifyUser(user.ID, models.NotifSystem,
+		"Nenosiri Limewekwa Upya",
+		"Nenosiri lako limewekwa upya na Mwenyekiti. Tumia nenosiri la muda ulilopewa kuingia; utakazwa kuweka nenosiri jipya.",
+	)
+
+	return c.JSON(fiber.Map{
+		"message":       "Nenosiri limewekwa upya. Mpe mtumiaji nenosiri la muda moja kwa moja (halitaonekana tena).",
+		"temp_password": tempPassword,
+	})
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -51,8 +52,7 @@ func upsertUserPosition(db *gorm.DB, userID string, role models.Role) error {
 		}
 		return nil
 	}
-	if err != gorm.ErrRecordNotFound && err != nil {
-		// First may return other errors
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 

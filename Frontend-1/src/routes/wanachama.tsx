@@ -2,8 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useMembers, useCreateMember, useUpdateMember } from "@/hooks/use-members";
-import { useCreateUser } from "@/hooks/use-user-management";
-import { useAdminResetPassword } from "@/hooks/use-admin";
+import { useCreateUser, useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { tarehe } from "@/lib/format";
@@ -47,9 +46,11 @@ function WanachamaPage() {
   const [resetMember, setResetMember] = useState<typeof members[number] | null>(null);
   const [lifecycleMember, setLifecycleMember] = useState<{ id: string; full_name: string; is_active: boolean } | null>(null);
   const isChair = hasRole(user, "chair");
-  const resetPwd = useAdminResetPassword();
+  const resetPwd = useChairResetPassword();
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
+  const [resetFailed, setResetFailed] = useState(false);
 
   const { data, isLoading, error, refetch } = useMembers({
     q: debouncedQ || undefined,
@@ -65,19 +66,25 @@ function WanachamaPage() {
     setPage(p);
   }, []);
 
+  const closeResetModal = () => {
+    setResetMember(null);
+    setResetMsg(null);
+    setResetTempPassword(null);
+    setResetFailed(false);
+  };
+
   const handleResetPassword = async () => {
     if (!resetMember?.user_id) return;
     setResetLoading(true);
     setResetMsg(null);
+    setResetTempPassword(null);
+    setResetFailed(false);
     try {
-      const res = await resetPwd.mutateAsync({ id: resetMember.user_id });
-      const temp = (res as { temp_password?: string }).temp_password;
-      setResetMsg(
-        temp
-          ? `${res.message || "Nenosiri limewekwa upya."} Nenosiri la muda: ${temp}`
-          : res.message || "Nenosiri limewekwa upya.",
-      );
+      const res = await resetPwd.mutateAsync(resetMember.user_id);
+      setResetMsg(res.message || "Nenosiri limewekwa upya.");
+      if (res.temp_password) setResetTempPassword(res.temp_password);
     } catch (e: unknown) {
+      setResetFailed(true);
       setResetMsg(e instanceof Error ? e.message : "Imeshindikana kuweka upya nenosiri");
     } finally {
       setResetLoading(false);
@@ -292,9 +299,9 @@ function WanachamaPage() {
         </div>
       )}
 
-      {/* Reset Password Confirmation Modal */}
+      {/* Reset Password Confirmation Modal (chair → POST /users/:id/reset-password) */}
       {resetMember && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={() => { setResetMember(null); setResetMsg(null); }}>
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={resetTempPassword ? undefined : closeResetModal}>
           <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -306,25 +313,34 @@ function WanachamaPage() {
                   <p className="text-xs text-muted-foreground">{resetMember.full_name}</p>
                 </div>
               </div>
-              <button onClick={() => { setResetMember(null); setResetMsg(null); }} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+              <button onClick={closeResetModal} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
-            {resetMsg ? (
-              <div className={`mb-4 rounded-xl px-4 py-3 text-sm ${resetMsg.includes("Imeshindikana") ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
+            {resetTempPassword ? (
+              <div className="mb-4 space-y-3">
+                {resetMsg && <p className="text-sm text-success">{resetMsg}</p>}
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-amber-900">Nenosiri la muda (onyesha mara moja):</p>
+                  <p className="mt-1 font-mono text-base tracking-wide text-amber-950 select-all">{resetTempPassword}</p>
+                  <p className="mt-1 text-[11px] text-amber-800">Nakili sasa — haitaonekana tena baada ya kufunga.</p>
+                </div>
+              </div>
+            ) : resetMsg ? (
+              <div className={`mb-4 rounded-xl px-4 py-3 text-sm ${resetFailed ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}>
                 {resetMsg}
               </div>
             ) : (
               <p className="mb-4 text-sm text-muted-foreground">
-                Nenosiri la <strong>{resetMember.full_name}</strong> litawekwa kuwa <strong>&quot;1-9&quot;</strong> na mtumiaji atakazwa kuweka nenosiri jipya atakapoingia.
+                Nenosiri la muda nasibu litatolewa kwa <strong>{resetMember.full_name}</strong>. Litaonyeshwa mara moja baada ya kuthibitisha — mpe mtumiaji moja kwa moja. Atakazwa kuweka nenosiri jipya atakapoingia.
               </p>
             )}
             <div className="flex gap-3">
               <button
-                onClick={() => { setResetMember(null); setResetMsg(null); }}
+                onClick={closeResetModal}
                 className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted"
               >
-                {resetMsg ? "Funga" : "Ghairi"}
+                {resetMsg || resetTempPassword ? "Funga" : "Ghairi"}
               </button>
-              {!resetMsg && (
+              {!resetMsg && !resetTempPassword && (
                 <button
                   onClick={handleResetPassword}
                   disabled={resetLoading}
@@ -459,7 +475,7 @@ function CreateUserDialog({ onClose }: { onClose: () => void }) {
 
 function EditMemberDialog({ member, onClose }: { member: { id: string; full_name: string; phone: string; address?: string; is_active: boolean; member_no: string; user_id?: string }; onClose: () => void }) {
   const updateMember = useUpdateMember();
-  const resetPwd = useAdminResetPassword();
+  const resetPwd = useChairResetPassword();
   const [f, setF] = useState({
     full_name: member.full_name,
     phone: member.phone,
@@ -468,6 +484,7 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
   });
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleSubmit = async () => {
@@ -511,10 +528,12 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
     if (!member.user_id) return;
     setErr(null);
     setSuccess(null);
+    setTempPassword(null);
     setActionLoading("resetPwd");
     try {
-      const res = await resetPwd.mutateAsync({ id: member.user_id });
-      setSuccess(res.message || "Nenosiri limewekwa upya. Mtumiaji atatumia \"1-9\" kuingia.");
+      const res = await resetPwd.mutateAsync(member.user_id);
+      setSuccess(res.message || "Nenosiri limewekwa upya.");
+      if (res.temp_password) setTempPassword(res.temp_password);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Imeshindikana kuweka upya nenosiri");
     } finally {
@@ -534,6 +553,13 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
         </div>
         {err && <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</p>}
         {success && <p className="mb-3 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{success}</p>}
+        {tempPassword && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+            <p className="font-semibold text-amber-900">Nenosiri la muda (onyesha mara moja):</p>
+            <p className="mt-1 font-mono text-base tracking-wide text-amber-950 select-all">{tempPassword}</p>
+            <p className="mt-1 text-xs text-amber-800">Nakili sasa — haitaonekana tena baada ya kufunga.</p>
+          </div>
+        )}
         <div className="space-y-3">
           <Field label="Jina kamili" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} />
           <Field label="Namba ya simu" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} type="tel" />
@@ -565,7 +591,7 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
                   {actionLoading === "resetPwd" ? "Inashughulikiwa..." : "Weka Upya"}
                 </button>
               </div>
-              <p className="mt-1 text-[11px] text-amber-600">Nenosiri litawekwa kuwa &quot;1-9&quot; na mtumiaji atakazwa kuweka jipya.</p>
+              <p className="mt-1 text-[11px] text-amber-600">Nenosiri la muda nasibu litatolewa na kuonyeshwa mara moja; mtumiaji atakazwa kuweka jipya.</p>
             </div>
           )}
         </div>

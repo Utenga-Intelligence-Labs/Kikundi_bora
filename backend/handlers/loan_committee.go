@@ -19,7 +19,8 @@ func NewLoanCommitteeHandler() *LoanCommitteeHandler {
 	return &LoanCommitteeHandler{}
 }
 
-// ListMembers returns all active committee members (including automatic ones by role).
+// ListMembers returns all active committee members (including automatic ones by role/position).
+// De-duplicates by user_id so leaders who are also appointed appear once.
 func (h *LoanCommitteeHandler) ListMembers(c *fiber.Ctx) error {
 	var appointed []models.LoanCommitteeMember
 	database.DB.
@@ -34,21 +35,25 @@ func (h *LoanCommitteeHandler) ListMembers(c *fiber.Ctx) error {
 		Find(&appointed)
 
 	var result []models.LoanCommitteeMemberResponse
+	seen := make(map[string]struct{})
 
-	// Add automatic members from positions
+	// Automatic members from leadership positions
 	var leaderPositions []models.UserPosition
 	database.DB.
 		Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, email, role")
 		}).
-		Where("position_type IN ? AND is_active = TRUE",
-			[]models.PositionType{models.PositionChairperson, models.PositionSecretary, models.PositionTreasurer}).
+		Where("position_type IN ? AND is_active = TRUE", leadershipPositions).
 		Find(&leaderPositions)
 
 	for _, p := range leaderPositions {
 		if p.User.ID == "" {
 			continue
 		}
+		if _, ok := seen[p.User.ID]; ok {
+			continue
+		}
+		seen[p.User.ID] = struct{}{}
 		email := ""
 		if p.User.Email != nil {
 			email = *p.User.Email
@@ -62,10 +67,38 @@ func (h *LoanCommitteeHandler) ListMembers(c *fiber.Ctx) error {
 		})
 	}
 
+	// Active users with leadership roles (legacy, not yet synced to positions)
+	var leaders []models.User
+	database.DB.Where("role IN ? AND status = ? AND deleted_at IS NULL AND is_active = TRUE",
+		[]models.Role{models.RoleChair, models.RoleSecretary, models.RoleTreasurer},
+		models.UserStatusActive,
+	).Find(&leaders)
+	for _, u := range leaders {
+		if _, ok := seen[u.ID]; ok {
+			continue
+		}
+		seen[u.ID] = struct{}{}
+		email := ""
+		if u.Email != nil {
+			email = *u.Email
+		}
+		result = append(result, models.LoanCommitteeMemberResponse{
+			UserID:    u.ID,
+			UserName:  u.Name,
+			UserEmail: email,
+			UserRole:  string(u.Role),
+			IsActive:  true,
+		})
+	}
+
 	for _, m := range appointed {
 		if m.User == nil {
 			continue
 		}
+		if _, ok := seen[m.UserID]; ok {
+			continue
+		}
+		seen[m.UserID] = struct{}{}
 		email := ""
 		if m.User.Email != nil {
 			email = *m.User.Email
@@ -401,7 +434,11 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 				"message": "Imeshindikana kukataa mkopo",
 			})
 		}
-		tx.Commit()
+		if err := tx.Commit().Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Imeshindikana kukataa mkopo",
+			})
+		}
 
 		services.LogAudit(c, &userID, models.AuditReject, "loans", &loan.ID,
 			map[string]interface{}{"status": string(models.LoanUnderReview)},
@@ -434,7 +471,11 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 				"message": "Imeshindikana kuidhinisha mkopo",
 			})
 		}
-		tx.Commit()
+		if err := tx.Commit().Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Imeshindikana kuidhinisha mkopo",
+			})
+		}
 
 		services.LogAudit(c, &userID, models.AuditApprove, "loans", &loan.ID,
 			map[string]interface{}{"status": string(models.LoanUnderReview)},
@@ -449,7 +490,11 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Imeshindikana kuhifadhi ukaguzi",
+		})
+	}
 
 	// Notify other committee members
 	msg := "Mkopo wa TZS " + formatMoney(loan.Amount) + " umepitiwa na mwanachama mwingine wa kamati."
@@ -495,18 +540,8 @@ func (h *LoanCommitteeHandler) GetDashboard(c *fiber.Ctx) error {
 		Where("reviewer_id = ? AND decision != 'PENDING'", userID).
 		Count(&dash.MyReviews)
 
-	automaticCount := int64(0)
-	database.DB.Model(&models.UserPosition{}).
-		Where("position_type IN ? AND is_active = TRUE",
-			[]models.PositionType{models.PositionChairperson, models.PositionSecretary, models.PositionTreasurer}).
-		Count(&automaticCount)
-
-	appointedCount := int64(0)
-	database.DB.Model(&models.LoanCommitteeMember{}).
-		Where("is_active = TRUE").
-		Count(&appointedCount)
-
-	dash.CommitteeMembers = automaticCount + appointedCount
+	// Distinct eligible voters (same denominator as SubmitReview unanimous check)
+	dash.CommitteeMembers = h.countActiveCommitteeMembers(database.DB)
 
 	return c.JSON(fiber.Map{"data": dash})
 }
@@ -689,33 +724,14 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"data": report})
 }
 
-// IsCommitteeMember checks if the current user is a committee member.
+// IsCommitteeMember checks if the current user is an eligible committee voter
+// (same rules as SubmitReview / RequireLoanCommitteeMember).
 func (h *LoanCommitteeHandler) IsCommitteeMember(c *fiber.Ctx) error {
-	// Admin bypasses
 	role := middleware.GetUserRole(c)
-	if role == models.RoleAdmin {
-		return c.JSON(fiber.Map{"is_committee_member": true})
-	}
-
 	userID := middleware.GetUserID(c)
-
-	// Check if user has a leadership position
-	var posCount int64
-	database.DB.Model(&models.UserPosition{}).
-		Where("user_id = ? AND position_type IN ? AND is_active = TRUE",
-			userID, []models.PositionType{models.PositionChairperson, models.PositionSecretary, models.PositionTreasurer}).
-		Count(&posCount)
-	if posCount > 0 {
-		return c.JSON(fiber.Map{"is_committee_member": true})
-	}
-
-	// Check if user is an appointed committee member
-	var count int64
-	database.DB.Model(&models.LoanCommitteeMember{}).
-		Where("user_id = ? AND is_active = TRUE", userID).
-		Count(&count)
-
-	return c.JSON(fiber.Map{"is_committee_member": count > 0})
+	return c.JSON(fiber.Map{
+		"is_committee_member": h.isEligibleCommitteeVoter(database.DB, userID, role),
+	})
 }
 
 // GetPendingLoansCount returns the count of loans pending committee review.
@@ -735,8 +751,9 @@ var leadershipPositions = []models.PositionType{
 }
 
 // isEligibleCommitteeVoter matches who may vote: leadership role, leadership position, or appointed.
+// System admin is not a committee voter (may still access committee routes via middleware for oversight).
 func (h *LoanCommitteeHandler) isEligibleCommitteeVoter(db *gorm.DB, userID string, role models.Role) bool {
-	if role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer || role == models.RoleAdmin {
+	if role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer {
 		return true
 	}
 	var posCount int64

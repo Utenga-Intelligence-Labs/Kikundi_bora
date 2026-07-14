@@ -220,7 +220,9 @@ func (h *PendingActionHandler) executeContributionEdit(payload json.RawMessage) 
 		return err
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
 	return nil
 }
 

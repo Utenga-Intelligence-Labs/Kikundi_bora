@@ -101,6 +101,8 @@ func main() {
 	users.Get("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), userMgmtHandler.ListUsers)
 	users.Post("/:id/approve", middleware.RequireRoles(models.RoleSecretary), userMgmtHandler.ApproveUser)
 	users.Post("/:id/reject", middleware.RequireRoles(models.RoleSecretary), userMgmtHandler.RejectUser)
+	// Chair may reset non-admin user passwords (temp returned once); not full admin powers
+	users.Post("/:id/reset-password", middleware.RequireRoles(models.RoleChair), userMgmtHandler.ResetUserPassword)
 
 	members := protected.Group("/members")
 	members.Get("/", memberHandler.List)
@@ -117,11 +119,13 @@ func main() {
 
 	loans := protected.Group("/loans")
 	loans.Get("/", loanHandler.List)
+	loans.Get("/outstanding-report", loanHandler.OutstandingReport)
 	loans.Get("/:id", loanHandler.Get)
 	loans.Post("/apply", loanHandler.Apply)
+	// Chair/treasurer can approve (legacy direct path); committee unanimous path also finalizes
+	loans.Post("/:id/approve", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), loanHandler.Approve)
 	loans.Post("/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), loanHandler.Reject)
 	loans.Post("/:id/disburse", middleware.RequirePosition(models.PositionTreasurer), loanHandler.Disburse)
-	loans.Get("/outstanding-report", loanHandler.OutstandingReport)
 
 	repayments := protected.Group("/repayments")
 	repayments.Get("/", repayHandler.List)
