@@ -1,0 +1,39 @@
+# VCS / IDE
+.git
+.gitignore
+.vscode
+.idea
+*.md
+*.html
+
+# Secrets — never bake into image layers
+.env
+.env.*
+!.env.example
+
+# Build artifacts / local binaries
+kikundi-api
+kikundi-api.exe
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Runtime data (mounted at deploy time)
+uploads/**
+!uploads/.gitkeep
+backups/
+*.db
+*.sql
+_local/
+
+# Tests
+**/*_test.go
+**/testdata/
+
+# Docker (not needed inside build context recursion)
+Dockerfile
+.dockerignore

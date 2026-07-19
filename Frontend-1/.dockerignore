@@ -1,0 +1,42 @@
+# VCS / IDE
+.git
+.gitignore
+.vscode
+.idea
+*.md
+AGENTS.md
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies & build output (rebuilt in image)
+node_modules
+dist
+build
+coverage
+.turbo
+.vinxi
+.output
+.nitro
+
+# Tests / tooling noise
+**/*.test.ts
+**/*.test.tsx
+**/__tests__
+src/test-setup.ts
+vitest.config.*
+eslint.config.*
+prettier.config.*
+.prettierrc*
+.prettierignore
+
+# Docker (nginx.conf must stay in context — copied into final image)
+Dockerfile
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+*.log

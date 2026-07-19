@@ -1,0 +1,91 @@
+# Kikundi Bora — local / WSL compose stack (all-in-one)
+# Includes PostgreSQL, backend API, and frontend.
+#
+# Usage:
+#   docker compose up --build -d
+#   docker compose logs -f
+
+name: kikundi-bora
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ${DOCKERHUB_USER:-kikundi}/kikundi-bora-backend:${TAG:-latest}
+    container_name: kikundi-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      PORT: "8080"
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      DB_HOST: db
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      - backend_uploads:/app/uploads
+      - backend_backups:/app/backups
+    # Reach host Postgres from Linux Docker Engine
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - kikundi-net
+
+  frontend:
+    build:
+      context: ./Frontend-1
+      dockerfile: Dockerfile
+      args:
+        # Browser must reach the API (host-published port, not docker-internal hostname)
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api/v1}
+    image: ${DOCKERHUB_USER:-kikundi}/kikundi-bora-frontend:${TAG:-latest}
+    container_name: kikundi-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8081}:8080"
+    networks:
+      - kikundi-net
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # Local PostgreSQL (used by backend)
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: kikundi-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kikundi
+      POSTGRES_PASSWORD: kikundi_secret_2024
+      POSTGRES_DB: kikundi_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - kikundi-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kikundi -d kikundi_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  kikundi-net:
+    name: kikundi-net
+    driver: bridge
+
+volumes:
+  backend_uploads:
+  backend_backups:
+  pgdata:
