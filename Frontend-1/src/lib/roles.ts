@@ -1,6 +1,6 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck } from "lucide-react";
-import type { Jukumu, User } from "@/api/types";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown } from "lucide-react";
+import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
   to: string;
@@ -8,7 +8,23 @@ export interface NavItem {
   icon: any;
 }
 
-// Sidebar (desktop) — full menu per role
+// Member navigation (all members see this)
+export const memberNav: NavItem[] = [
+  { to: "/dashibodi", label: "Dashboard Yangu", icon: Home },
+  { to: "/michango", label: "Akiba Yangu", icon: PiggyBank },
+  { to: "/mikopo", label: "Omba Mkopo", icon: Banknote },
+  { to: "/mikopo", label: "Historia Yangu", icon: Receipt },
+  { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
+];
+
+// Leadership navigation (only for users with leadership roles)
+export const leadershipNav: NavItem[] = [
+  { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
+  { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
+  { to: "/wanachama", label: "Wanachama Wote", icon: Users },
+];
+
+// Legacy role-based nav (kept for backward compatibility)
 export const sidebarNav: Record<Jukumu, NavItem[]> = {
   Mwenyekiti: [
     { to: "/dashibodi", label: "Dashibodi", icon: Home },
@@ -55,7 +71,25 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
   ],
 };
 
-// Returns sidebar nav with committee item injected for ordinary committee members
+// Dual plane navigation: returns member nav + leadership nav (if applicable)
+export function getDualPlaneNav(
+  jukumu: Jukumu,
+  isCommitteeMember: boolean,
+  leadership: LeadershipRole[] = []
+): { member: NavItem[]; leadership: NavItem[] } {
+  const member = [...memberNav];
+  
+  // Inject committee item for ordinary committee members
+  if (jukumu === "Mwanachama" && isCommitteeMember) {
+    member.push({ to: "/kamati-mikopo", label: "Kamati ya Mikopo", icon: UserPlus });
+  }
+  
+  const leadershipItems = leadership.length > 0 ? [...leadershipNav] : [];
+  
+  return { member, leadership: leadershipItems };
+}
+
+// Legacy: Returns sidebar nav with committee item injected for ordinary committee members
 export function getSidebarNav(jukumu: Jukumu, isCommitteeMember: boolean): NavItem[] {
   const items = [...sidebarNav[jukumu]];
   if (jukumu === "Mwanachama" && isCommitteeMember) {
@@ -77,4 +111,11 @@ export const roleSubtitle: Record<Jukumu, string> = {
   Katibu: "Kumbukumbu na usajili wa wanachama",
   Mwanachama: "Akiba, mikopo na malipo yako",
   Msimamizi: "Simamia mfumo wote na watumiaji",
+};
+
+// Leadership role labels (Swahili)
+export const leadershipRoleLabel: Record<LeadershipRole, string> = {
+  MWENYEKITI: "Mwenyekiti",
+  HAZINA: "Mweka Hazina",
+  KATIBU: "Katibu",
 };

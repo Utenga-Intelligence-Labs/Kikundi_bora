@@ -49,6 +49,8 @@ export interface ResetPasswordRequest {
 
 export type UserStatus = "PENDING" | "ACTIVE" | "REJECTED" | "SUSPENDED";
 
+export type LeadershipRole = "MWENYEKITI" | "HAZINA" | "KATIBU";
+
 export interface User {
   id: string;
   name: string;
@@ -65,6 +67,10 @@ export interface User {
   last_login_at?: string;
   created_at: string;
   updated_at: string;
+  // Dual plane fields (from /me endpoint)
+  member_id?: string;
+  member_code?: string;
+  leadership?: LeadershipRole[];
 }
 
 export type Jukumu = "Mwenyekiti" | "Mweka Hazina" | "Katibu" | "Mwanachama" | "Msimamizi";

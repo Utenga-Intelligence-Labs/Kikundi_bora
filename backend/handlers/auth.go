@@ -278,7 +278,33 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
 	}
 
-	return c.JSON(user)
+	resp := models.MeResponse{
+		User:       &user,
+		Leadership: []string{},
+	}
+
+	// Admin has no member row
+	if user.Role == models.RoleAdmin {
+		return c.JSON(resp)
+	}
+
+	// Find linked member
+	var member models.Member
+	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).
+		First(&member).Error; err == nil {
+		resp.MemberID = &member.ID
+		resp.MemberCode = &member.MemberNo
+
+		// Find leadership positions
+		var positions []models.LeadershipPosition
+		database.DB.Where("member_id = ? AND is_current = TRUE", member.ID).
+			Find(&positions)
+		for _, p := range positions {
+			resp.Leadership = append(resp.Leadership, string(p.Role))
+		}
+	}
+
+	return c.JSON(resp)
 }
 
 func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {

@@ -75,6 +75,7 @@ func main() {
 	uploadHandler := handlers.NewUploadHandler(config.AppConfig.PublicBaseURL)
 	backupHandler := handlers.NewBackupHandler()
 	reportHandler := handlers.NewReportHandler()
+	leadershipHandler := handlers.NewLeadershipHandler()
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
@@ -209,6 +210,16 @@ func main() {
 	reports.Get("/mikopo", reportHandler.LoansReport)
 	reports.Get("/mapato", reportHandler.IncomeExpenseReport)
 	reports.Get("/muhtasari", reportHandler.SummaryReport)
+
+	// Leadership routes (dual plane — members with leadership roles)
+	uongozi := protected.Group("/uongozi")
+	uongozi.Use(middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary))
+
+	uongozi.Get("/dashboard", leadershipHandler.Dashboard)
+	uongozi.Get("/mikopo/pending", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), leadershipHandler.PendingLoans)
+	uongozi.Post("/mikopo/:id/approve", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), leadershipHandler.ApproveLoan)
+	uongozi.Get("/ripoti", leadershipHandler.Reports)
+	uongozi.Get("/wanachama", memberHandler.List)
 
 	// Graceful shutdown
 	go func() {

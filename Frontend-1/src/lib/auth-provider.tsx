@@ -82,12 +82,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const currentUser = user ?? null;
+  const isMember = !!currentUser?.member_id;
+  const isLeadership = (currentUser?.leadership?.length ?? 0) > 0;
+  const isAdmin = currentUser?.role === "admin";
+
+  const hasLeadershipRole = (...roles: string[]) => {
+    if (!currentUser?.leadership) return false;
+    return currentUser.leadership.some((r) => roles.includes(r));
+  };
+
   const value: AuthContextValue = {
-    user: user ?? null,
+    user: currentUser,
     isLoading,
     login: async (data) => { return await loginMutation.mutateAsync(data); },
     register: async (data) => { return await registerMutation.mutateAsync(data); },
     logout: async () => { await logoutMutation.mutateAsync(); },
+    isMember,
+    isLeadership,
+    isAdmin,
+    hasLeadershipRole,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

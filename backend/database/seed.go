@@ -24,6 +24,8 @@ func Seed() {
 	seedMembers()
 	// Users created/approved before auto-member fix get a members row
 	BackfillMembersFromUsers()
+	// Backfill leadership positions from user_positions
+	MigrateLeadershipPositions()
 
 	log.Println("Seed complete")
 }

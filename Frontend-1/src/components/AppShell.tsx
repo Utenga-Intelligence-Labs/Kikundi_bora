@@ -1,10 +1,16 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Settings, User as UserIcon, LogIn, LogOut } from "lucide-react";
+import { Settings, User as UserIcon, LogIn, LogOut, Crown } from "lucide-react";
 import type { ReactNode } from "react";
 import { useAuth, initials } from "@/lib/auth-provider";
-import { roleMap, type Jukumu } from "@/api/types";
-import { getSidebarNav, mobileNav } from "@/lib/roles";
+import { roleMap, type Jukumu, type LeadershipRole } from "@/api/types";
+import { getDualPlaneNav, leadershipRoleLabel } from "@/lib/roles";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
+
+const leadershipLabel: Record<string, string> = {
+  MWENYEKITI: "Mwenyekiti",
+  HAZINA: "Mweka Hazina",
+  KATIBU: "Katibu",
+};
 
 const navSecondary = [
   { to: "/wasifu", label: "Wasifu wangu", icon: UserIcon },
@@ -29,12 +35,18 @@ export function AppShell({
 }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isMember, isLeadership } = useAuth();
   const jukumu: Jukumu = user ? roleMap[user.role] ?? "Mwanachama" : "Mwanachama";
   const { data: committeeCheck } = useIsCommitteeMember();
   const isCommitteeMember = committeeCheck?.is_committee_member ?? false;
-  const navSidebar = getSidebarNav(jukumu, isCommitteeMember);
-  const navMobile = mobileNav(jukumu, isCommitteeMember);
+  
+  // Dual plane navigation
+  const leadership: LeadershipRole[] = user?.leadership ?? [];
+  const { member: navMember, leadership: navLeadership } = getDualPlaneNav(
+    jukumu,
+    isCommitteeMember,
+    leadership
+  );
 
 
   return (
@@ -49,9 +61,9 @@ export function AppShell({
           </div>
         </Link>
         <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          <p className="px-3 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Menyu</p>
+          <p className="px-3 pb-1.5 pt-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dashboard Yangu</p>
           <ul className="space-y-0.5">
-            {navSidebar.map(({ to, label, icon: Icon }) => {
+            {navMember.map(({ to, label, icon: Icon }) => {
               const active = isActive(path, to);
               return (
                 <li key={to}>
@@ -68,6 +80,35 @@ export function AppShell({
               );
             })}
           </ul>
+          
+          {navLeadership.length > 0 && (
+            <>
+              <div className="my-3 border-t border-border" />
+              <p className="flex items-center gap-1.5 px-3 pb-1.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                <Crown className="h-3 w-3" />
+                Uongozi
+              </p>
+              <ul className="space-y-0.5">
+                {navLeadership.map(({ to, label, icon: Icon }) => {
+                  const active = isActive(path, to);
+                  return (
+                    <li key={to}>
+                      <Link
+                        to={to}
+                        className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                          active ? "bg-amber-600 text-white" : "text-foreground/80 hover:bg-amber-50"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 2} />
+                        {label}
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
+          
           <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Akaunti</p>
           <ul className="space-y-0.5">
             {navSecondary.map(({ to, label, icon: Icon }) => {
@@ -109,12 +150,28 @@ export function AppShell({
             <span className="grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-white bg-primary">
               {initials(user.name)}
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{user.name}</p>
-              <p className="truncate text-[11px] text-muted-foreground">{roleMap[user.role] ?? user.role}</p>
+              <div className="mt-0.5 flex flex-wrap gap-1">
+                {isAdmin && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-semibold text-red-700">
+                    Msimamizi
+                  </span>
+                )}
+                {isMember && user.member_code && (
+                  <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold text-green-700">
+                    {user.member_code}
+                  </span>
+                )}
+                {isLeadership && user.leadership?.map((role) => (
+                  <span key={role} className="inline-flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-700">
+                    <Crown className="h-2.5 w-2.5" />
+                    {leadershipLabel[role] ?? role}
+                  </span>
+                ))}
+              </div>
             </div>
           </Link>
-
         )}
       </aside>
 
@@ -179,7 +236,7 @@ export function AppShell({
       {/* Mobile bottom nav — per user */}
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur lg:hidden">
         <ul className="mx-auto grid max-w-3xl grid-cols-5 px-1 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
-          {navMobile.map(({ to, label, icon: Icon }) => {
+          {navMember.slice(0, 4).map(({ to, label, icon: Icon }) => {
             const active = isActive(path, to);
             return (
               <li key={to}>
@@ -195,6 +252,12 @@ export function AppShell({
               </li>
             );
           })}
+          <li>
+            <Link to="/wasifu" className="flex flex-col items-center gap-0.5 rounded-lg px-1 py-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <UserIcon className="h-5 w-5" strokeWidth={1.75} />
+              <span className="truncate">Wasifu</span>
+            </Link>
+          </li>
         </ul>
       </nav>
     </div>

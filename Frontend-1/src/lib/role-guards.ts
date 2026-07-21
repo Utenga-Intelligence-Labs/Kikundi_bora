@@ -69,3 +69,21 @@ export function blockAdminFromPage() {
     throw redirect({ to: "/dashibodi" });
   }
 }
+
+// Dual plane guard: requires user to have a linked member row
+export function requireMember(user: User | null | undefined) {
+  requireAuth(user);
+  if (user && user.role === "admin") return;
+  if (user && !user.member_id) {
+    throw redirect({ to: "/dashibodi" });
+  }
+}
+
+// Dual plane guard: requires user to hold at least one of the given leadership roles
+export function requireLeadership(user: User | null | undefined, ...roles: string[]) {
+  requireAuth(user);
+  if (user && user.role === "admin") return;
+  if (user && (!user.leadership || !user.leadership.some((r) => roles.includes(r)))) {
+    throw redirect({ to: "/dashibodi" });
+  }
+}

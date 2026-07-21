@@ -22,6 +22,14 @@ type AuthResponse struct {
 	FirstLoginRequired bool  `json:"first_login_required,omitempty"`
 }
 
+// MeResponse extends User with member context and leadership roles for dual-plane UI.
+type MeResponse struct {
+	*User
+	MemberID    *string          `json:"member_id,omitempty"`
+	MemberCode  *string          `json:"member_code,omitempty"`
+	Leadership  []string         `json:"leadership"`
+}
+
 type UpdateProfileRequest struct {
 	Name      *string `json:"name"`
 	Phone     *string `json:"phone"`

@@ -22,6 +22,7 @@ func AutoMigrate() {
 		&models.UserApproval{},
 		&models.AdminLog{},
 		&models.UserPosition{},
+		&models.LeadershipPosition{},
 		&models.PendingAction{},
 
 		// Member & financial tables
@@ -122,6 +123,8 @@ func addFKConstraints() {
 		{"audit_logs", "fk_audit_logs_user", "user_id", "users", "id", "SET NULL"},
 		// Notification → User
 		{"notifications", "fk_notifications_user", "user_id", "users", "id", "CASCADE"},
+		// LeadershipPosition → Member
+		{"leadership_positions", "fk_leadership_positions_member", "member_id", "members", "id", "CASCADE"},
 	}
 
 	for _, fk := range fks {
