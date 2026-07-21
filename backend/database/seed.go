@@ -26,6 +26,8 @@ func Seed() {
 	BackfillMembersFromUsers()
 	// Backfill leadership positions from user_positions
 	MigrateLeadershipPositions()
+	// Ensure leadership positions exist for demo users
+	ensureDemoLeadershipPositions()
 
 	log.Println("Seed complete")
 }
@@ -91,6 +93,56 @@ func seedMembers() {
 	}
 
 	log.Printf("Seeded %d members", len(members))
+}
+
+// ensureDemoLeadershipPositions ensures leadership positions exist for demo users
+// even if phone numbers don't match between users and seed members.
+func ensureDemoLeadershipPositions() {
+	type mapping struct {
+		UserRole        models.Role
+		LeadershipRole  models.LeadershipRole
+	}
+	mappings := []mapping{
+		{models.RoleChair, models.LeadershipChair},
+		{models.RoleTreasurer, models.LeadershipTreasurer},
+		{models.RoleSecretary, models.LeadershipSecretary},
+	}
+
+	for _, m := range mappings {
+		// Find user with this role
+		var user models.User
+		if err := DB.Where("role = ? AND deleted_at IS NULL", m.UserRole).First(&user).Error; err != nil {
+			continue
+		}
+
+		// Find member linked to this user
+		var member models.Member
+		if err := DB.Where("user_id = ? AND deleted_at IS NULL", user.ID).First(&member).Error; err != nil {
+			log.Printf("Leadership backfill: no member for %s user %s", m.UserRole, user.Name)
+			continue
+		}
+
+		// Check if leadership position already exists
+		var count int64
+		DB.Model(&models.LeadershipPosition{}).
+			Where("member_id = ? AND role = ? AND is_current = TRUE", member.ID, m.LeadershipRole).
+			Count(&count)
+		if count > 0 {
+			continue
+		}
+
+		// Create leadership position
+		lp := models.LeadershipPosition{
+			MemberID:  member.ID,
+			Role:      m.LeadershipRole,
+			IsCurrent: true,
+		}
+		if err := DB.Create(&lp).Error; err != nil {
+			log.Printf("Leadership backfill: create for %s failed: %v", user.Name, err)
+		} else {
+			log.Printf("Leadership backfill: created %s for %s", m.LeadershipRole, user.Name)
+		}
+	}
 }
 
 func ensureAdmin() {

@@ -1,6 +1,7 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
-import { Settings, User as UserIcon, LogIn, LogOut, Crown } from "lucide-react";
+import { Settings, User as UserIcon, LogIn, LogOut, Crown, Bell } from "lucide-react";
 import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth, initials } from "@/lib/auth-provider";
 import { roleMap, type Jukumu, type LeadershipRole } from "@/api/types";
 import { getDualPlaneNav, leadershipRoleLabel } from "@/lib/roles";
@@ -47,7 +48,23 @@ export function AppShell({
   const jukumu: Jukumu = user ? roleMap[user.role] ?? "Mwanachama" : "Mwanachama";
   const { data: committeeCheck } = useIsCommitteeMember();
   const isCommitteeMember = committeeCheck?.is_committee_member ?? false;
-  
+
+  // Fetch unread notification count
+  const { data: notifData } = useQuery<{ unread: number }>({
+    queryKey: ["notifications", "unread"],
+    queryFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch("/api/v1/notifications?limit=1", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return { unread: 0 };
+      return res.json();
+    },
+    enabled: !!user,
+    refetchInterval: 30000, // Poll every 30 seconds
+  });
+  const unreadCount = notifData?.unread ?? 0;
+
   // Dual plane navigation
   const leadership: LeadershipRole[] = user?.leadership ?? [];
   const { member: navMember, leadership: navLeadership } = getDualPlaneNav(
@@ -55,7 +72,7 @@ export function AppShell({
     isCommitteeMember,
     leadership
   );
-  
+
   // Filter secondary nav based on leadership
   const filteredNavSecondary = getNavSecondary(isLeadership || isAdmin);
 
@@ -148,13 +165,32 @@ export function AppShell({
           </ul>
         </nav>
         {user && (
-          <button
-            onClick={async () => { await logout(); navigate({ to: "/" }); }}
-            className="mx-3 mb-2 flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            Toka kwenye akaunti
-          </button>
+          <div className="mx-3 mb-2 space-y-1">
+            <Link
+              to="/arifa"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted transition-colors"
+            >
+              <div className="relative">
+                <Bell className="h-4 w-4" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-[8px] font-bold text-destructive-foreground">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </div>
+              Arifa
+              {unreadCount > 0 && (
+                <span className="ml-auto text-xs font-bold text-destructive">{unreadCount}</span>
+              )}
+            </Link>
+            <button
+              onClick={async () => { await logout(); navigate({ to: "/" }); }}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-muted transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+              Toka kwenye akaunti
+            </button>
+          </div>
         )}
         {user && (
           <Link to="/wasifu" className="flex items-center gap-3 border-t border-border px-5 py-4 hover:bg-muted">
@@ -197,6 +233,18 @@ export function AppShell({
             </Link>
             {user ? (
               <div className="flex items-center gap-2">
+                <Link
+                  to="/arifa"
+                  className="relative grid h-9 w-9 place-items-center rounded-full text-foreground/80 hover:bg-muted transition-colors"
+                  aria-label="Arifa"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
                 <button
                   onClick={async () => { await logout(); navigate({ to: "/" }); }}
                   className="grid h-9 w-9 place-items-center rounded-full text-foreground/80 hover:bg-muted transition-colors"
