@@ -14,6 +14,8 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+var treasuryService = services.NewTreasuryService()
+
 type LoanHandler struct{}
 
 func NewLoanHandler() *LoanHandler {
@@ -135,6 +137,17 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 
 	if req.Amount <= 0 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha mkopo lazima kiwe zaidi ya sifuri"})
+	}
+
+	// PHASE 2: Check if treasury can afford this loan
+	canAfford, availableBalance, err := treasuryService.CanAffordLoan(req.Amount)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuangalia hali ya hazina"})
+	}
+	if !canAfford {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": fmt.Sprintf("Kiasi kinazidi hazina ya kikundi (TZS %.0f iliyopo). Kiasi ulichoomba: TZS %.0f", availableBalance, req.Amount),
+		})
 	}
 
 	dueDate, err := time.Parse("2006-01-02", req.DueDate)

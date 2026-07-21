@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WekaNenosiriRouteImport } from './routes/weka-nenosiri'
+import { Route as WekaMchangoRouteImport } from './routes/weka-mchango'
 import { Route as WasifuRouteImport } from './routes/wasifu'
 import { Route as WanachamaKusubiriRouteImport } from './routes/wanachama-kusubiri'
 import { Route as WanachamaRouteImport } from './routes/wanachama'
@@ -19,12 +20,16 @@ import { Route as SahauRouteImport } from './routes/sahau'
 import { Route as RipotiRouteImport } from './routes/ripoti'
 import { Route as MipangilioRouteImport } from './routes/mipangilio'
 import { Route as MikopoRouteImport } from './routes/mikopo'
+import { Route as MichangoYanguRouteImport } from './routes/michango-yangu'
+import { Route as MichangoInayosubiriRouteImport } from './routes/michango-inayosubiri'
 import { Route as MichangoRouteImport } from './routes/michango'
 import { Route as MfukoKijamiiRouteImport } from './routes/mfuko-kijamii'
 import { Route as MarejeshoRouteImport } from './routes/marejesho'
 import { Route as KamatiMikopoRouteImport } from './routes/kamati-mikopo'
 import { Route as IngiaRouteImport } from './routes/ingia'
+import { Route as HistoriaYanguRouteImport } from './routes/historia-yangu'
 import { Route as DashibodiRouteImport } from './routes/dashibodi'
+import { Route as ArifaRouteImport } from './routes/arifa'
 import { Route as AdminLogsRouteImport } from './routes/admin-logs'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -35,6 +40,11 @@ import { Route as UkaguziMkopoLoanIdRouteImport } from './routes/ukaguzi-mkopo.$
 const WekaNenosiriRoute = WekaNenosiriRouteImport.update({
   id: '/weka-nenosiri',
   path: '/weka-nenosiri',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WekaMchangoRoute = WekaMchangoRouteImport.update({
+  id: '/weka-mchango',
+  path: '/weka-mchango',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WasifuRoute = WasifuRouteImport.update({
@@ -82,6 +92,16 @@ const MikopoRoute = MikopoRouteImport.update({
   path: '/mikopo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MichangoYanguRoute = MichangoYanguRouteImport.update({
+  id: '/michango-yangu',
+  path: '/michango-yangu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MichangoInayosubiriRoute = MichangoInayosubiriRouteImport.update({
+  id: '/michango-inayosubiri',
+  path: '/michango-inayosubiri',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MichangoRoute = MichangoRouteImport.update({
   id: '/michango',
   path: '/michango',
@@ -107,9 +127,19 @@ const IngiaRoute = IngiaRouteImport.update({
   path: '/ingia',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HistoriaYanguRoute = HistoriaYanguRouteImport.update({
+  id: '/historia-yangu',
+  path: '/historia-yangu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashibodiRoute = DashibodiRouteImport.update({
   id: '/dashibodi',
   path: '/dashibodi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArifaRoute = ArifaRouteImport.update({
+  id: '/arifa',
+  path: '/arifa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminLogsRoute = AdminLogsRouteImport.update({
@@ -147,12 +177,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/admin-logs': typeof AdminLogsRoute
+  '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
+  '/michango-inayosubiri': typeof MichangoInayosubiriRoute
+  '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
   '/ripoti': typeof RipotiRoute
@@ -162,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/wanachama': typeof WanachamaRoute
   '/wanachama-kusubiri': typeof WanachamaKusubiriRoute
   '/wasifu': typeof WasifuRoute
+  '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
@@ -171,12 +206,16 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/admin-logs': typeof AdminLogsRoute
+  '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
+  '/michango-inayosubiri': typeof MichangoInayosubiriRoute
+  '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
   '/ripoti': typeof RipotiRoute
@@ -186,6 +225,7 @@ export interface FileRoutesByTo {
   '/wanachama': typeof WanachamaRoute
   '/wanachama-kusubiri': typeof WanachamaKusubiriRoute
   '/wasifu': typeof WasifuRoute
+  '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
@@ -196,12 +236,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/admin-logs': typeof AdminLogsRoute
+  '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
+  '/michango-inayosubiri': typeof MichangoInayosubiriRoute
+  '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
   '/ripoti': typeof RipotiRoute
@@ -211,6 +255,7 @@ export interface FileRoutesById {
   '/wanachama': typeof WanachamaRoute
   '/wanachama-kusubiri': typeof WanachamaKusubiriRoute
   '/wasifu': typeof WasifuRoute
+  '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
@@ -222,12 +267,16 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin-logs'
+    | '/arifa'
     | '/dashibodi'
+    | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
+    | '/michango-inayosubiri'
+    | '/michango-yangu'
     | '/mikopo'
     | '/mipangilio'
     | '/ripoti'
@@ -237,6 +286,7 @@ export interface FileRouteTypes {
     | '/wanachama'
     | '/wanachama-kusubiri'
     | '/wasifu'
+    | '/weka-mchango'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/mikopo'
@@ -246,12 +296,16 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin-logs'
+    | '/arifa'
     | '/dashibodi'
+    | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
+    | '/michango-inayosubiri'
+    | '/michango-yangu'
     | '/mikopo'
     | '/mipangilio'
     | '/ripoti'
@@ -261,6 +315,7 @@ export interface FileRouteTypes {
     | '/wanachama'
     | '/wanachama-kusubiri'
     | '/wasifu'
+    | '/weka-mchango'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/mikopo'
@@ -270,12 +325,16 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/admin-logs'
+    | '/arifa'
     | '/dashibodi'
+    | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
+    | '/michango-inayosubiri'
+    | '/michango-yangu'
     | '/mikopo'
     | '/mipangilio'
     | '/ripoti'
@@ -285,6 +344,7 @@ export interface FileRouteTypes {
     | '/wanachama'
     | '/wanachama-kusubiri'
     | '/wasifu'
+    | '/weka-mchango'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/mikopo'
@@ -295,12 +355,16 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AdminLogsRoute: typeof AdminLogsRoute
+  ArifaRoute: typeof ArifaRoute
   DashibodiRoute: typeof DashibodiRoute
+  HistoriaYanguRoute: typeof HistoriaYanguRoute
   IngiaRoute: typeof IngiaRoute
   KamatiMikopoRoute: typeof KamatiMikopoRoute
   MarejeshoRoute: typeof MarejeshoRoute
   MfukoKijamiiRoute: typeof MfukoKijamiiRoute
   MichangoRoute: typeof MichangoRoute
+  MichangoInayosubiriRoute: typeof MichangoInayosubiriRoute
+  MichangoYanguRoute: typeof MichangoYanguRoute
   MikopoRoute: typeof MikopoRoute
   MipangilioRoute: typeof MipangilioRoute
   RipotiRoute: typeof RipotiRoute
@@ -310,6 +374,7 @@ export interface RootRouteChildren {
   WanachamaRoute: typeof WanachamaRoute
   WanachamaKusubiriRoute: typeof WanachamaKusubiriRoute
   WasifuRoute: typeof WasifuRoute
+  WekaMchangoRoute: typeof WekaMchangoRoute
   WekaNenosiriRoute: typeof WekaNenosiriRoute
   UkaguziMkopoLoanIdRoute: typeof UkaguziMkopoLoanIdRoute
   UongoziMikopoRoute: typeof UongoziMikopoRoute
@@ -323,6 +388,13 @@ declare module '@tanstack/react-router' {
       path: '/weka-nenosiri'
       fullPath: '/weka-nenosiri'
       preLoaderRoute: typeof WekaNenosiriRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/weka-mchango': {
+      id: '/weka-mchango'
+      path: '/weka-mchango'
+      fullPath: '/weka-mchango'
+      preLoaderRoute: typeof WekaMchangoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/wasifu': {
@@ -388,6 +460,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MikopoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/michango-yangu': {
+      id: '/michango-yangu'
+      path: '/michango-yangu'
+      fullPath: '/michango-yangu'
+      preLoaderRoute: typeof MichangoYanguRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/michango-inayosubiri': {
+      id: '/michango-inayosubiri'
+      path: '/michango-inayosubiri'
+      fullPath: '/michango-inayosubiri'
+      preLoaderRoute: typeof MichangoInayosubiriRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/michango': {
       id: '/michango'
       path: '/michango'
@@ -423,11 +509,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IngiaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/historia-yangu': {
+      id: '/historia-yangu'
+      path: '/historia-yangu'
+      fullPath: '/historia-yangu'
+      preLoaderRoute: typeof HistoriaYanguRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashibodi': {
       id: '/dashibodi'
       path: '/dashibodi'
       fullPath: '/dashibodi'
       preLoaderRoute: typeof DashibodiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/arifa': {
+      id: '/arifa'
+      path: '/arifa'
+      fullPath: '/arifa'
+      preLoaderRoute: typeof ArifaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin-logs': {
@@ -479,12 +579,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AdminLogsRoute: AdminLogsRoute,
+  ArifaRoute: ArifaRoute,
   DashibodiRoute: DashibodiRoute,
+  HistoriaYanguRoute: HistoriaYanguRoute,
   IngiaRoute: IngiaRoute,
   KamatiMikopoRoute: KamatiMikopoRoute,
   MarejeshoRoute: MarejeshoRoute,
   MfukoKijamiiRoute: MfukoKijamiiRoute,
   MichangoRoute: MichangoRoute,
+  MichangoInayosubiriRoute: MichangoInayosubiriRoute,
+  MichangoYanguRoute: MichangoYanguRoute,
   MikopoRoute: MikopoRoute,
   MipangilioRoute: MipangilioRoute,
   RipotiRoute: RipotiRoute,
@@ -494,6 +598,7 @@ const rootRouteChildren: RootRouteChildren = {
   WanachamaRoute: WanachamaRoute,
   WanachamaKusubiriRoute: WanachamaKusubiriRoute,
   WasifuRoute: WasifuRoute,
+  WekaMchangoRoute: WekaMchangoRoute,
   WekaNenosiriRoute: WekaNenosiriRoute,
   UkaguziMkopoLoanIdRoute: UkaguziMkopoLoanIdRoute,
   UongoziMikopoRoute: UongoziMikopoRoute,

@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"time"
+
 	"kikundibora/database"
 	"kikundibora/middleware"
 	"kikundibora/models"
+	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -11,8 +14,52 @@ import (
 
 type LeadershipHandler struct{}
 
+var treasurySvc = services.NewTreasuryService()
+
 func NewLeadershipHandler() *LeadershipHandler {
 	return &LeadershipHandler{}
+}
+
+// QuickStats returns quick statistics for the "Takwimu za Haraka" dashboard section.
+// GET /api/v1/uongozi/quick-stats
+func (h *LeadershipHandler) QuickStats(c *fiber.Ctx) error {
+	// Get total members count
+	var totalMembers int64
+	database.DB.Model(&models.Member{}).
+		Where("deleted_at IS NULL").
+		Count(&totalMembers)
+
+	// Get contributions this month
+	var contributionsThisMonth float64
+	startOfMonth := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+	database.DB.Model(&models.Contribution{}).
+		Where("status = 'PAID' AND paid_at >= ?", startOfMonth).
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&contributionsThisMonth)
+
+	// Get outstanding loans
+	var outstandingLoans int64
+	database.DB.Model(&models.Loan{}).
+		Where("status = ?", models.LoanOutstanding).
+		Count(&outstandingLoans)
+
+	// Get treasury balance
+	treasury, err := treasurySvc.CalculateHazinaBalance()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Imeshindikana kupata hesabu ya hazina",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"total_members":         totalMembers,
+		"contributions_month":   contributionsThisMonth,
+		"outstanding_loans":     outstandingLoans,
+		"treasury_balance":      treasury.AvailableBalance,
+		"total_contributions":   treasury.TotalContributions,
+		"total_repayments":      treasury.TotalRepayments,
+		"total_disbursed":       treasury.TotalDisbursed,
+	})
 }
 
 // PendingLoans returns loans with status PENDING (leadership view).

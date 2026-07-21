@@ -76,6 +76,8 @@ func main() {
 	backupHandler := handlers.NewBackupHandler()
 	reportHandler := handlers.NewReportHandler()
 	leadershipHandler := handlers.NewLeadershipHandler()
+	memberContribHandler := handlers.NewMemberContributionHandler()
+	announcementHandler := handlers.NewAnnouncementHandler()
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
@@ -211,11 +213,22 @@ func main() {
 	reports.Get("/mapato", reportHandler.IncomeExpenseReport)
 	reports.Get("/muhtasari", reportHandler.SummaryReport)
 
+	// Member Contribution routes (Phase 4)
+	michango := protected.Group("/michango")
+	michango.Post("/", memberContribHandler.Submit)
+	michango.Get("/mine", memberContribHandler.MyContributions)
+	michango.Get("/pending", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), memberContribHandler.PendingContributions)
+	michango.Get("/", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), memberContribHandler.AllContributions)
+	michango.Post("/:id/confirm", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), memberContribHandler.Confirm)
+	michango.Post("/:id/reject", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), memberContribHandler.Reject)
+
 	// Leadership routes (dual plane — members with leadership roles)
 	uongozi := protected.Group("/uongozi")
 	uongozi.Use(middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary))
 
 	uongozi.Get("/dashboard", leadershipHandler.Dashboard)
+	uongozi.Get("/quick-stats", leadershipHandler.QuickStats)
+	uongozi.Post("/announcements", announcementHandler.Broadcast)
 	uongozi.Get("/mikopo/pending", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), leadershipHandler.PendingLoans)
 	uongozi.Post("/mikopo/:id/approve", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), leadershipHandler.ApproveLoan)
 	uongozi.Get("/ripoti", leadershipHandler.Reports)

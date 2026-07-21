@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
 import { AppShell } from "@/components/AppShell";
-import { FileBarChart2, Download, Users, PiggyBank, Banknote, TrendingUp } from "lucide-react";
+import { FileBarChart2, Download, Users, PiggyBank, Banknote, TrendingUp, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/uongozi/ripoti")({
   beforeLoad: () => {
@@ -12,10 +13,31 @@ export const Route = createFileRoute("/uongozi/ripoti")({
   component: RipotiPage,
 });
 
+interface QuickStats {
+  total_members: number;
+  contributions_month: number;
+  outstanding_loans: number;
+  treasury_balance: number;
+}
+
 function RipotiPage() {
   const { user, isLeadership } = useAuth();
   const [reportType, setReportType] = useState("summary");
   const [loading, setLoading] = useState(false);
+
+  // Fetch quick stats from backend
+  const { data: stats, isLoading: statsLoading } = useQuery<QuickStats>({
+    queryKey: ["uongozi", "quick-stats"],
+    queryFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch("/api/v1/uongozi/quick-stats", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Imeshindikana kupata takwimu");
+      return res.json();
+    },
+    enabled: isLeadership,
+  });
 
   if (!user || !isLeadership) {
     return (
@@ -110,12 +132,35 @@ function RipotiPage() {
 
         <div className="card-surface p-6">
           <h3 className="font-display text-lg font-semibold mb-4">Takwimu za Haraka</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <StatCard icon={Users} label="Wanachama" value="--" color="blue" />
-            <StatCard icon={PiggyBank} label="Michango Mwezi Huu" value="--" color="green" />
-            <StatCard icon={Banknote} label="Mikopo Inayodaiwa" value="--" color="red" />
-            <StatCard icon={TrendingUp} label="Mikopo Iliyoisha" value="--" color="purple" />
-          </div>
+          {statsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            </div>
+          ) : stats ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <StatCard icon={Users} label="Wanachama" value={stats.total_members.toString()} color="blue" />
+              <StatCard 
+                icon={PiggyBank} 
+                label="Michango Mwezi Huu" 
+                value={`TZS ${stats.contributions_month.toLocaleString()}`} 
+                color="green" 
+              />
+              <StatCard 
+                icon={Banknote} 
+                label="Mikopo Inayodaiwa" 
+                value={stats.outstanding_loans.toString()} 
+                color="red" 
+              />
+              <StatCard 
+                icon={TrendingUp} 
+                label="Hazina" 
+                value={`TZS ${stats.treasury_balance.toLocaleString()}`} 
+                color="purple" 
+              />
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-4">Imeshindikana kupata takwimu</p>
+          )}
         </div>
       </div>
     </AppShell>

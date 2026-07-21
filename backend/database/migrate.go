@@ -23,6 +23,7 @@ func AutoMigrate() {
 		&models.AdminLog{},
 		&models.UserPosition{},
 		&models.LeadershipPosition{},
+		&models.MemberContribution{},
 		&models.PendingAction{},
 
 		// Member & financial tables
