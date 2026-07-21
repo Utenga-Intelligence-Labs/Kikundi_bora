@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
 import { AppShell } from "@/components/AppShell";
-import { FileBarChart2, Download, Users, PiggyBank, Banknote, TrendingUp, Loader2 } from "lucide-react";
+import { FileBarChart2, Download, Users, PiggyBank, Banknote, TrendingUp, Loader2, Clock } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -16,8 +16,13 @@ export const Route = createFileRoute("/uongozi/ripoti")({
 interface QuickStats {
   total_members: number;
   contributions_month: number;
+  pending_contributions: number;
   outstanding_loans: number;
+  pending_loans: number;
   treasury_balance: number;
+  total_contributions: number;
+  total_repayments: number;
+  total_disbursed: number;
 }
 
 function RipotiPage() {
@@ -139,24 +144,40 @@ function RipotiPage() {
           ) : stats ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <StatCard icon={Users} label="Wanachama" value={stats.total_members.toString()} color="blue" />
-              <StatCard 
-                icon={PiggyBank} 
-                label="Michango Mwezi Huu" 
-                value={`TZS ${stats.contributions_month.toLocaleString()}`} 
-                color="green" 
+              <StatCard
+                icon={PiggyBank}
+                label="Michango Mwezi Huu"
+                value={`TZS ${stats.contributions_month.toLocaleString()}`}
+                color="green"
               />
-              <StatCard 
-                icon={Banknote} 
-                label="Mikopo Inayodaiwa" 
-                value={stats.outstanding_loans.toString()} 
-                color="red" 
+              <StatCard
+                icon={Banknote}
+                label="Mikopo Wazi"
+                value={stats.outstanding_loans.toString()}
+                color="red"
               />
-              <StatCard 
-                icon={TrendingUp} 
-                label="Hazina" 
-                value={`TZS ${stats.treasury_balance.toLocaleString()}`} 
-                color="purple" 
+              <StatCard
+                icon={TrendingUp}
+                label="Hazina"
+                value={`TZS ${stats.treasury_balance.toLocaleString()}`}
+                color="purple"
               />
+              {stats.pending_contributions > 0 && (
+                <StatCard
+                  icon={Clock}
+                  label="Michango Inayosubiri"
+                  value={stats.pending_contributions.toString()}
+                  color="amber"
+                />
+              )}
+              {stats.pending_loans > 0 && (
+                <StatCard
+                  icon={Clock}
+                  label="Mikopo Inayosubiri"
+                  value={stats.pending_loans.toString()}
+                  color="amber"
+                />
+              )}
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-4">Imeshindikana kupata takwimu</p>
@@ -173,6 +194,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: any; label: strin
     green: "bg-green-100 text-green-700",
     red: "bg-red-100 text-red-700",
     purple: "bg-purple-100 text-purple-700",
+    amber: "bg-amber-100 text-amber-700",
   };
 
   return (

@@ -25,16 +25,26 @@ type HazinaBalance struct {
 func (s *TreasuryService) CalculateHazinaBalance() (*HazinaBalance, error) {
 	var balance HazinaBalance
 
-	// 1. Total confirmed contributions
+	// 1. Total confirmed contributions from NEW MemberContribution table (Phase 4)
 	var totalContributions float64
-	err := database.DB.Model(&models.Contribution{}).
-		Where("status = ?", "PAID").
+	err := database.DB.Model(&models.MemberContribution{}).
+		Where("status = ?", models.ContributionConfirmed).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&totalContributions).Error
 	if err != nil {
 		return nil, err
 	}
-	balance.TotalContributions = totalContributions
+
+	// Also include legacy contributions from OLD Contribution table
+	var legacyContributions float64
+	err = database.DB.Model(&models.Contribution{}).
+		Where("status = ?", "PAID").
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&legacyContributions).Error
+	if err != nil {
+		return nil, err
+	}
+	balance.TotalContributions = totalContributions + legacyContributions
 
 	// 2. Total loan repayments
 	var totalRepayments float64

@@ -29,19 +29,39 @@ func (h *LeadershipHandler) QuickStats(c *fiber.Ctx) error {
 		Where("deleted_at IS NULL").
 		Count(&totalMembers)
 
-	// Get contributions this month
+	// Get contributions this month from NEW MemberContribution table (Phase 4)
 	var contributionsThisMonth float64
 	startOfMonth := time.Date(time.Now().Year(), time.Now().Month(), 1, 0, 0, 0, 0, time.UTC)
+	database.DB.Model(&models.MemberContribution{}).
+		Where("status = ? AND created_at >= ?", models.ContributionConfirmed, startOfMonth).
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&contributionsThisMonth)
+
+	// Also check OLD Contribution table for legacy data
+	var legacyContributionsThisMonth float64
 	database.DB.Model(&models.Contribution{}).
 		Where("status = 'PAID' AND paid_at >= ?", startOfMonth).
 		Select("COALESCE(SUM(amount), 0)").
-		Scan(&contributionsThisMonth)
+		Scan(&legacyContributionsThisMonth)
+	contributionsThisMonth += legacyContributionsThisMonth
+
+	// Get pending contributions count
+	var pendingContributions int64
+	database.DB.Model(&models.MemberContribution{}).
+		Where("status = ?", models.ContributionPending).
+		Count(&pendingContributions)
 
 	// Get outstanding loans
 	var outstandingLoans int64
 	database.DB.Model(&models.Loan{}).
 		Where("status = ?", models.LoanOutstanding).
 		Count(&outstandingLoans)
+
+	// Get pending loans
+	var pendingLoans int64
+	database.DB.Model(&models.Loan{}).
+		Where("status = ?", models.LoanPending).
+		Count(&pendingLoans)
 
 	// Get treasury balance
 	treasury, err := treasurySvc.CalculateHazinaBalance()
@@ -52,13 +72,15 @@ func (h *LeadershipHandler) QuickStats(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"total_members":         totalMembers,
-		"contributions_month":   contributionsThisMonth,
-		"outstanding_loans":     outstandingLoans,
-		"treasury_balance":      treasury.AvailableBalance,
-		"total_contributions":   treasury.TotalContributions,
-		"total_repayments":      treasury.TotalRepayments,
-		"total_disbursed":       treasury.TotalDisbursed,
+		"total_members":          totalMembers,
+		"contributions_month":    contributionsThisMonth,
+		"pending_contributions":  pendingContributions,
+		"outstanding_loans":      outstandingLoans,
+		"pending_loans":          pendingLoans,
+		"treasury_balance":       treasury.AvailableBalance,
+		"total_contributions":    treasury.TotalContributions,
+		"total_repayments":       treasury.TotalRepayments,
+		"total_disbursed":        treasury.TotalDisbursed,
 	})
 }
 
