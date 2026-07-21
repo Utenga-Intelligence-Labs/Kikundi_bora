@@ -197,4 +197,9 @@ export const welfareApi = {
     api.post<MessageResponse>(
       `/welfare/events/${eventId}/contributions/${memberId}/waive`
     ),
+
+  disburseEvent: (eventId: string) =>
+    api.post<MessageResponse>(
+      `/welfare/events/${eventId}/disburse`
+    ),
 };

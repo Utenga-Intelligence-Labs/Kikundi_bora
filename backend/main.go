@@ -167,18 +167,21 @@ func main() {
 	// Dashboard — all authenticated users
 	welfare.Get("/dashboard", welfareHandler.Dashboard)
 
-	// Events — treasurer creates, chair approves/rejects, all can view (filtered by role)
+	// Events — all can view, treasurer creates, chair OR secretary approves
 	welfare.Get("/events", welfareHandler.ListEvents)
 	welfare.Get("/events/:id", welfareHandler.GetEvent)
 	welfare.Post("/events", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.CreateEvent)
-	welfare.Post("/events/:id/approve", middleware.RequireRoles(models.RoleChair), welfareHandler.ApproveEvent)
-	welfare.Post("/events/:id/reject", middleware.RequireRoles(models.RoleChair), welfareHandler.RejectEvent)
+	welfare.Post("/events/:id/approve", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), welfareHandler.ApproveEvent)
+	welfare.Post("/events/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), welfareHandler.RejectEvent)
 
 	// Contributions — members see their own, treasurer/chair/secretary see all
 	welfare.Get("/contributions", welfareHandler.ListContributions)
 	welfare.Get("/my-contributions", welfareHandler.MyContributions)
 	welfare.Post("/events/:id/contributions/:memberId/pay", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RecordPayment)
 	welfare.Post("/events/:id/contributions/:memberId/waive", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.WaiveContribution)
+
+	// Disbursement — treasurer disburses after event is approved and fully funded
+	welfare.Post("/events/:id/disburse", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.DisburseEvent)
 
 	// Pending Actions routes (Chairperson approves)
 	pending := protected.Group("/pending-actions")

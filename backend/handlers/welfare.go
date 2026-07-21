@@ -262,6 +262,93 @@ func (h *WelfareHandler) RejectEvent(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Tukio la kijamii limekataliwa", "data": event})
 }
 
+// ---------- TREASURER: Disburse welfare event to member ----------
+
+func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	var event models.WelfareEvent
+	if err := database.DB.First(&event, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
+	}
+
+	if event.Status != models.WelfareApproved {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tukio haliwezi kutolewa. Hali yake ni: " + string(event.Status)})
+	}
+
+	// Check if all contributions are collected (for member-funded events)
+	if event.FundingSource == models.FundMemberContribution || event.FundingSource == models.FundBoth {
+		var totalCollected float64
+		database.DB.Model(&models.WelfareContribution{}).
+			Where("event_id = ? AND status = ?", event.ID, models.WelfareContribPaid).
+			Select("COALESCE(SUM(amount), 0)").
+			Scan(&totalCollected)
+
+		var totalRequired float64
+		database.DB.Model(&models.WelfareContribution{}).
+			Where("event_id = ?", event.ID).
+			Select("COALESCE(SUM(amount), 0)").
+			Scan(&totalRequired)
+
+		if totalCollected < totalRequired {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"message": fmt.Sprintf("Michango haijakamilika. Imekusanywa: TZS %s, Inahitajika: TZS %s", formatMoney(totalCollected), formatMoney(totalRequired)),
+			})
+		}
+	}
+
+	// Calculate disbursement amount
+	disbursementAmount := event.AmountApproved
+	if disbursementAmount == nil || *disbursementAmount <= 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha kutolewa si sahihi"})
+	}
+
+	tx := database.DB.Begin()
+
+	// Update event status to completed
+	now := time.Now()
+	event.Status = models.WelfareCompleted
+	event.CompletedAt = &now
+
+	if err := tx.Save(&event).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutoa fedha"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutoa fedha"})
+	}
+
+	services.LogAudit(c, &userID, "WELFARE_DISBURSE", "welfare_events", &event.ID,
+		map[string]interface{}{"status": "APPROVED"},
+		map[string]interface{}{"status": "COMPLETED", "amount": *disbursementAmount},
+	)
+
+	// Notify affected member
+	var member models.Member
+	if err := database.DB.First(&member, "id = ?", event.MemberID).Error; err == nil {
+		var notifUserID string
+		if member.UserID != nil {
+			notifUserID = *member.UserID
+		}
+		if notifUserID == "" {
+			notifUserID = member.RegisteredBy
+		}
+		if notifUserID != "" {
+			services.NotifyUser(notifUserID, models.NotifWelfareCompleted,
+				"Fedha za Kijamii Zimetolewa",
+				"Fedha za TZS "+formatMoney(*disbursementAmount)+" kwa tukio lako la "+string(event.EventType)+" zimetolewa. Wasiliana na Mweka Hazina.",
+			)
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message": fmt.Sprintf("Fedha za TZS %s zimetolewa kwa mwanachama.", formatMoney(*disbursementAmount)),
+		"data":    event,
+	})
+}
+
 // ---------- TREASURER: Record welfare contribution payment ----------
 
 func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {

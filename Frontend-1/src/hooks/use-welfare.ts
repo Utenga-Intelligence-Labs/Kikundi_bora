@@ -135,3 +135,11 @@ export function useWaiveWelfareContribution() {
     onSuccess: () => qc.invalidateQueries({ queryKey: welfareKeys.all }),
   });
 }
+
+export function useDisburseWelfareEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) => welfareApi.disburseEvent(eventId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: welfareKeys.all }),
+  });
+}

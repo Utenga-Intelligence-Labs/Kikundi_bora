@@ -15,6 +15,7 @@ import {
   useWelfareContributions,
   useRecordWelfarePayment,
   useWaiveWelfareContribution,
+  useDisburseWelfareEvent,
 } from "@/hooks/use-welfare";
 import type {
   WelfareEventType,
@@ -336,6 +337,7 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
   const { data, isLoading } = useWelfareEvent(eventId);
   const recordPayment = useRecordWelfarePayment();
   const waiveContrib = useWaiveWelfareContribution();
+  const disburseEvent = useDisburseWelfareEvent();
   const [payingMember, setPayingMember] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
 
@@ -351,6 +353,7 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
 
   const { data: event, contributions, stats } = data;
   const isTreasurer = user?.role === "treasurer";
+  const canDisburse = isTreasurer && event.status === "APPROVED" && stats.pending_count === 0;
 
   return (
     <Modal title="Taarifa za Tukio" onClose={onClose}>
