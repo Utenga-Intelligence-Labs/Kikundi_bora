@@ -79,7 +79,19 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		IsActive:           true,
 	}
 
-	if err := database.DB.Create(&user).Error; err != nil {
+	tx := database.DB.Begin()
+	if err := tx.Create(&user).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusajili"})
+	}
+
+	// Linked member row (appears on wanachama; login still requires approval)
+	if err := database.EnsureMemberForUser(tx, user, user.ID); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
+	}
+
+	if err := tx.Commit().Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusajili"})
 	}
 

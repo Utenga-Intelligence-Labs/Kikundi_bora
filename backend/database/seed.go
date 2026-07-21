@@ -22,6 +22,8 @@ func Seed() {
 
 	ensureAdmin()
 	seedMembers()
+	// Users created/approved before auto-member fix get a members row
+	BackfillMembersFromUsers()
 
 	log.Println("Seed complete")
 }

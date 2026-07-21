@@ -69,17 +69,3 @@ export function blockAdminFromPage() {
     throw redirect({ to: "/dashibodi" });
   }
 }
-
-const isDev = import.meta.env.DEV;
-
-export const DEMO_ACCOUNTS: Record<
-  string,
-  { email: string; password: string }
-> = isDev
-  ? {
-      Mwenyekiti: { email: "juma@kikundi.tz", password: "demo123" },
-      "Mweka Hazina": { email: "fatuma@kikundi.tz", password: "demo123" },
-      Katibu: { email: "rashidi@kikundi.tz", password: "demo123" },
-      Msimamizi: { email: "0000000000", password: "123456789" },
-    }
-  : {};

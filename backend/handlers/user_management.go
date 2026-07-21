@@ -93,6 +93,12 @@ func (h *UserManagementHandler) CreateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuweka nafasi ya mtumiaji"})
 	}
 
+	// Auto-create linked member so they appear on /wanachama
+	if err := database.EnsureMemberForUser(tx, user, actorID); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
+	}
+
 	if err := tx.Commit().Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunda mtumiaji"})
 	}
@@ -219,6 +225,12 @@ func (h *UserManagementHandler) ApproveUser(c *fiber.Ctx) error {
 	if err := upsertUserPosition(tx, user.ID, user.Role); err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuweka nafasi ya mtumiaji"})
+	}
+
+	// Ensure member row exists (self-register path + legacy users)
+	if err := database.EnsureMemberForUser(tx, user, actorID); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": err.Error()})
 	}
 
 	// Create approval record

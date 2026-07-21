@@ -1,7 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
-import { DEMO_ACCOUNTS } from "@/lib/role-guards";
-import type { Jukumu } from "@/api/types";
 import { PiggyBank, Banknote, Users, FileBarChart2, Check } from "lucide-react";
 import heroImage from "@/assets/hero-app.png";
 
@@ -19,19 +17,7 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { user, isLoading, login } = useAuth();
-  const navigate = useNavigate();
-
-  const loginDemo = async (jukumu: Jukumu) => {
-    const account = DEMO_ACCOUNTS[jukumu];
-    if (!account) return;
-    try {
-      await login({ email: account.email, password: account.password });
-      navigate({ to: "/dashibodi" });
-    } catch {
-      // silent fail on landing page
-    }
-  };
+  const { user } = useAuth();
 
   return (
     <div className="min-h-dvh bg-background">

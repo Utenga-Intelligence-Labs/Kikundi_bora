@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"time"
 
 	"kikundibora/database"
@@ -114,19 +113,10 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 	tx := database.DB.Begin()
 	defer tx.Rollback()
 
-	var lastNo string
-	tx.Raw(`
-		SELECT member_no FROM members
-		WHERE deleted_at IS NULL
-		ORDER BY id DESC LIMIT 1 FOR UPDATE
-	`).Scan(&lastNo)
-
-	var next int64 = 1
-	if lastNo != "" {
-		fmt.Sscanf(lastNo, "KKK-%d", &next)
-		next++
+	memberNo, err := database.NextMemberNo(tx)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza namba ya uanachama"})
 	}
-	memberNo := fmt.Sprintf("KKK-%04d", next)
 
 	member := models.Member{
 		MemberNo:     memberNo,
