@@ -35,6 +35,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as UongoziRipotiRouteImport } from './routes/uongozi/ripoti'
 import { Route as UongoziMikopoRouteImport } from './routes/uongozi/mikopo'
+import { Route as UongoziImportDataRouteImport } from './routes/uongozi/import-data'
 import { Route as UkaguziMkopoLoanIdRouteImport } from './routes/ukaguzi-mkopo.$loanId'
 
 const WekaNenosiriRoute = WekaNenosiriRouteImport.update({
@@ -167,6 +168,11 @@ const UongoziMikopoRoute = UongoziMikopoRouteImport.update({
   path: '/uongozi/mikopo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UongoziImportDataRoute = UongoziImportDataRouteImport.update({
+  id: '/uongozi/import-data',
+  path: '/uongozi/import-data',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UkaguziMkopoLoanIdRoute = UkaguziMkopoLoanIdRouteImport.update({
   id: '/ukaguzi-mkopo/$loanId',
   path: '/ukaguzi-mkopo/$loanId',
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
+  '/uongozi/import-data': typeof UongoziImportDataRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
   '/uongozi/ripoti': typeof UongoziRipotiRoute
 }
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
+  '/uongozi/import-data': typeof UongoziImportDataRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
   '/uongozi/ripoti': typeof UongoziRipotiRoute
 }
@@ -258,6 +266,7 @@ export interface FileRoutesById {
   '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
+  '/uongozi/import-data': typeof UongoziImportDataRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
   '/uongozi/ripoti': typeof UongoziRipotiRoute
 }
@@ -289,6 +298,7 @@ export interface FileRouteTypes {
     | '/weka-mchango'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
+    | '/uongozi/import-data'
     | '/uongozi/mikopo'
     | '/uongozi/ripoti'
   fileRoutesByTo: FileRoutesByTo
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/weka-mchango'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
+    | '/uongozi/import-data'
     | '/uongozi/mikopo'
     | '/uongozi/ripoti'
   id:
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/weka-mchango'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
+    | '/uongozi/import-data'
     | '/uongozi/mikopo'
     | '/uongozi/ripoti'
   fileRoutesById: FileRoutesById
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   WekaMchangoRoute: typeof WekaMchangoRoute
   WekaNenosiriRoute: typeof WekaNenosiriRoute
   UkaguziMkopoLoanIdRoute: typeof UkaguziMkopoLoanIdRoute
+  UongoziImportDataRoute: typeof UongoziImportDataRoute
   UongoziMikopoRoute: typeof UongoziMikopoRoute
   UongoziRipotiRoute: typeof UongoziRipotiRoute
 }
@@ -565,6 +578,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UongoziMikopoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/uongozi/import-data': {
+      id: '/uongozi/import-data'
+      path: '/uongozi/import-data'
+      fullPath: '/uongozi/import-data'
+      preLoaderRoute: typeof UongoziImportDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ukaguzi-mkopo/$loanId': {
       id: '/ukaguzi-mkopo/$loanId'
       path: '/ukaguzi-mkopo/$loanId'
@@ -601,6 +621,7 @@ const rootRouteChildren: RootRouteChildren = {
   WekaMchangoRoute: WekaMchangoRoute,
   WekaNenosiriRoute: WekaNenosiriRoute,
   UkaguziMkopoLoanIdRoute: UkaguziMkopoLoanIdRoute,
+  UongoziImportDataRoute: UongoziImportDataRoute,
   UongoziMikopoRoute: UongoziMikopoRoute,
   UongoziRipotiRoute: UongoziRipotiRoute,
 }

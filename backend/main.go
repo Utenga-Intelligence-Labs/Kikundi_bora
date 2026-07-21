@@ -78,6 +78,7 @@ func main() {
 	leadershipHandler := handlers.NewLeadershipHandler()
 	memberContribHandler := handlers.NewMemberContributionHandler()
 	announcementHandler := handlers.NewAnnouncementHandler()
+	importHandler := handlers.NewImportHandler()
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
@@ -236,6 +237,12 @@ func main() {
 	uongozi.Post("/mikopo/:id/approve", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer), leadershipHandler.ApproveLoan)
 	uongozi.Get("/ripoti", leadershipHandler.Reports)
 	uongozi.Get("/wanachama", memberHandler.List)
+
+	// Import routes (leadership only — for historical data from books)
+	importRoutes := protected.Group("/import")
+	importRoutes.Use(middleware.RequireRoles(models.RoleChair, models.RoleTreasurer))
+	importRoutes.Post("/contributions", importHandler.ImportContributions)
+	importRoutes.Post("/loans", importHandler.ImportLoans)
 
 	// Graceful shutdown
 	go func() {

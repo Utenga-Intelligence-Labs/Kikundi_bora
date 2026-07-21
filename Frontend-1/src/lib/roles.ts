@@ -25,6 +25,7 @@ export const leadershipNav: NavItem[] = [
   { to: "/marejesho", label: "Pokea Marejesho", icon: Receipt },
   { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
+  { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },
 ];
 
