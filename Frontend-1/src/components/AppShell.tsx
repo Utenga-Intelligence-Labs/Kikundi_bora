@@ -17,6 +17,14 @@ const navSecondary = [
   { to: "/mipangilio", label: "Mipangilio", icon: Settings },
 ] as const;
 
+// Filter navSecondary based on leadership status
+function getNavSecondary(isLeadership: boolean) {
+  return navSecondary.filter((item) => {
+    if (item.to === "/mipangilio") return isLeadership;
+    return true;
+  });
+}
+
 function isActive(pathname: string, to: string) {
   return to === "/" ? pathname === "/" : pathname.startsWith(to);
 }
@@ -47,6 +55,9 @@ export function AppShell({
     isCommitteeMember,
     leadership
   );
+  
+  // Filter secondary nav based on leadership
+  const filteredNavSecondary = getNavSecondary(isLeadership || isAdmin);
 
 
   return (
@@ -111,7 +122,7 @@ export function AppShell({
           
           <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Akaunti</p>
           <ul className="space-y-0.5">
-            {navSecondary.map(({ to, label, icon: Icon }) => {
+            {filteredNavSecondary.map(({ to, label, icon: Icon }) => {
               const active = isActive(path, to);
               return (
                 <li key={to}>

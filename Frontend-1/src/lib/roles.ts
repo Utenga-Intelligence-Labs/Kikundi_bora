@@ -13,7 +13,7 @@ export const memberNav: NavItem[] = [
   { to: "/dashibodi", label: "Dashboard Yangu", icon: Home },
   { to: "/michango", label: "Akiba Yangu", icon: PiggyBank },
   { to: "/mikopo", label: "Omba Mkopo", icon: Banknote },
-  { to: "/mikopo", label: "Historia Yangu", icon: Receipt },
+  { to: "/marejesho", label: "Historia Yangu", icon: Receipt },
   { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
 ];
 

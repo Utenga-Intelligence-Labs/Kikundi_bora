@@ -28,6 +28,8 @@ import { Route as DashibodiRouteImport } from './routes/dashibodi'
 import { Route as AdminLogsRouteImport } from './routes/admin-logs'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as UongoziRipotiRouteImport } from './routes/uongozi/ripoti'
+import { Route as UongoziMikopoRouteImport } from './routes/uongozi/mikopo'
 import { Route as UkaguziMkopoLoanIdRouteImport } from './routes/ukaguzi-mkopo.$loanId'
 
 const WekaNenosiriRoute = WekaNenosiriRouteImport.update({
@@ -125,6 +127,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UongoziRipotiRoute = UongoziRipotiRouteImport.update({
+  id: '/uongozi/ripoti',
+  path: '/uongozi/ripoti',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UongoziMikopoRoute = UongoziMikopoRouteImport.update({
+  id: '/uongozi/mikopo',
+  path: '/uongozi/mikopo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UkaguziMkopoLoanIdRoute = UkaguziMkopoLoanIdRouteImport.update({
   id: '/ukaguzi-mkopo/$loanId',
   path: '/ukaguzi-mkopo/$loanId',
@@ -152,6 +164,8 @@ export interface FileRoutesByFullPath {
   '/wasifu': typeof WasifuRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
+  '/uongozi/mikopo': typeof UongoziMikopoRoute
+  '/uongozi/ripoti': typeof UongoziRipotiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -174,6 +188,8 @@ export interface FileRoutesByTo {
   '/wasifu': typeof WasifuRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
+  '/uongozi/mikopo': typeof UongoziMikopoRoute
+  '/uongozi/ripoti': typeof UongoziRipotiRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -197,6 +213,8 @@ export interface FileRoutesById {
   '/wasifu': typeof WasifuRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
+  '/uongozi/mikopo': typeof UongoziMikopoRoute
+  '/uongozi/ripoti': typeof UongoziRipotiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,6 +239,8 @@ export interface FileRouteTypes {
     | '/wasifu'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
+    | '/uongozi/mikopo'
+    | '/uongozi/ripoti'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -243,6 +263,8 @@ export interface FileRouteTypes {
     | '/wasifu'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
+    | '/uongozi/mikopo'
+    | '/uongozi/ripoti'
   id:
     | '__root__'
     | '/'
@@ -265,6 +287,8 @@ export interface FileRouteTypes {
     | '/wasifu'
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
+    | '/uongozi/mikopo'
+    | '/uongozi/ripoti'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -288,6 +312,8 @@ export interface RootRouteChildren {
   WasifuRoute: typeof WasifuRoute
   WekaNenosiriRoute: typeof WekaNenosiriRoute
   UkaguziMkopoLoanIdRoute: typeof UkaguziMkopoLoanIdRoute
+  UongoziMikopoRoute: typeof UongoziMikopoRoute
+  UongoziRipotiRoute: typeof UongoziRipotiRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -425,6 +451,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/uongozi/ripoti': {
+      id: '/uongozi/ripoti'
+      path: '/uongozi/ripoti'
+      fullPath: '/uongozi/ripoti'
+      preLoaderRoute: typeof UongoziRipotiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/uongozi/mikopo': {
+      id: '/uongozi/mikopo'
+      path: '/uongozi/mikopo'
+      fullPath: '/uongozi/mikopo'
+      preLoaderRoute: typeof UongoziMikopoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ukaguzi-mkopo/$loanId': {
       id: '/ukaguzi-mkopo/$loanId'
       path: '/ukaguzi-mkopo/$loanId'
@@ -456,6 +496,8 @@ const rootRouteChildren: RootRouteChildren = {
   WasifuRoute: WasifuRoute,
   WekaNenosiriRoute: WekaNenosiriRoute,
   UkaguziMkopoLoanIdRoute: UkaguziMkopoLoanIdRoute,
+  UongoziMikopoRoute: UongoziMikopoRoute,
+  UongoziRipotiRoute: UongoziRipotiRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

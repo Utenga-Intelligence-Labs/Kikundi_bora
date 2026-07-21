@@ -755,14 +755,24 @@ function CreateEventForm({ onClose }: { onClose: () => void }) {
   const handleSubmit = async () => {
     if (!f.memberId || !f.eventType || !f.description || !f.amount || !f.fundingSource) return;
 
+    // Set default amounts based on funding source
+    let treasuryAmount = Number(f.treasuryAmount) || 0;
+    let memberAmount = Number(f.memberAmount) || 0;
+    
+    if (f.fundingSource === "TREASURY" && treasuryAmount === 0) {
+      treasuryAmount = Number(f.amount);
+    } else if (f.fundingSource === "MEMBER_CONTRIBUTION" && memberAmount === 0) {
+      memberAmount = Number(f.amount);
+    }
+
     const data: CreateWelfareEventRequest = {
       member_id: f.memberId,
       event_type: f.eventType as WelfareEventType,
       description: f.description,
       amount_requested: Number(f.amount),
       funding_source: f.fundingSource as WelfareFundingSource,
-      treasury_amount: Number(f.treasuryAmount) || 0,
-      member_amount: Number(f.memberAmount) || 0,
+      treasury_amount: treasuryAmount,
+      member_amount: memberAmount,
     };
 
     try {

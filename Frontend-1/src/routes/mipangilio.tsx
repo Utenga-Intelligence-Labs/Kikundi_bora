@@ -46,9 +46,21 @@ export const Route = createFileRoute("/mipangilio")({
 });
 
 function MipangilioPage() {
-  const { user } = useAuth();
+  const { user, isLeadership } = useAuth();
   const isChair = user?.role === "chair";
   const isAdmin = user?.role === "admin";
+
+  // Restrict to leadership only (Mwenyekiti, Mweka Hazina, Katibu)
+  if (!isLeadership && !isAdmin) {
+    return (
+      <AppShell title="Mipangilio">
+        <div className="card-surface p-12 text-center">
+          <p className="text-muted-foreground">Huna ruhusa ya kufikia ukurasa huu</p>
+          <p className="text-sm text-muted-foreground mt-2">Mipangilio inapatikana kwa viongozi pekee</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   const [mchango, setMchango] = useState(() => {
     if (typeof window !== "undefined") {
