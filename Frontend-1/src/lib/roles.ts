@@ -11,14 +11,18 @@ export interface NavItem {
 // Member navigation (all members see this)
 export const memberNav: NavItem[] = [
   { to: "/dashibodi", label: "Dashboard Yangu", icon: Home },
-  { to: "/michango", label: "Akiba Yangu", icon: PiggyBank },
-  { to: "/mikopo", label: "Omba Mkopo", icon: Banknote },
-  { to: "/marejesho", label: "Historia Yangu", icon: Receipt },
+  { to: "/michango-yangu", label: "Michango Yangu", icon: PiggyBank },
+  { to: "/weka-mchango", label: "Weka Mchango", icon: Banknote },
+  { to: "/mikopo", label: "Mikopo Yangu", icon: Banknote },
+  { to: "/historia-yangu", label: "Historia Yangu", icon: Receipt },
   { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
 ];
 
 // Leadership navigation (only for users with leadership roles)
 export const leadershipNav: NavItem[] = [
+  { to: "/michango", label: "Pokea Michango", icon: PiggyBank },
+  { to: "/michango-inayosubiri", label: "Inayosubiri", icon: ClipboardList },
+  { to: "/marejesho", label: "Pokea Marejesho", icon: Receipt },
   { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },

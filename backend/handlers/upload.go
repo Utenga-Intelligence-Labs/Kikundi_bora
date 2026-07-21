@@ -185,7 +185,7 @@ func (h *UploadHandler) UploadDoc(c *fiber.Ctx) error {
 	}
 
 	category := c.FormValue("category", "docs")
-	if category != "docs" && category != "reports" {
+	if category != "docs" && category != "reports" && category != "contributions" {
 		category = "docs"
 	}
 

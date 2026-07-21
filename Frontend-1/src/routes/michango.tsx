@@ -6,7 +6,7 @@ import { useMembers } from "@/hooks/use-members";
 import { Field } from "@/components/Field";
 import { tzs, mwezi } from "@/lib/format";
 import { useAuth } from "@/lib/auth-provider";
-import { blockAdminFromPage, hasRole, requireAuth } from "@/lib/role-guards";
+import { blockAdminFromPage, hasRole, requireAuth, requireRole } from "@/lib/role-guards";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, X, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -20,6 +20,7 @@ export const Route = createFileRoute("/michango")({
   }),
   beforeLoad: () => {
     requireAuth();
+    requireRole("chair", "treasurer", "secretary");
     blockAdminFromPage();
   },
   component: MichangoPage,

@@ -84,6 +84,16 @@ function MichangoYanguPage() {
                     <p className="text-xs text-muted-foreground mt-1">
                       Tarehe: {new Date(contrib.created_at).toLocaleDateString("sw-TZ")}
                     </p>
+                    {contrib.proof_image_url && (
+                      <div className="mt-3">
+                        <p className="text-xs text-muted-foreground mb-1">Picha ya Uthibitisho:</p>
+                        <img
+                          src={contrib.proof_image_url}
+                          alt="Uthibitisho"
+                          className="max-h-48 rounded-lg border object-contain"
+                        />
+                      </div>
+                    )}
                     {contrib.proof_message && (
                       <div className="mt-3 p-3 bg-muted/50 rounded-lg">
                         <p className="text-xs text-muted-foreground mb-1">Ujumbe wa Muamala:</p>
