@@ -39,7 +39,7 @@ function Dashibodi() {
       {jukumu === "Mwenyekiti" && <ChairmanView />}
       {jukumu === "Mweka Hazina" && <TreasurerView />}
       {jukumu === "Katibu" && <SecretaryView />}
-      {jukumu === "Mwanachama" && <MemberView userId={user.id} userName={user.name} />}
+      {jukumu === "Mwanachama" && <MemberView userId={user.id} userName={user.name} memberId={user.member_id || null} memberCode={user.member_code || null} userPhone={user.phone} />}
       {jukumu === "Msimamizi" && <AdminView />}
     </AppShell>
   );
@@ -169,25 +169,23 @@ function SecretaryView() {
 }
 
 // ---------- MWANACHAMA ----------
-function MemberView({ userId, userName }: { userId: string; userName: string }) {
-  const { data: membersData, isLoading: membersLoading } = useMembers({ page: 1, limit: 1, user_id: userId });
-  const members = membersData?.data ?? [];
-  const me = members[0] ?? null;
-  const memberId = me?.id;
+function MemberView({ userId, userName, memberId, memberCode, userPhone }: { userId: string; userName: string; memberId: string | null; memberCode: string | null; userPhone: string }) {
+  const me = memberId ? { id: memberId, member_no: memberCode, phone: userPhone } : null;
+  const memberIdVal = me?.id;
 
   // Personal totals only — never show group dashboard as "Akiba Yangu"
   const { data: contribsData, isLoading: contribsLoading } = useContributions({
-    member_id: memberId,
+    member_id: memberIdVal,
     limit: 200,
-    enabled: !!memberId,
+    enabled: !!memberIdVal,
   });
   const { data: loansData, isLoading: loansLoading } = useLoans({
-    member_id: memberId,
+    member_id: memberIdVal,
     limit: 200,
-    enabled: !!memberId,
+    enabled: !!memberIdVal,
   });
 
-  if (membersLoading || (!!memberId && (contribsLoading || loansLoading))) {
+  if (!!memberIdVal && (contribsLoading || loansLoading)) {
     return <LoadingSkeleton />;
   }
 
@@ -226,8 +224,8 @@ function MemberView({ userId, userName }: { userId: string; userName: string }) 
         <div className="card-surface flex items-center gap-3 p-4">
           <CheckCircle2 className="h-8 w-8 text-success" />
           <div>
-            <p className="text-sm font-semibold">Mwanachama #{me.member_no}</p>
-            <p className="text-xs text-muted-foreground">Tangu {me.joined_at}</p>
+            <p className="text-sm font-semibold">{me.member_no ? `Mwanachama #${me.member_no}` : `Mwanachama #${me.id?.slice(0, 8)}`}</p>
+            <p className="text-xs text-muted-foreground">Namba ya simu: {me.phone}</p>
           </div>
         </div>
         <div className="card-surface p-4">

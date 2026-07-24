@@ -32,6 +32,16 @@ type Loan struct {
 	DisbursedAt      *time.Time  `json:"disbursed_at,omitempty"`
 	UpdatedAt        time.Time   `gorm:"autoUpdateTime" json:"updated_at"`
 
+	// Sequential approval — Hazina → Katibu → Bodi Member → Mwenyekiti (in order)
+	HazinaApprovedBy     *string    `gorm:"type:uuid" json:"hazina_approved_by,omitempty"`
+	HazinaApprovedAt     *time.Time `json:"hazina_approved_at,omitempty"`
+	KatibuApprovedBy     *string    `gorm:"type:uuid" json:"katibu_approved_by,omitempty"`
+	KatibuApprovedAt     *time.Time `json:"katibu_approved_at,omitempty"`
+	BodiApprovedBy       *string    `gorm:"type:uuid" json:"bodi_approved_by,omitempty"`
+	BodiApprovedAt       *time.Time `json:"bodi_approved_at,omitempty"`
+	MwenyekitiApprovedBy *string    `gorm:"type:uuid" json:"mwenyekiti_approved_by,omitempty"`
+	MwenyekitiApprovedAt *time.Time `json:"mwenyekiti_approved_at,omitempty"`
+
 	Member    *Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
 	Reviewer  *User   `gorm:"foreignKey:ReviewedBy" json:"reviewer,omitempty"`
 	Disburser *User   `gorm:"foreignKey:DisbursedBy" json:"disburser,omitempty"`

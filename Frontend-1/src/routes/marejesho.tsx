@@ -3,40 +3,37 @@ import { useState, useEffect } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useRepayments, useRecordRepayment } from "@/hooks/use-repayments";
 import { useLoans } from "@/hooks/use-loans";
+import { useAuth } from "@/lib/auth-provider";
 import { Field } from "@/components/Field";
 import { tzs, tarehe } from "@/lib/format";
 import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, X, Receipt, Loader2, Wallet } from "lucide-react";
+import { Plus, X, Receipt, Loader2, Wallet, MessageSquare } from "lucide-react";
 
 export const Route = createFileRoute("/marejesho")({
-  head: () => ({
-    meta: [
-      { title: "Marejesho — Money Seeking" },
-      { name: "description", content: "Pokea na fuatilia marejesho ya mikopo." },
-    ],
-  }),
-  beforeLoad: () => {
-    requireAuth();
-    blockAdminFromPage();
-  },
+  beforeLoad: () => { requireAuth(); blockAdminFromPage(); },
   component: MarejeshoPage,
 });
 
 function MarejeshoPage() {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const isHazina = user?.role === "treasurer";
+
   const { data: repaymentsData, isLoading, error, refetch } = useRepayments({ limit: 200 });
   const repayments = repaymentsData?.data ?? [];
   const jumla = repayments.reduce((s, r) => s + r.amount, 0);
 
   return (
     <AppShell
-      title="Marejesho"
-      subtitle="Pokea malipo ya mikopo"
+      title="Taarifa Za Marejesho"
+      subtitle={isHazina ? "Pokea na thibitisha malipo ya mikopo" : "Angalia taarifa za marejesho ya wanachama"}
       action={
-        <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground">
-          <Plus className="h-4 w-4" /> Pokea
-        </button>
+        isHazina && (
+          <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground">
+            <Plus className="h-4 w-4" /> Pokea
+          </button>
+        )
       }
     >
       <div className="card-surface p-5">
@@ -50,10 +47,7 @@ function MarejeshoPage() {
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="card-surface flex items-center gap-3 p-3.5">
               <Skeleton className="h-9 w-9 shrink-0 rounded-xl" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-3 w-28" />
-              </div>
+              <div className="flex-1 space-y-1.5"><Skeleton className="h-4 w-40" /><Skeleton className="h-3 w-28" /></div>
               <Skeleton className="h-4 w-20" />
             </div>
           ))}
@@ -81,6 +75,11 @@ function MarejeshoPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{r.member?.full_name ?? `Mwanachama #${r.member_id}`}</p>
                   <p className="text-xs text-muted-foreground">{tarehe(r.paid_at)} · Salio: {tzs(r.balance_after)}</p>
+                  {r.notes && (
+                    <p className="text-xs text-muted-foreground/70 mt-0.5 flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" /> {r.notes}
+                    </p>
+                  )}
                 </div>
                 <p className="shrink-0 text-sm font-semibold text-success">+{tzs(r.amount)}</p>
               </div>
@@ -90,7 +89,7 @@ function MarejeshoPage() {
         </>
       )}
 
-      {open && <Form onClose={() => setOpen(false)} />}
+      {open && isHazina && <Form onClose={() => setOpen(false)} />}
     </AppShell>
   );
 }
@@ -101,35 +100,24 @@ function Form({ onClose }: { onClose: () => void }) {
   const openLoans = loansData?.data ?? [];
 
   const [loanId, setLoanId] = useState("");
-  useEffect(() => {
-    if (!loanId && openLoans[0]?.id) {
-      setLoanId(String(openLoans[0].id));
-    }
-  }, [openLoans]);
+  useEffect(() => { if (!loanId && openLoans[0]?.id) setLoanId(String(openLoans[0].id)); }, [openLoans]);
   const selectedLoan = openLoans.find((l) => String(l.id) === loanId);
   const bal = selectedLoan?.balance_remaining ?? 0;
 
-  const [f, setF] = useState({ kiasi: "", tarehe: new Date().toISOString().slice(0, 10) });
+  const [f, setF] = useState({ kiasi: "", tarehe: new Date().toISOString().slice(0, 10), maelezo: "" });
   const kiasiN = Number(f.kiasi);
   const valid = !isNaN(kiasiN) && isFinite(kiasiN) && kiasiN > 0;
   const tooMuch = valid && kiasiN > bal;
   const [submitErr, setSubmitErr] = useState<string | null>(null);
 
-  const resetForm = () => {
-    setF({ kiasi: "", tarehe: new Date().toISOString().slice(0, 10) });
-    setSubmitErr(null);
-    onClose();
-  };
+  const resetForm = () => { setF({ kiasi: "", tarehe: new Date().toISOString().slice(0, 10), maelezo: "" }); setSubmitErr(null); onClose(); };
 
   const handleSubmit = async () => {
     if (!loanId || !valid) return;
     setSubmitErr(null);
     try {
       await recordRepayment.mutateAsync({
-        loan_id: loanId,
-        amount: kiasiN,
-        paid_at: f.tarehe,
-        payment_method: "CASH",
+        loan_id: loanId, amount: kiasiN, paid_at: f.tarehe, payment_method: "CASH", notes: f.maelezo || undefined,
       });
       resetForm();
     } catch (e: unknown) {
@@ -156,24 +144,28 @@ function Form({ onClose }: { onClose: () => void }) {
               <span className="mb-1 block text-xs font-medium text-muted-foreground">Mkopo</span>
               <select value={loanId} onChange={(e) => { setLoanId(e.target.value); setSubmitErr(null); }} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm">
                 {openLoans.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.member?.full_name ?? `Mkopo #${l.id}`} · Salio: {tzs(l.balance_remaining ?? 0)}
-                  </option>
+                  <option key={l.id} value={l.id}>{l.member?.full_name ?? `Mkopo #${l.id}`} · Salio: {tzs(l.balance_remaining ?? 0)}</option>
                 ))}
               </select>
             </label>
             <div className="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-muted p-3 text-xs">
-              <div>
-                <p className="text-muted-foreground">Salio la mkopo</p>
-                <p className="font-semibold">{tzs(bal)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Mwisho</p>
-                <p className="font-semibold">{selectedLoan ? tarehe(selectedLoan.due_date) : "—"}</p>
-              </div>
+              <div><p className="text-muted-foreground">Salio la mkopo</p><p className="font-semibold">{tzs(bal)}</p></div>
+              <div><p className="text-muted-foreground">Mwisho</p><p className="font-semibold">{selectedLoan ? tarehe(selectedLoan.due_date) : "—"}</p></div>
             </div>
             <div className="mt-3"><Field label="Kiasi cha malipo (TZS)" value={f.kiasi} onChange={(v) => { setF({ ...f, kiasi: v }); setSubmitErr(null); }} type="number" /></div>
             <div className="mt-3"><Field label="Tarehe ya malipo" value={f.tarehe} onChange={(v) => setF({ ...f, tarehe: v })} type="date" /></div>
+            <div className="mt-3">
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">Maelezo / Comment</span>
+                <textarea
+                  value={f.maelezo}
+                  onChange={(e) => setF({ ...f, maelezo: e.target.value })}
+                  placeholder="Andika maelezo ya malipo haya..."
+                  rows={2}
+                  className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary"
+                />
+              </label>
+            </div>
             {tooMuch && <p className="mt-2 text-xs text-destructive">Kiasi kinazidi salio la mkopo ({tzs(bal)}).</p>}
             <button
               disabled={!loanId || !valid || tooMuch || recordRepayment.isPending}

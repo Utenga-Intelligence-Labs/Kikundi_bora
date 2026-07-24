@@ -16,17 +16,17 @@ export const memberNav: NavItem[] = [
   { to: "/mikopo", label: "Mikopo Yangu", icon: Banknote },
   { to: "/historia-yangu", label: "Historia Yangu", icon: Receipt },
   { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
-  { to: "/arifa", label: "Arifa", icon: Bell },
 ];
 
 // Leadership navigation (only for users with leadership roles)
-export const leadershipNav: NavItem[] = [
+// Each item can specify required roles — if omitted, all leadership roles see it.
+export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] = [
   { to: "/michango", label: "Pokea Michango", icon: PiggyBank },
-  { to: "/michango-inayosubiri", label: "Inayosubiri", icon: ClipboardList },
-  { to: "/marejesho", label: "Pokea Marejesho", icon: Receipt },
+  { to: "/michango-inayosubiri", label: "Taarifa za Wanaosubiri", icon: ClipboardList },
+  { to: "/marejesho", label: "Taarifa Za Marejesho", icon: Receipt },
   { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
-  { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck },
+  { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },
 ];
 
@@ -48,7 +48,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/kamati-mikopo", label: "Kamati ya Mikopo", icon: UserPlus },
     { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
     { to: "/michango", label: "Pokea Michango", icon: PiggyBank },
-    { to: "/marejesho", label: "Pokea Marejesho", icon: Receipt },
+  { to: "/marejesho", label: "Taarifa Za Marejesho", icon: Receipt },
     { to: "/mikopo", label: "Mikopo", icon: Wallet },
     { to: "/wanachama", label: "Wanachama", icon: Users },
     { to: "/ripoti", label: "Ripoti za Fedha", icon: FileBarChart2 },
@@ -85,12 +85,20 @@ export function getDualPlaneNav(
 ): { member: NavItem[]; leadership: NavItem[] } {
   const member = [...memberNav];
   
-  // Inject committee item for ordinary committee members
+  // Filter leadership nav based on user's actual leadership roles
+  const leadershipItems: NavItem[] = leadership.length > 0
+    ? leadershipNav.filter((item) => {
+        if (!item.requiredRoles) return true;
+        return item.requiredRoles.some((r) => leadership.includes(r));
+      }).map(({ to, label, icon }) => ({ to, label, icon }))
+    : [];
+  
+  // Inject committee + bodi items for ordinary committee members
   if (jukumu === "Mwanachama" && isCommitteeMember) {
     member.push({ to: "/kamati-mikopo", label: "Kamati ya Mikopo", icon: UserPlus });
+    // Bodi ya Mikopo member: show Idhinisha Mikopo in leadership section
+    leadershipItems.push({ to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck });
   }
-  
-  const leadershipItems = leadership.length > 0 ? [...leadershipNav] : [];
   
   return { member, leadership: leadershipItems };
 }

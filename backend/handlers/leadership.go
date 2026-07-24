@@ -10,6 +10,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type LeadershipHandler struct{}
@@ -106,12 +107,124 @@ func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 	})
 }
 
-// ApproveLoan delegates to loan approval logic (same as POST /loans/:id/approve).
+// ApproveLoan handles sequential loan approval: Hazina → Katibu → Mwenyekiti.
 // POST /api/v1/uongozi/mikopo/:id/approve
 func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
-	// Reuse existing loan handler
-	loanHandler := NewLoanHandler()
-	return loanHandler.Approve(c)
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
+	var req struct {
+		ApprovedAmount float64 `json:"approved_amount"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+
+	tx := database.DB.Begin()
+
+	var loan models.Loan
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&loan, "id = ?", id).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
+	}
+
+	if loan.Status != models.LoanPending {
+		tx.Rollback()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mkopo huu hauwezi kuidhinishwa. Hali yake: " + string(loan.Status)})
+	}
+
+	now := time.Now()
+
+	// Enforce sequential order: Hazina → Katibu → Bodi Member → Mwenyekiti
+	switch role {
+	case models.RoleTreasurer:
+		if loan.HazinaApprovedAt != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina tayari ameidhinisha mkopo huu"})
+		}
+		loan.HazinaApprovedBy = &userID
+		loan.HazinaApprovedAt = &now
+
+	case models.RoleSecretary:
+		if loan.HazinaApprovedAt == nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina lazima aidhinishe kwanza kabla ya Katibu"})
+		}
+		if loan.KatibuApprovedAt != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Katibu tayari ameidhinisha mkopo huu"})
+		}
+		loan.KatibuApprovedBy = &userID
+		loan.KatibuApprovedAt = &now
+
+	case models.RoleChair:
+		if loan.HazinaApprovedAt == nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina lazima aidhinishe kwanza kabla ya Mwenyekiti"})
+		}
+		if loan.KatibuApprovedAt == nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Katibu lazima aidhinishe kwanza kabla ya Mwenyekiti"})
+		}
+		if loan.BodiApprovedAt == nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Bodi ya mikopo lazima iidhinishe kwanza kabla ya Mwenyekiti"})
+		}
+		if loan.MwenyekitiApprovedAt != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mwenyekiti tayari ameidhinisha mkopo huu"})
+		}
+		loan.MwenyekitiApprovedBy = &userID
+		loan.MwenyekitiApprovedAt = &now
+
+		// Final approval: all four have approved
+		loan.Status = models.LoanApproved
+		loan.ApprovedAmount = &loan.Amount
+		if req.ApprovedAmount > 0 {
+			loan.ApprovedAmount = &req.ApprovedAmount
+		}
+		loan.ReviewedBy = &userID
+		loan.ReviewedAt = &now
+
+	default:
+		// Bodi member (appointed committee member) — must come after Katibu and before Mwenyekiti
+		var isCommittee bool
+		database.DB.Model(&models.LoanCommitteeMember{}).
+			Where("user_id = ? AND is_active = TRUE", userID).
+			Select("1").Scan(&isCommittee)
+		if !isCommittee {
+			tx.Rollback()
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Huna ruhusa ya kuidhinisha mkopo"})
+		}
+		if loan.HazinaApprovedAt == nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina lazima aidhinishe kwanza"})
+		}
+		if loan.KatibuApprovedAt == nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Katibu lazima aidhinishe kwanza"})
+		}
+		if loan.BodiApprovedAt != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Bodi tayari imeidhinisha mkopo huu"})
+		}
+		loan.BodiApprovedBy = &userID
+		loan.BodiApprovedAt = &now
+	}
+
+	if err := tx.Save(&loan).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	tx.Commit()
+
+	services.LogAudit(c, &userID, models.AuditLoanReview, "loans", &loan.ID, nil, map[string]interface{}{
+		"status": string(loan.Status), "role": string(role),
+	})
+
+	return c.JSON(fiber.Map{"message": "Mkopo umeidhinishwa", "data": loan})
 }
 
 // Reports returns leadership reports (delegates to report handler).

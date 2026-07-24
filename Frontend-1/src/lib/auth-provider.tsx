@@ -61,7 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: (data: LoginRequest) => authApi.login(data),
     onSuccess: (res) => {
       tokenStorage.set(res.token);
-      qc.setQueryData(["auth", "me"], res.user);
+      // Invalidate to force a fresh /me fetch (includes leadership, member_id)
+      qc.invalidateQueries({ queryKey: ["auth", "me"] });
     },
   });
 
@@ -69,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutationFn: (data: RegisterRequest) => authApi.register(data),
     onSuccess: (res) => {
       tokenStorage.set(res.token);
-      qc.setQueryData(["auth", "me"], res.user);
+      qc.invalidateQueries({ queryKey: ["auth", "me"] });
     },
   });
 

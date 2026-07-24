@@ -304,3 +304,63 @@ func (h *MemberContributionHandler) Reject(c *fiber.Ctx) error {
 		"data":    contribution,
 	})
 }
+
+// MembersSummary returns all active members with their latest contribution status.
+// Used by Mwenyekiti/Katibu (read-only) and Hazina (with approve/decline actions).
+// GET /api/v1/michango/members-summary
+func (h *MemberContributionHandler) MembersSummary(c *fiber.Ctx) error {
+	type MemberRow struct {
+		MemberID    string  `json:"member_id"`
+		FullName    string  `json:"full_name"`
+		MemberNo    string  `json:"member_no"`
+		Phone       string  `json:"phone"`
+		Status      string  `json:"status"` // PENDING_VERIFICATION / CONFIRMED / REJECTED / HAJACHANGIA
+		Amount      float64 `json:"amount"`
+		PeriodLabel string  `json:"period_label"`
+		ContributionType string `json:"contribution_type"`
+		ContributionID   string `json:"contribution_id"`
+		ProofImageURL    string `json:"proof_image_url"`
+		ProofMessage     string `json:"proof_message"`
+		SubmittedAt      string `json:"submitted_at"`
+	}
+
+	var rows []MemberRow
+
+	// Left join: all active members with their latest contribution
+	database.DB.Raw(`
+		SELECT
+			m.id AS member_id,
+			m.full_name,
+			m.member_no,
+			m.phone,
+			COALESCE(mc.status, 'HAJACHANGIA') AS status,
+			COALESCE(mc.amount, 0) AS amount,
+			COALESCE(mc.period_label, '') AS period_label,
+			COALESCE(mc.contribution_type, '') AS contribution_type,
+			COALESCE(mc.id::text, '') AS contribution_id,
+			COALESCE(mc.proof_image_url, '') AS proof_image_url,
+			COALESCE(mc.proof_message, '') AS proof_message,
+			COALESCE(to_char(mc.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '') AS submitted_at
+		FROM members m
+		LEFT JOIN LATERAL (
+			SELECT * FROM member_contributions
+			WHERE member_id = m.id AND deleted_at IS NULL
+			ORDER BY created_at DESC LIMIT 1
+		) mc ON TRUE
+		WHERE m.deleted_at IS NULL AND m.is_active = TRUE
+		ORDER BY
+			CASE COALESCE(mc.status, 'HAJACHANGIA')
+				WHEN 'PENDING_VERIFICATION' THEN 1
+				WHEN 'HAJACHANGIA' THEN 2
+				WHEN 'CONFIRMED' THEN 3
+				WHEN 'REJECTED' THEN 4
+				ELSE 5
+			END,
+			m.full_name ASC
+	`).Scan(&rows)
+
+	return c.JSON(fiber.Map{
+		"data":  rows,
+		"total": len(rows),
+	})
+}

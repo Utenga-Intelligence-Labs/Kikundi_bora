@@ -27,7 +27,8 @@ function getNavSecondary(isLeadership: boolean) {
 }
 
 function isActive(pathname: string, to: string) {
-  return to === "/" ? pathname === "/" : pathname.startsWith(to);
+  if (to === "/") return pathname === "/";
+  return pathname === to || pathname.startsWith(to + "/");
 }
 
 
