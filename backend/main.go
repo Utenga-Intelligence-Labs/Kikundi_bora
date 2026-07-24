@@ -28,6 +28,9 @@ func main() {
 	database.Connect()
 	services.InitEmail()
 
+	// Ensure leadership positions exist on every startup (idempotent)
+	database.EnsureLeadershipSetup()
+
 	if *migrateFlag {
 		database.AutoMigrate()
 		database.Seed()
