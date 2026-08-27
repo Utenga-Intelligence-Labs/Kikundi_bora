@@ -13,18 +13,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var (
+	dsnEnv    = os.Getenv("LEDGER_TEST_DSN")
+	resetOnce sync.Once
+)
+
 // testPool connects to a real PostgreSQL for store-level tests.
 // Set LEDGER_TEST_DSN (e.g.
 //   postgres://kikundi:kikundi_secret_2024@127.0.0.1:5434/kikundi_db)
 // to enable; tests skip otherwise.
+//
+// Set LEDGER_TEST_RESET=1 to truncate all ledger_* tables on first use
+// (removes residue from prior runs/buggy-era schemas; tests generate
+// uniquely-named groups, so a shared database is never corrupted).
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	dsn := os.Getenv("LEDGER_TEST_DSN")
-	if dsn == "" {
+	if dsnEnv == "" {
 		t.Skip("LEDGER_TEST_DSN not set; skipping ledger DB tests")
 	}
+	resetOnce.Do(resetLedgerTables)
+
 	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dsn)
+	pool, err := pgxpool.New(ctx, dsnEnv)
 	if err != nil {
 		t.Fatalf("connect: %v", err)
 	}
@@ -40,6 +50,27 @@ func testPool(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 	return pool
+}
+
+// resetLedgerTables clears all ledger data (guarded trigger temporarily
+// disabled, restored immediately). Only runs when LEDGER_TEST_RESET=1.
+func resetLedgerTables() {
+	if os.Getenv("LEDGER_TEST_RESET") != "1" {
+		return
+	}
+	pool0, err := pgxpool.New(context.Background(), dsnEnv)
+	if err != nil {
+		return // table may not exist yet; Migrate will create fresh ones
+	}
+	defer pool0.Close()
+	ctx := context.Background()
+	_, _ = pool0.Exec(ctx, `
+	    TRUNCATE ledger_statement_lines, ledger_trial_balance,
+	             ledger_account_balances, ledger_accounts;
+	    ALTER TABLE ledger_events DISABLE TRIGGER trg_ledger_events_immutable;
+	    DELETE FROM ledger_events;
+	    ALTER TABLE ledger_events ENABLE TRIGGER trg_ledger_events_immutable;
+	    DELETE FROM ledger_groups WHERE name LIKE 'test-group-%';`)
 }
 
 // testGroup creates a uniquely-named group scope for a test.
