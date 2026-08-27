@@ -12,16 +12,20 @@ import (
 	"kikundibora/config"
 	"kikundibora/database"
 	"kikundibora/handlers"
+	"kikundibora/ledger"
 	"kikundibora/middleware"
 	"kikundibora/models"
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 func main() {
 	migrateFlag := flag.Bool("migrate", false, "Run database migration and seed, then exit")
 	seedFlag := flag.Bool("seed", false, "Run seed only (no table drop), then exit")
+	replayLedgerFlag := flag.String("replay-ledger", "", "Rebuild ledger projections from the event log: '' skip, 'group' this group's scope, 'all' every group")
+	serveFlag := flag.Bool("serve", true, "Start the HTTP server (set -serve=false with -replay-ledger for CLI-style runs)")
 	flag.Parse()
 
 	config.Load()
@@ -42,6 +46,35 @@ func main() {
 		database.Seed()
 		log.Println("Seed complete. Exiting.")
 		os.Exit(0)
+	}
+
+	// ---- Ledger core (event-sourced, append-only) -------------------------
+	lg, ledgerGroupID := ledgerInit()
+
+	// Replay / rebuild-projections operation (spec §4, §6 op 7).
+	//   ./server -replay-ledger=group -serve=false
+	//   ./server -replay-ledger=all -serve=false
+	if *replayLedgerFlag != "" {
+		ctx := context.Background()
+		var scope *uuid.UUID
+		switch *replayLedgerFlag {
+		case "group":
+			scope = ledgerGroupID
+		case "all":
+			// nil scope = whole store
+		default:
+			log.Fatalf("FATAL: unknown -replay-ledger scope %q (use 'group' or 'all')", *replayLedgerFlag)
+		}
+		start := time.Now()
+		if err := lg.RebuildProjections(ctx, scope); err != nil {
+			log.Fatalf("FATAL: ledger replay failed: %v", err)
+		}
+		log.Printf("Ledger projections rebuilt in %s", time.Since(start))
+		if !*serveFlag {
+			database.ClosePgx()
+			return
+		}
+		log.Println("Continuing to serve.")
 	}
 
 	app := fiber.New(fiber.Config{
@@ -82,6 +115,7 @@ func main() {
 	memberContribHandler := handlers.NewMemberContributionHandler()
 	announcementHandler := handlers.NewAnnouncementHandler()
 	importHandler := handlers.NewImportHandler()
+	ledgerHandler := handlers.NewLedgerHandler(lg, *ledgerGroupID)
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
@@ -211,6 +245,18 @@ func main() {
 	admin.Post("/backup/settings", backupHandler.SaveBackupSettings)
 	admin.Get("/backup/download/:id", backupHandler.DownloadBackup)
 
+	// Ledger / accounting core routes (treasurer + admin) — event-sourced,
+	// append-only; every write attributes to the session user.
+	ledgerRoutes := protected.Group("/admin/ledger")
+	ledgerRoutes.Use(middleware.RequireRoles(models.RoleTreasurer, models.RoleAdmin))
+	ledgerRoutes.Post("/accounts", ledgerHandler.OpenAccount)
+	ledgerRoutes.Post("/transactions", ledgerHandler.RecordTransaction)
+	ledgerRoutes.Post("/transactions/:id/reverse", ledgerHandler.ReverseTransaction)
+	ledgerRoutes.Get("/balance", ledgerHandler.GetBalance)
+	ledgerRoutes.Get("/statement", ledgerHandler.GetStatement)
+	ledgerRoutes.Get("/trial-balance", ledgerHandler.GetTrialBalance)
+	ledgerRoutes.Post("/replay", ledgerHandler.Replay)
+
 	// Reports routes (Chair only)
 	reports := protected.Group("/reports")
 	reports.Use(middleware.RequireRoles(models.RoleChair))
@@ -279,4 +325,32 @@ func errorHandler(c *fiber.Ctx, err error) error {
 		message = err.Error()
 	}
 	return c.Status(code).JSON(fiber.Map{"message": message})
+}
+
+// ledgerInit brings up the raw-SQL pool, the ledger schema and this
+// deployment's group scope, returning a ready-to-use Ledger. Fatal on failure.
+func ledgerInit() (*ledger.Ledger, *uuid.UUID) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	pool, err := database.ConnectPgx(ctx)
+	if err != nil {
+		log.Fatalf("FATAL: ledger pool: %v", err)
+	}
+	if err := ledger.Migrate(ctx, pool); err != nil {
+		log.Fatalf("FATAL: ledger migrate: %v", err)
+	}
+	groupName := os.Getenv("LEDGER_GROUP_NAME")
+	if groupName == "" {
+		groupName = "kikundi-main"
+	}
+	gid, err := ledger.CreateGroup(ctx, pool, groupName, ledger.CurrencyTZS)
+	if err != nil {
+		log.Fatalf("FATAL: ensure ledger group %q: %v", groupName, err)
+	}
+	lg, err := ledger.New(pool)
+	if err != nil {
+		log.Fatalf("FATAL: ledger init: %v", err)
+	}
+	return lg, &gid
 }
