@@ -66,7 +66,8 @@ type AccountOpenedPayload struct {
 
 // AccountClosedPayload accompanies EventAccountClosed.
 type AccountClosedPayload struct {
-	Reason string `json:"reason,omitempty"`
+	AccountName string `json:"account_name"`
+	Reason      string `json:"reason,omitempty"`
 }
 
 // EntryData is one leg of a transaction as persisted inside a payload.

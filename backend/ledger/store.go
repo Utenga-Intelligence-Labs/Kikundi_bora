@@ -149,3 +149,9 @@ func errorsAs(err error, target **pgconn.PgError) bool {
 	}
 	return false
 }
+
+// isUniqueViolation reports whether err is a Postgres unique-constraint error.
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errorsAs(err, &pgErr) && pgErr.Code == pgErrUniqueViolation
+}

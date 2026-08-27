@@ -19,17 +19,30 @@ func (d Direction) Opposite() Direction {
 	return Debit
 }
 
-// Signed returns +amount for a debit-positive account type on debit,
-// etc., per the normal-balance-side weighting used for reconciliation.
-func (d Direction) Signed(t AccountType, amount int64) int64 {
-	positive := amount
-	if d == Credit {
-		positive = -amount
+// Signed returns the contribution of a leg to the GLOBAL reconciliation
+// invariant: every debit leg counts +amount and every credit leg −amount,
+// INDEPENDENT of account type. Summing these over any valid transaction's
+// entries yields exactly zero, which is what the property test asserts.
+//
+// (Proof sketch: with normal-side weights w=+1 for {asset,expense} and w=−1
+// otherwise, and normalized deltas Ñ, the product w·ΔÑ collapses to +amt on
+// debits and −amt on credits for every type — the signs cancel.)
+func (d Direction) Signed(amountMinor int64) int64 {
+	if d == Debit {
+		return amountMinor
 	}
-	if t.DebitPositive() {
-		return positive
+	return -amountMinor
+}
+
+// NormalizedDelta returns a leg's contribution to an account's STORED
+// balance, which is expressed positive-on-normal-side: debit-positive types
+// (asset, expense) grow on debit; credit-positive types (liability, income,
+// equity) grow on credit.
+func NormalizedDelta(t AccountType, d Direction, amountMinor int64) int64 {
+	if (d == Debit) == t.DebitPositive() {
+		return amountMinor
 	}
-	return -positive
+	return -amountMinor
 }
 
 // Entry is one leg of a transaction in the domain model.
