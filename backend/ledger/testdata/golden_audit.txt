@@ -1,0 +1,16 @@
+# Kikundibora ledger audit export
+# currency: TZS (minor units == shillings)
+# fixture: open hazina_benki:nmb-audit/akiba_ya_mwanachama:m-5/mapato_ya_faini; deposit 30000; fine 1500; transfer 800;
+#          reverse deposit; correct redeposit 28000 at fixed UTC times
+
+== TRIAL BALANCE ==
+akiba_ya_mwanachama:m-5      liability debit=30000    credit=58000
+hazina_benki:nmb-audit       asset     debit=58800    credit=30000
+hazina_taslimu               asset     debit=1500     credit=800
+mapato_ya_faini              income    debit=0        credit=1500
+totals debit=90300 credit=90300 balanced=true
+
+== STATEMENT akiba_ya_mwanachama:m-5 [2024-06-01T08:00:00Z .. 2024-06-09T17:00:00Z] ==
+2024-06-02T09:00:00Z TransactionRecorded   credit  30000   memo="amana ya mwanachama"
+2024-06-05T09:00:00Z TransactionReversed   debit   30000   memo=""
+2024-06-06T09:00:00Z TransactionRecorded   credit  28000   memo="amana sahihi"
