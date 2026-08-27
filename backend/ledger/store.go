@@ -16,6 +16,12 @@ type Querier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+// RowsQuerier additionally supports multi-row queries (pool/tx-level).
+type RowsQuerier interface {
+	Querier
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
 // Store is the append-only PostgreSQL event store. It issues INSERT-only SQL
 // against the events table — no UPDATE or DELETE path exists anywhere in this
 // file (spec §2 invariant 1). Raw pgx, not GORM, deliberately.
