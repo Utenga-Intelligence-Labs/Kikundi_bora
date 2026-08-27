@@ -331,5 +331,109 @@ func dataToEntries(data []EntryData) []Entry {
 
 // DeterministicAccountID derives the stable account id for a group+name pair.
 func DeterministicAccountID(groupID uuid.UUID, name string) uuid.UUID {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(groupID.String() + "|" + name))
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(groupID.String()+"|"+name))
+}
+
+// ReverseTransaction emits a TransactionReversed event carrying MIRRORED
+// entries for the original transaction (spec §6 op 3). The original event is
+// never mutated or deleted; its net balance effect becomes zero once both
+// are projected (spec §7 requirement 5).
+//
+// causation_id links the reversal to the original event; correlation_id is
+// inherited from the original command so the whole business action stays
+// traceable end-to-end.
+func (l *Ledger) ReverseTransaction(
+	ctx context.Context,
+	groupID, actorID uuid.UUID,
+	transactionID uuid.UUID,
+	occurredAt time.Time,
+	reason string,
+) (uuid.UUID, error) {
+	tx, err := l.pool.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// 1. Locate the original TransactionRecorded event.
+	var (
+		origEnv     Envelope
+		origPayload []byte
+		origCorr    *uuid.UUID
+	)
+	err = tx.QueryRow(ctx,
+		`SELECT event_id, global_seq, payload, correlation_id
+		   FROM ledger_events
+		  WHERE stream_id=$1 AND event_type='TransactionRecorded'
+		  ORDER BY global_seq LIMIT 1`, transactionID,
+	).Scan(&origEnv.EventID, &origEnv.GlobalSeq, &origPayload, &origCorr)
+	switch {
+	case err == pgx.ErrNoRows:
+		return uuid.Nil, fmt.Errorf("%s: %w", transactionID, ErrTransactionNotFound)
+	case err != nil:
+		return uuid.Nil, err
+	}
+	var orig TransactionRecordedPayload
+	if err := json.Unmarshal(origPayload, &orig); err != nil {
+		return uuid.Nil, fmt.Errorf("decode original payload: %w", err)
+	}
+
+	// 2. Refuse double reversal.
+	var already bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS(
+		    SELECT 1 FROM ledger_events
+		     WHERE event_type='TransactionReversed'
+		       AND payload->>'original_event_id' = $1)`,
+		origEnv.EventID.String(),
+	).Scan(&already); err != nil {
+		return uuid.Nil, err
+	}
+	if already {
+		return uuid.Nil, fmt.Errorf("%s: %w", transactionID, ErrAlreadyReversed)
+	}
+
+	// 3. Mirror every leg (debits<->credits swap, amounts untouched).
+	mirrored := make([]EntryData, len(orig.Entries))
+	for i, e := range orig.Entries {
+		d := Direction(e.Direction)
+		mirrored[i] = EntryData{
+			AccountName: e.AccountName,
+			Direction:   d.Opposite(),
+			AmountMinor: e.AmountMinor,
+			Currency:    e.Currency,
+		}
+	}
+
+	payload, err := json.Marshal(TransactionReversedPayload{
+		OriginalEventID: origEnv.EventID,
+		Reason:          reason,
+		Entries:         mirrored,
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+	reversalID := uuid.New()
+	env, err := insertEvent(ctx, tx, NewEvent{
+		GroupID:       groupID,
+		StreamID:      reversalID,
+		EventType:     EventTransactionReversed,
+		Payload:       payload,
+		ActorID:       actorID,
+		OccurredAt:    occurredAt,
+		CausationID:   &origEnv.EventID,
+		CorrelationID: origCorr,
+	}, 1)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	// 4. Project through the shared path: balances shift by mirrored deltas.
+	if err := applyToProjections(ctx, tx, env); err != nil {
+		return uuid.Nil, fmt.Errorf("project TransactionReversed: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+	return env.EventID, nil
 }

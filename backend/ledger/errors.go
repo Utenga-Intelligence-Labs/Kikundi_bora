@@ -31,4 +31,9 @@ var (
 	ErrTrialBalanceNotZero = errors.New("ledger: trial balance does not net to zero (critical invariant violation)")
 	// ErrUnknownEventType means an unregistered event type was encountered during replay/projection.
 	ErrUnknownEventType = errors.New("ledger: unknown event type")
+	// ErrTransactionNotFound means no recorded transaction exists under that id.
+	ErrTransactionNotFound = errors.New("ledger: transaction not found")
+	// ErrAlreadyReversed means this transaction has already been reversed;
+	// double reversal is refused (reverse twice == original re-applied).
+	ErrAlreadyReversed = errors.New("ledger: transaction already reversed")
 )
