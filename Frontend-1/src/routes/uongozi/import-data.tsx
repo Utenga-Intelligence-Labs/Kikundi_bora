@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-provider";
 import { requireRole } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { AppShell } from "@/components/AppShell";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, AlertTriangle, Download } from "lucide-react";
 
@@ -52,7 +53,7 @@ function ImportDataPage() {
     setResult(null);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const formData = new FormData();
       formData.append("file", selectedFile);
 

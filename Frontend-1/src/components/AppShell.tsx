@@ -3,6 +3,7 @@ import { Settings, User as UserIcon, LogIn, LogOut, Crown, Bell } from "lucide-r
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth, initials } from "@/lib/auth-provider";
+import { tokenStorage } from "@/lib/auth-storage";
 import { roleMap, type Jukumu, type LeadershipRole } from "@/api/types";
 import { getDualPlaneNav, leadershipRoleLabel } from "@/lib/roles";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
@@ -54,7 +55,7 @@ export function AppShell({
   const { data: notifData } = useQuery<{ unread: number }>({
     queryKey: ["notifications", "unread"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/notifications?limit=1", {
         headers: { Authorization: `Bearer ${token}` },
       });

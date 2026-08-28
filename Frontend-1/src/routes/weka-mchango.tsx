@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { AppShell } from "@/components/AppShell";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon } from "lucide-react";
@@ -76,7 +77,7 @@ function WekaMchangoPage() {
     setUploadError(null);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const uploadFormData = new FormData();
       uploadFormData.append("file", selectedFile);
       uploadFormData.append("category", "contributions");
@@ -107,7 +108,7 @@ function WekaMchangoPage() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: { contribution_type: string; period_label: string; amount: number; proof_image_url?: string; proof_message?: string }) => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/michango", {
         method: "POST",
         headers: {

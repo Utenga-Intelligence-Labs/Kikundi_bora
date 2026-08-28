@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { AppShell } from "@/components/AppShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -77,7 +78,7 @@ function ArifaPage() {
   const { data, isLoading } = useQuery<{ data: Notification[]; total: number; unread: number }>({
     queryKey: ["notifications"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/notifications", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -89,7 +90,7 @@ function ArifaPage() {
 
   const markReadMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/notifications/read", {
         method: "POST",
         headers: {

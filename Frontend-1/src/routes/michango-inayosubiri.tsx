@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireRole } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { AppShell } from "@/components/AppShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -47,7 +48,7 @@ function TaarifaWanaosubiriPage() {
   const { data, isLoading } = useQuery<{ data: MemberRow[]; total: number }>({
     queryKey: ["michango", "members-summary"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/michango/members-summary", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -58,7 +59,7 @@ function TaarifaWanaosubiriPage() {
 
   const confirmMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch(`/api/v1/michango/${id}/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -75,7 +76,7 @@ function TaarifaWanaosubiriPage() {
 
   const rejectMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch(`/api/v1/michango/${id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },

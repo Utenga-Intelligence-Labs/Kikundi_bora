@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { AppShell } from "@/components/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
@@ -34,7 +35,7 @@ function HistoriaYanguPage() {
   const { data: contribData, isLoading: contribLoading } = useQuery<{ data: any[] }>({
     queryKey: ["michango", "mine"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/michango/mine", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -47,7 +48,7 @@ function HistoriaYanguPage() {
   const { data: loanData, isLoading: loanLoading } = useQuery<{ data: any[] }>({
     queryKey: ["mikopo", "mine"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/loans", {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -60,7 +61,7 @@ function HistoriaYanguPage() {
   const { data: repaymentData, isLoading: repaymentLoading } = useQuery<{ data: any[] }>({
     queryKey: ["marejesho", "mine"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/repayments", {
         headers: { Authorization: `Bearer ${token}` },
       });

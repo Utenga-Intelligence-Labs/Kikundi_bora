@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth-provider";
 import { blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle, XCircle, Clock, Loader2, Eye, ImageIcon, X, Filter } from "lucide-react";
@@ -53,7 +54,7 @@ function MichangoPage() {
   const { data, isLoading, error } = useQuery<{ data: MemberContribution[]; total: number }>({
     queryKey: ["michango", "all"],
     queryFn: async () => {
-      const token = localStorage.getItem("auth_token");
+      const token = tokenStorage.get();
       const res = await fetch("/api/v1/michango", {
         headers: { Authorization: `Bearer ${token}` },
       });
