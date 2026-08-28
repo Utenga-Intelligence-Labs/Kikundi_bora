@@ -125,7 +125,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	loginID := strings.TrimSpace(req.Email) // can be email or phone
 	ip := c.IP()
 
-	// SECURITY: Rate limiting based on failed login attempts
+	// SECURITY: Rate limiting based on failed login attempts (IP-based)
 	var recentAttempts int64
 	fiveMinAgo := time.Now().Add(-5 * time.Minute)
 	database.DB.Model(&models.FailedLogin{}).
@@ -134,6 +134,17 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	if recentAttempts >= 5 {
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 			"message": "Majaribio mengi mno ya kuingia. Jaribu tena baada ya dakika 5.",
+		})
+	}
+
+	// SECURITY: Rate limiting based on failed login attempts (account-based)
+	var accountAttempts int64
+	database.DB.Model(&models.FailedLogin{}).
+		Where("email_attempted = ? AND attempted_at > ?", loginID, fiveMinAgo).
+		Count(&accountAttempts)
+	if accountAttempts >= 5 {
+		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+			"message": "Majaribio mengi mno ya kuingia kwenye akaunti hii. Jaribu tena baada ya dakika 5.",
 		})
 	}
 
