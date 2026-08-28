@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "../auth-provider";
 import { authApi } from "@/api/auth";
+import type { User } from "@/api/types";
 import { tokenStorage } from "../auth-storage";
 
 vi.mock("@/api/auth", () => ({
@@ -48,18 +49,32 @@ function AuthConsumer() {
       <button data-testid="logout-btn" onClick={() => auth.logout()}>
         Logout
       </button>
-      <span data-testid="error">{auth.error ?? ""}</span>
     </div>
   );
 }
 
 describe("AuthProvider", () => {
   it("displays user name after successful login", async () => {
+    const mockUser: User = {
+      id: "2",
+      name: "Test User",
+      phone: "07123",
+      role: "member",
+      status: "ACTIVE",
+      is_active: true,
+      must_change_password: false,
+      created_at: "2024-01-01T00:00:00Z",
+      updated_at: "2024-01-01T00:00:00Z",
+    };
     vi.mocked(authApi.login).mockResolvedValueOnce({
       token: "new-token",
-      user: { id: "2", name: "Test User", phone: "07123", role: "member", status: "ACTIVE", is_active: true },
+      user: mockUser,
+      expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       first_login_required: false,
     });
+    // After login the token exists, so AuthProvider refetches /me —
+    // mock a successful response (module default rejects with "no token")
+    vi.mocked(authApi.me).mockResolvedValueOnce(mockUser);
 
     const user = userEvent.setup();
     render(<AuthConsumer />, { wrapper: createWrapper() });
