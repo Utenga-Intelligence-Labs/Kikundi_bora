@@ -86,9 +86,6 @@ func main() {
 	app.Use(middleware.SecurityHeaders())
 	app.Use(middleware.RequestLogger())
 
-	// Serve uploaded files
-	app.Static("/uploads", "./uploads")
-
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": "kikundi-api"})
 	})
@@ -119,6 +116,11 @@ func main() {
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
+
+	// Serve uploaded files (authenticated only)
+	uploads := app.Group("/uploads")
+	uploads.Use(middleware.AuthRequired)
+	uploads.Static("/", "./uploads")
 
 	protected := api.Group("")
 	protected.Use(middleware.AuthRequired)
