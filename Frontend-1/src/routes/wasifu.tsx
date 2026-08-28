@@ -68,7 +68,7 @@ function WasifuPage() {
         name: jina.trim() || undefined,
         phone: simu.trim() || undefined,
         bio: bio.trim() || undefined,
-        avatar_url: photo ?? "",
+        avatar_url: photo ?? undefined,
       });
       // Update auth cache so data persists across refreshes
       if (res.data) {
