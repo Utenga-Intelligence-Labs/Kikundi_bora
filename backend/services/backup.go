@@ -245,10 +245,7 @@ func SendBackupEmail(record *models.BackupHistory, to string) error {
 	record.Status = models.BackupStatusCompleted
 	database.DB.Save(record)
 
-	go func() {
-		time.Sleep(24 * time.Hour)
-		os.Remove(zipPath)
-	}()
+	os.Remove(zipPath)
 
 	return nil
 }
