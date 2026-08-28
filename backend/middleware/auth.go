@@ -74,8 +74,16 @@ func AuthRequired(c *fiber.Ctx) error {
 		Where("user_id = ? AND token_hash = ? AND revoked_at IS NULL", userID, tokenHash).
 		Updates(map[string]interface{}{"last_active_at": time.Now()})
 
+	// Verify role from database to prevent stale role from JWT
+	var user models.User
+	if err := database.DB.Select("role").Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Mtumiaji hajapatikana",
+		})
+	}
+
 	c.Locals("user_id", userID)
-	c.Locals("role", role)
+	c.Locals("role", user.Role)
 
 	return c.Next()
 }
