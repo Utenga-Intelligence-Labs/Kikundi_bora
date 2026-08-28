@@ -29,7 +29,7 @@ export function getTokenRole(): string | null {
 
 export function isTokenExpired(token: string): boolean {
   const payload = decodeToken(token);
-  if (!payload?.exp) return false;
+  if (!payload?.exp) return true;
   const now = Math.floor(Date.now() / 1000);
   return (payload.exp as number) < now;
 }
