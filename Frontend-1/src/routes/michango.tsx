@@ -28,7 +28,7 @@ interface MemberContribution {
   member_id: string;
   contribution_type: "AKIBA" | "MFUKO_WA_KIJAMII";
   period_label: string;
-  amount: number;
+  amount: string; // backend decimal.Decimal serializes as string
   proof_image_url?: string;
   proof_message?: string;
   status: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED";
@@ -70,7 +70,7 @@ function MichangoPage() {
   });
 
   // Summary stats
-  const totalAmount = filtered.reduce((sum, c) => sum + c.amount, 0);
+  const totalAmount = filtered.reduce((sum, c) => sum + Number(c.amount), 0);
   const pendingCount = contributions.filter((c) => c.status === "PENDING_VERIFICATION").length;
   const confirmedCount = contributions.filter((c) => c.status === "CONFIRMED").length;
 
@@ -225,7 +225,7 @@ function MichangoPage() {
                           {status.label}
                         </span>
                       </div>
-                      <p className="font-display text-base font-bold">TZS {contrib.amount.toLocaleString()}</p>
+                      <p className="font-display text-base font-bold">TZS {Number(contrib.amount).toLocaleString()}</p>
                       <p className="text-sm text-muted-foreground">
                         {contrib.member?.full_name} ({contrib.member?.member_no})
                       </p>
@@ -283,7 +283,7 @@ function MichangoPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Kiasi</p>
-                  <p className="font-display text-2xl font-bold">TZS {viewingContrib.amount.toLocaleString()}</p>
+                  <p className="font-display text-2xl font-bold">TZS {Number(viewingContrib.amount).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Aina</p>

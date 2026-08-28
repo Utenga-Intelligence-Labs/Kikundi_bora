@@ -20,7 +20,7 @@ interface MemberRow {
   member_no: string;
   phone: string;
   status: string;
-  amount: number;
+  amount: string; // backend decimal.Decimal serializes as string
   period_label: string;
   contribution_type: string;
   contribution_id: string;
@@ -111,8 +111,8 @@ function TaarifaWanaosubiriPage() {
                       <Icon className="h-3 w-3" />
                       {cfg.label}
                     </span>
-                    {m.amount > 0 && (
-                      <span className="ml-2 text-sm font-bold">TZS {m.amount.toLocaleString()}</span>
+                    {Number(m.amount) > 0 && (
+                      <span className="ml-2 text-sm font-bold">TZS {Number(m.amount).toLocaleString()}</span>
                     )}
                   </div>
 
@@ -162,7 +162,7 @@ function TaarifaWanaosubiriPage() {
               )}
               <div className="grid grid-cols-2 gap-4">
                 <div><p className="text-xs text-muted-foreground">Mwanachama</p><p className="font-semibold">{viewing.full_name}</p><p className="text-xs text-muted-foreground">{viewing.member_no}</p></div>
-                <div><p className="text-xs text-muted-foreground">Kiasi</p><p className="font-display text-2xl font-bold">TZS {viewing.amount.toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Kiasi</p><p className="font-display text-2xl font-bold">TZS {Number(viewing.amount).toLocaleString()}</p></div>
                 <div><p className="text-xs text-muted-foreground">Kipindi</p><p className="font-semibold">{viewing.period_label || "—"}</p></div>
                 <div><p className="text-xs text-muted-foreground">Hali</p><span className={`chip inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded ${STATUS_CONFIG[viewing.status]?.color}`}>{STATUS_CONFIG[viewing.status]?.label}</span></div>
               </div>
