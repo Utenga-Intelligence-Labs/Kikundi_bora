@@ -99,6 +99,11 @@ func (h *PendingActionHandler) Approve(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kitendo tayari kimeshughulikiwa"})
 	}
 
+	// Execute the action first; only mark approved if it succeeds
+	if err := h.executeAction(action); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutekeleza: " + err.Error()})
+	}
+
 	now := time.Now()
 	updates := map[string]interface{}{
 		"status":      models.ActionStatusApproved,
@@ -108,11 +113,6 @@ func (h *PendingActionHandler) Approve(c *fiber.Ctx) error {
 	}
 	if err := database.DB.Model(&action).Updates(updates).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
-	}
-
-	// Execute the action based on type
-	if err := h.executeAction(action); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutekeleza: " + err.Error()})
 	}
 
 	services.LogAudit(c, &approverID, models.AuditApprove, "pending_actions", &action.ID, nil, map[string]interface{}{
