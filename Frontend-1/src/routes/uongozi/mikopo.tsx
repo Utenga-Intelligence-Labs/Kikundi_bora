@@ -33,7 +33,7 @@ function MikopoPage() {
   const isKatibu = user?.role === "secretary";
   const isMwenyekiti = user?.role === "chair";
   const { data: committeeCheck } = useIsCommitteeMember();
-  const isBodi = user?.role === "member" && committeeCheck?.is_member;
+  const isBodi = user?.role === "member" && committeeCheck?.is_committee_member;
 
   if (!user || !isLeadership) {
     return <AppShell title="Idhinisha Mikopo"><div className="card-surface p-12 text-center"><p className="text-muted-foreground">Huna ruhusa</p></div></AppShell>;
