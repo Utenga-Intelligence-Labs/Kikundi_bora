@@ -35,9 +35,9 @@ func (h *AnnouncementHandler) Broadcast(c *fiber.Ctx) error {
 		})
 	}
 
-	// Find all active members
+	// Find all active members (GORM auto-filters soft-deleted)
 	var members []models.Member
-	database.DB.Where("deleted_at IS NULL").Find(&members)
+	database.DB.Find(&members)
 
 	// Send notification to each member's linked user
 	count := 0

@@ -204,12 +204,11 @@ func (h *MemberHandler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	var member models.Member
-	if err := database.DB.Where("deleted_at IS NULL").First(&member, "id = ?", id).Error; err != nil {
+	if err := database.DB.First(&member, "id = ?", id).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
 	}
 
-	now := time.Now()
-	database.DB.Model(&member).Update("deleted_at", now)
+	database.DB.Delete(&member)
 
 	userID := middleware.GetUserID(c)
 	services.LogAudit(c, &userID, models.AuditDelete, "members", &member.ID, nil, nil)
