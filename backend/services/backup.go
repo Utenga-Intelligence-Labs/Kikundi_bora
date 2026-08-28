@@ -98,7 +98,6 @@ func generateDBBackup(zipPath string) error {
 		defer os.Remove(pgpass.Name())
 	} else {
 		cmd.Env = append(os.Environ(), "PGPASSWORD="+cfg.DBPassword)
-		defer func() { _ = recover() }()
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -133,7 +132,6 @@ func generateDBWithFilesBackup(zipPath string) error {
 		defer os.Remove(pgpass.Name())
 	} else {
 		cmd.Env = append(os.Environ(), "PGPASSWORD="+cfg.DBPassword)
-		defer func() { _ = recover() }()
 	}
 
 	if err := cmd.Run(); err != nil {
