@@ -177,6 +177,9 @@ func (h *AdminHandler) ResetUserPassword(c *fiber.Ctx) error {
 	providedPwd := false
 	var req models.AdminResetPasswordRequest
 	if err := c.BodyParser(&req); err == nil && req.NewPassword != "" {
+		if len(req.NewPassword) < 8 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri lazima liwe na angalau herufi 8"})
+		}
 		newPwd = req.NewPassword
 		providedPwd = true
 	}
