@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
-import { tokenStorage } from "@/lib/auth-storage";
+import { api } from "@/api/client";
 import { AppShell } from "@/components/AppShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -78,29 +78,14 @@ function ArifaPage() {
   const { data, isLoading } = useQuery<{ data: Notification[]; total: number; unread: number }>({
     queryKey: ["notifications"],
     queryFn: async () => {
-      const token = tokenStorage.get();
-      const res = await fetch("/api/v1/notifications", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Imeshindikana kupata arifa");
-      return res.json();
+      return api.get("/notifications");
     },
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   const markReadMutation = useMutation({
     mutationFn: async (ids: string[]) => {
-      const token = tokenStorage.get();
-      const res = await fetch("/api/v1/notifications/read", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ids }),
-      });
-      if (!res.ok) throw new Error("Imeshindikana");
-      return res.json();
+      return api.post("/notifications/read", { ids });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });

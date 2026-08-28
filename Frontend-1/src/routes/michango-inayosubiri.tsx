@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireRole } from "@/lib/role-guards";
-import { tokenStorage } from "@/lib/auth-storage";
+import { api } from "@/api/client";
 import { AppShell } from "@/components/AppShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -48,24 +48,13 @@ function TaarifaWanaosubiriPage() {
   const { data, isLoading } = useQuery<{ data: MemberRow[]; total: number }>({
     queryKey: ["michango", "members-summary"],
     queryFn: async () => {
-      const token = tokenStorage.get();
-      const res = await fetch("/api/v1/michango/members-summary", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Imeshindikana kupata taarifa");
-      return res.json();
+      return api.get("/michango/members-summary");
     },
   });
 
   const confirmMutation = useMutation({
     mutationFn: async (id: string) => {
-      const token = tokenStorage.get();
-      const res = await fetch(`/api/v1/michango/${id}/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "Imeshindikana kuthibitisha");
-      return res.json();
+      return api.post(`/michango/${id}/confirm`);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["michango"] });
@@ -76,14 +65,7 @@ function TaarifaWanaosubiriPage() {
 
   const rejectMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const token = tokenStorage.get();
-      const res = await fetch(`/api/v1/michango/${id}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ reason }),
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "Imeshindikana kukataa");
-      return res.json();
+      return api.post(`/michango/${id}/reject`, { reason });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["michango"] });

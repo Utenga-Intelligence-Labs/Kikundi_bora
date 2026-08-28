@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
-import { tokenStorage } from "@/lib/auth-storage";
+import { api } from "@/api/client";
 import { AppShell } from "@/components/AppShell";
 import { FileBarChart2, Download, Users, PiggyBank, Banknote, TrendingUp, Loader2, Clock } from "lucide-react";
 import { useState } from "react";
@@ -35,12 +35,7 @@ function RipotiPage() {
   const { data: stats, isLoading: statsLoading } = useQuery<QuickStats>({
     queryKey: ["uongozi", "quick-stats"],
     queryFn: async () => {
-      const token = tokenStorage.get();
-      const res = await fetch("/api/v1/uongozi/quick-stats", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Imeshindikana kupata takwimu");
-      return res.json();
+      return api.get("/uongozi/quick-stats");
     },
     enabled: isLeadership,
   });
@@ -58,18 +53,10 @@ function RipotiPage() {
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const token = tokenStorage.get();
-      const res = await fetch(`/api/v1/uongozi/ripoti?type=${reportType}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Imeshindikana kupata ripoti");
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `ripoti-${reportType}-${Date.now()}.csv`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      await api.download(
+        `/uongozi/ripoti?type=${reportType}`,
+        `ripoti-${reportType}-${Date.now()}.csv`
+      );
     } catch (err) {
       console.error(err);
       alert("Imeshindikana kupakua ripoti");

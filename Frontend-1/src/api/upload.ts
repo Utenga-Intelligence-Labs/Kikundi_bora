@@ -15,7 +15,10 @@ export const uploadApi = {
     });
   },
 
-  doc: (file: File, category: "docs" | "reports" = "docs"): Promise<UploadResponse> => {
+  doc: (
+    file: File,
+    category: "docs" | "reports" | "contributions" = "docs"
+  ): Promise<UploadResponse> => {
     const form = new FormData();
     form.append("file", file);
     form.append("category", category);

@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
-import { tokenStorage } from "@/lib/auth-storage";
+import { api } from "@/api/client";
+import { uploadApi } from "@/api/upload";
 import { AppShell } from "@/components/AppShell";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon } from "lucide-react";
@@ -77,25 +78,7 @@ function WekaMchangoPage() {
     setUploadError(null);
 
     try {
-      const token = tokenStorage.get();
-      const uploadFormData = new FormData();
-      uploadFormData.append("file", selectedFile);
-      uploadFormData.append("category", "contributions");
-
-      const res = await fetch("/api/v1/upload/doc", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: uploadFormData,
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Imeshindikana kupakia picha");
-      }
-
-      const data = await res.json();
+      const data = await uploadApi.doc(selectedFile, "contributions");
       setUploadedUrl(data.url);
       return data.url;
     } catch (err: any) {
@@ -108,20 +91,7 @@ function WekaMchangoPage() {
 
   const submitMutation = useMutation({
     mutationFn: async (data: { contribution_type: string; period_label: string; amount: number; proof_image_url?: string; proof_message?: string }) => {
-      const token = tokenStorage.get();
-      const res = await fetch("/api/v1/michango", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Imeshindikana kuwasilisha");
-      }
-      return res.json();
+      return api.post("/michango", data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["michango"] });

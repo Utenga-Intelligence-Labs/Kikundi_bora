@@ -3,7 +3,7 @@ import { Settings, User as UserIcon, LogIn, LogOut, Crown, Bell } from "lucide-r
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth, initials } from "@/lib/auth-provider";
-import { tokenStorage } from "@/lib/auth-storage";
+import { api } from "@/api/client";
 import { roleMap, type Jukumu, type LeadershipRole } from "@/api/types";
 import { getDualPlaneNav, leadershipRoleLabel } from "@/lib/roles";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
@@ -55,12 +55,11 @@ export function AppShell({
   const { data: notifData } = useQuery<{ unread: number }>({
     queryKey: ["notifications", "unread"],
     queryFn: async () => {
-      const token = tokenStorage.get();
-      const res = await fetch("/api/v1/notifications?limit=1", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return { unread: 0 };
-      return res.json();
+      try {
+        return await api.get("/notifications", { limit: "1" });
+      } catch {
+        return { unread: 0 };
+      }
     },
     enabled: !!user,
     refetchInterval: 30000, // Poll every 30 seconds
