@@ -14,6 +14,8 @@ import (
 	"kikundibora/models"
 	"kikundibora/services"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -146,7 +148,7 @@ func (h *ImportHandler) ImportContributions(c *fiber.Ctx) error {
 			MemberID:           member.ID,
 			ContributionType:   models.ContributionType(contribType),
 			PeriodLabel:        parsedDate.Format("2006-01"),
-			Amount:             amount,
+			Amount:             decimal.NewFromFloat(amount),
 			Status:             models.ContributionStatus(status),
 			IsHistoricalImport: true,
 			CreatedAt:          parsedDate,
@@ -292,8 +294,8 @@ func (h *ImportHandler) ImportLoans(c *fiber.Ctx) error {
 
 		loan := models.Loan{
 			MemberID:      member.ID,
-			Amount:        amount,
-			ApprovedAmount: &approvedAmount,
+			Amount:        decimal.NewFromFloat(amount),
+			ApprovedAmount: func() *decimal.Decimal { d := decimal.NewFromFloat(approvedAmount); return &d }(),
 			Purpose:       &purpose,
 			DueDate:       dueDate,
 			Status:        loanStatus,

@@ -9,6 +9,8 @@ import (
 
 	"kikundibora/database"
 	"kikundibora/models"
+
+	"github.com/shopspring/decimal"
 )
 
 const reportDir = "./uploads/reports"
@@ -162,13 +164,13 @@ func GenerateLoansReport(status string) (*ReportData, error) {
 			memberName = l.Member.FullName
 			memberNo = l.Member.MemberNo
 		}
-		approved := fmt.Sprintf("%.0f", l.Amount)
-		if l.ApprovedAmount != nil && *l.ApprovedAmount > 0 {
-			approved = fmt.Sprintf("%.0f", *l.ApprovedAmount)
+		approved := l.Amount.String()
+		if l.ApprovedAmount != nil && l.ApprovedAmount.GreaterThan(decimal.Zero) {
+			approved = l.ApprovedAmount.String()
 		}
 		balance := "0"
 		if l.BalanceRemaining != nil {
-			balance = fmt.Sprintf("%.0f", *l.BalanceRemaining)
+			balance = l.BalanceRemaining.String()
 		}
 		purpose := ""
 		if l.Purpose != nil {

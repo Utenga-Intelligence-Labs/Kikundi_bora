@@ -9,6 +9,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -100,7 +101,7 @@ func (h *ContributionHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mwanachama huyu tayari amelipa mwezi huu"})
 	}
 
-	if req.Amount <= 0 {
+	if req.Amount.LessThanOrEqual(decimal.Zero) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi lazima kiwe zaidi ya sifuri"})
 	}
 
@@ -151,7 +152,7 @@ func (h *ContributionHandler) Edit(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mchango haujapatikana"})
 	}
 
-	if req.NewAmount <= 0 {
+	if req.NewAmount.LessThanOrEqual(decimal.Zero) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi lazima kiwe zaidi ya sifuri"})
 	}
 
@@ -201,12 +202,12 @@ func (h *ContributionHandler) MonthlyReport(c *fiber.Ctx) error {
 
 	type Row struct {
 		MemberNo   string   `json:"member_no"`
-		FullName   string   `json:"full_name"`
-		Phone      string   `json:"phone"`
-		AmountPaid *float64 `json:"amount_paid"`
-		PaidAt     *string  `json:"paid_at"`
-		ContribID  *string  `json:"contrib_id"`
-		Notes      *string  `json:"notes"`
+		FullName   string           `json:"full_name"`
+		Phone      string           `json:"phone"`
+		AmountPaid *decimal.Decimal `json:"amount_paid"`
+		PaidAt     *string          `json:"paid_at"`
+		ContribID  *string          `json:"contrib_id"`
+		Notes      *string          `json:"notes"`
 	}
 
 	var rows []Row
@@ -232,7 +233,7 @@ func (h *ContributionHandler) MonthlyReport(c *fiber.Ctx) error {
 				paidAt = *r.PaidAt
 			}
 		}
-		amt := 0.0
+		amt := decimal.Zero
 		if r.AmountPaid != nil {
 			amt = *r.AmountPaid
 		}

@@ -7,6 +7,7 @@ import (
 	"kikundibora/models"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 )
 
 type DashboardHandler struct{}
@@ -18,15 +19,15 @@ func NewDashboardHandler() *DashboardHandler {
 func (h *DashboardHandler) Summary(c *fiber.Ctx) error {
 	var (
 		activeMembers              int64
-		totalContributions         float64
-		totalLoansIssued           float64
-		totalRepayments            float64
-		totalOutstanding           float64
+		totalContributions         decimal.Decimal
+		totalLoansIssued           decimal.Decimal
+		totalRepayments            decimal.Decimal
+		totalOutstanding           decimal.Decimal
 		countOutstanding           int64
 		countPending               int64
 		membersPaid                int64
-		totalContributionsMonth    float64
-		totalRepaymentsMonth       float64
+		totalContributionsMonth    decimal.Decimal
+		totalRepaymentsMonth       decimal.Decimal
 	)
 
 	now := time.Now()

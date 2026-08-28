@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
-	"time"
 
 	"kikundibora/config"
 	"kikundibora/database"
@@ -49,13 +48,12 @@ func AuthRequired(c *fiber.Ctx) error {
 			"message": "Token haina kitambulisho cha mtumiaji",
 		})
 	}
-	roleStr, ok := claims["role"].(string)
-	if !ok || roleStr == "" {
+	_, ok = claims["role"].(string)
+	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Token haina jukumu la mtumiaji",
 		})
 	}
-	role := models.Role(roleStr)
 
 	// Check if token session has been revoked (logout)
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(tokenStr)))

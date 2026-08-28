@@ -11,6 +11,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -190,10 +191,10 @@ func (h *PendingActionHandler) executeAction(action models.PendingAction) error 
 
 func (h *PendingActionHandler) executeContributionEdit(payload json.RawMessage) error {
 	var data struct {
-		ContributionID string  `json:"contribution_id"`
-		NewAmount      float64 `json:"new_amount"`
-		Reason         string  `json:"reason"`
-		EditedBy       string  `json:"edited_by"`
+		ContributionID string          `json:"contribution_id"`
+		NewAmount      decimal.Decimal `json:"new_amount"`
+		Reason         string          `json:"reason"`
+		EditedBy       string          `json:"edited_by"`
 	}
 	if err := json.Unmarshal(payload, &data); err != nil {
 		return err

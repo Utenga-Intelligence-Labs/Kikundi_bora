@@ -10,6 +10,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -37,9 +38,9 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 	var req struct {
 		ContributionType string  `json:"contribution_type"`
 		PeriodLabel      string  `json:"period_label"`
-		Amount           float64 `json:"amount"`
-		ProofImageURL    string  `json:"proof_image_url"`
-		ProofMessage     string  `json:"proof_message"`
+		Amount           decimal.Decimal `json:"amount"`
+		ProofImageURL    string          `json:"proof_image_url"`
+		ProofMessage     string          `json:"proof_message"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -47,7 +48,7 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 	}
 
 	// Validate
-	if req.ContributionType == "" || req.PeriodLabel == "" || req.Amount <= 0 {
+	if req.ContributionType == "" || req.PeriodLabel == "" || req.Amount.LessThanOrEqual(decimal.Zero) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"message": "Aina ya mchango, kipindi, na kiasi vinahitajika",
 		})

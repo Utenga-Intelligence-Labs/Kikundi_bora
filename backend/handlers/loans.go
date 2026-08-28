@@ -10,6 +10,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -135,7 +136,7 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 		}
 	}
 
-	if req.Amount <= 0 {
+	if req.Amount.LessThanOrEqual(decimal.Zero) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha mkopo lazima kiwe zaidi ya sifuri"})
 	}
 
@@ -146,7 +147,7 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 	}
 	if !canAfford {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"message": fmt.Sprintf("Kiasi kinazidi hazina ya kikundi (TZS %.0f iliyopo). Kiasi ulichoomba: TZS %.0f", availableBalance, req.Amount),
+			"message": fmt.Sprintf("Kiasi kinazidi hazina ya kikundi (TZS %s iliyopo). Kiasi ulichoomba: TZS %s", availableBalance.StringFixed(2), req.Amount.StringFixed(2)),
 		})
 	}
 
@@ -227,7 +228,7 @@ func (h *LoanHandler) Approve(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mkopo huu hauwezi kuidhinishwa. Hali yake ni: " + string(loan.Status)})
 	}
 
-	if req.ApprovedAmount <= 0 || req.ApprovedAmount > loan.Amount {
+	if req.ApprovedAmount.LessThanOrEqual(decimal.Zero) || req.ApprovedAmount.GreaterThan(loan.Amount) {
 		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi kilichoidhinishwa sio sahihi"})
 	}
@@ -396,9 +397,9 @@ func (h *LoanHandler) OutstandingReport(c *fiber.Ctx) error {
 		FullName         string  `json:"full_name"`
 		Phone            string  `json:"phone"`
 		LoanID           string  `json:"loan_id"`
-		ApprovedAmount   float64 `json:"approved_amount"`
-		BalanceRemaining float64 `json:"balance_remaining"`
-		DueDate          string  `json:"due_date"`
+		ApprovedAmount   decimal.Decimal `json:"approved_amount"`
+		BalanceRemaining decimal.Decimal `json:"balance_remaining"`
+		DueDate          string          `json:"due_date"`
 	}
 
 	var rows []Row
@@ -433,7 +434,7 @@ func (h *LoanHandler) OutstandingReport(c *fiber.Ctx) error {
 			LoanID:           r.LoanID,
 			ApprovedAmount:   r.ApprovedAmount,
 			BalanceRemaining: r.BalanceRemaining,
-			AmountPaidSoFar:  r.ApprovedAmount - r.BalanceRemaining,
+			AmountPaidSoFar:  r.ApprovedAmount.Sub(r.BalanceRemaining),
 			DueDate:          r.DueDate,
 			Urgency:          urgency,
 			DaysRemaining:    daysRemaining,
@@ -443,6 +444,6 @@ func (h *LoanHandler) OutstandingReport(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"data": result})
 }
 
-func formatMoney(n float64) string {
-	return fmt.Sprintf("%.2f", n)
+func formatMoney(n decimal.Decimal) string {
+	return n.StringFixed(2)
 }

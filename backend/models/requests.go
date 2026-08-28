@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required"`
@@ -57,30 +61,30 @@ type UpdateMemberRequest struct {
 }
 
 type CreateContributionRequest struct {
-	MemberID        string  `json:"member_id" validate:"required"`
-	Amount          float64 `json:"amount" validate:"required,gt=0"`
-	Month           string  `json:"month" validate:"required"`
-	PaidAt          string  `json:"paid_at" validate:"required"`
-	PaymentMethod   string  `json:"payment_method" validate:"required,oneof=CASH BANK MOBILE_MONEY"`
-	ReferenceNumber string  `json:"reference_number"`
-	ReceiptURL      string  `json:"receipt_url"`
-	Notes           *string `json:"notes"`
+	MemberID        string          `json:"member_id" validate:"required"`
+	Amount          decimal.Decimal `json:"amount" validate:"required,gt=0"`
+	Month           string          `json:"month" validate:"required"`
+	PaidAt          string          `json:"paid_at" validate:"required"`
+	PaymentMethod   string          `json:"payment_method" validate:"required,oneof=CASH BANK MOBILE_MONEY"`
+	ReferenceNumber string          `json:"reference_number"`
+	ReceiptURL      string          `json:"receipt_url"`
+	Notes           *string         `json:"notes"`
 }
 
 type EditContributionRequest struct {
-	NewAmount float64 `json:"new_amount" validate:"required,gt=0"`
-	Reason    string  `json:"reason" validate:"required"`
+	NewAmount decimal.Decimal `json:"new_amount" validate:"required,gt=0"`
+	Reason    string          `json:"reason" validate:"required"`
 }
 
 type ApplyLoanRequest struct {
-	MemberID string  `json:"member_id" validate:"required"`
-	Amount   float64 `json:"amount" validate:"required,gt=0"`
-	Purpose  *string `json:"purpose"`
-	DueDate  string  `json:"due_date" validate:"required"`
+	MemberID string          `json:"member_id" validate:"required"`
+	Amount   decimal.Decimal `json:"amount" validate:"required,gt=0"`
+	Purpose  *string         `json:"purpose"`
+	DueDate  string          `json:"due_date" validate:"required"`
 }
 
 type ApproveLoanRequest struct {
-	ApprovedAmount float64 `json:"approved_amount" validate:"required,gt=0"`
+	ApprovedAmount decimal.Decimal `json:"approved_amount" validate:"required,gt=0"`
 }
 
 type RejectLoanRequest struct {
@@ -88,27 +92,27 @@ type RejectLoanRequest struct {
 }
 
 type RecordRepaymentRequest struct {
-	LoanID          string  `json:"loan_id" validate:"required"`
-	Amount          float64 `json:"amount" validate:"required,gt=0"`
-	PaidAt          string  `json:"paid_at" validate:"required"`
-	PaymentMethod   string  `json:"payment_method" validate:"required,oneof=CASH BANK MOBILE_MONEY"`
-	ReferenceNumber string  `json:"reference_number"`
-	ReceiptURL      string  `json:"receipt_url"`
-	Notes           *string `json:"notes"`
+	LoanID          string          `json:"loan_id" validate:"required"`
+	Amount          decimal.Decimal `json:"amount" validate:"required,gt=0"`
+	PaidAt          string          `json:"paid_at" validate:"required"`
+	PaymentMethod   string          `json:"payment_method" validate:"required,oneof=CASH BANK MOBILE_MONEY"`
+	ReferenceNumber string          `json:"reference_number"`
+	ReceiptURL      string          `json:"receipt_url"`
+	Notes           *string         `json:"notes"`
 }
 
 type DashboardSummary struct {
-	TotalActiveMembers          int64   `json:"total_active_members"`
-	TotalContributions          float64 `json:"total_contributions"`
-	TotalLoansIssued            float64 `json:"total_loans_issued"`
-	TotalRepayments             float64 `json:"total_repayments"`
-	TotalOutstanding            float64 `json:"total_outstanding_balance"`
-	CountOutstandingLoans       int64   `json:"count_outstanding_loans"`
-	CountPendingLoans           int64   `json:"count_pending_loans"`
-	MembersPaidThisMonth        int64   `json:"members_paid_this_month"`
-	MembersDefaulted            int64   `json:"members_defaulted_this_month"`
-	TotalContributionsThisMonth float64 `json:"total_contributions_this_month"`
-	TotalRepaymentsThisMonth    float64 `json:"total_repayments_this_month"`
+	TotalActiveMembers          int64           `json:"total_active_members"`
+	TotalContributions          decimal.Decimal `json:"total_contributions"`
+	TotalLoansIssued            decimal.Decimal `json:"total_loans_issued"`
+	TotalRepayments             decimal.Decimal `json:"total_repayments"`
+	TotalOutstanding            decimal.Decimal `json:"total_outstanding_balance"`
+	CountOutstandingLoans       int64           `json:"count_outstanding_loans"`
+	CountPendingLoans           int64           `json:"count_pending_loans"`
+	MembersPaidThisMonth        int64           `json:"members_paid_this_month"`
+	MembersDefaulted            int64           `json:"members_defaulted_this_month"`
+	TotalContributionsThisMonth decimal.Decimal `json:"total_contributions_this_month"`
+	TotalRepaymentsThisMonth    decimal.Decimal `json:"total_repayments_this_month"`
 }
 
 type MessageResponse struct {
@@ -117,26 +121,26 @@ type MessageResponse struct {
 }
 
 type MonthlyContributionRow struct {
-	MemberNo   string   `json:"member_no"`
-	FullName   string   `json:"full_name"`
-	Phone      string   `json:"phone"`
-	AmountPaid float64  `json:"amount_paid"`
-	PaidAt     *string  `json:"paid_at,omitempty"`
-	Status     string   `json:"status"`
-	Notes      *string  `json:"notes,omitempty"`
+	MemberNo   string          `json:"member_no"`
+	FullName   string          `json:"full_name"`
+	Phone      string          `json:"phone"`
+	AmountPaid decimal.Decimal `json:"amount_paid"`
+	PaidAt     *string         `json:"paid_at,omitempty"`
+	Status     string          `json:"status"`
+	Notes      *string         `json:"notes,omitempty"`
 }
 
 type OutstandingLoanRow struct {
-	MemberNo         string  `json:"member_no"`
-	FullName         string  `json:"full_name"`
-	Phone            string  `json:"phone"`
-	LoanID           string  `json:"loan_id"`
-	ApprovedAmount   float64 `json:"approved_amount"`
-	BalanceRemaining float64 `json:"balance_remaining"`
-	AmountPaidSoFar  float64 `json:"amount_paid_so_far"`
-	DueDate          string  `json:"due_date"`
-	Urgency          string  `json:"urgency"`
-	DaysRemaining    int     `json:"days_remaining"`
+	MemberNo         string          `json:"member_no"`
+	FullName         string          `json:"full_name"`
+	Phone            string          `json:"phone"`
+	LoanID           string          `json:"loan_id"`
+	ApprovedAmount   decimal.Decimal `json:"approved_amount"`
+	BalanceRemaining decimal.Decimal `json:"balance_remaining"`
+	AmountPaidSoFar  decimal.Decimal `json:"amount_paid_so_far"`
+	DueDate          string          `json:"due_date"`
+	Urgency          string          `json:"urgency"`
+	DaysRemaining    int             `json:"days_remaining"`
 }
 
 type PaginationQuery struct {
@@ -163,9 +167,9 @@ type MemberNoResponse struct {
 }
 
 type RepaymentResponse struct {
-	RepaymentID string  `json:"repayment_id"`
-	BalanceAfter float64 `json:"balance_after"`
-	LoanClosed  bool    `json:"loan_closed"`
+	RepaymentID string          `json:"repayment_id"`
+	BalanceAfter decimal.Decimal `json:"balance_after"`
+	LoanClosed  bool            `json:"loan_closed"`
 }
 
 type NotificationReadRequest struct {
@@ -216,15 +220,15 @@ type LoanCommitteeDashboard struct {
 }
 
 type LoanCommitteeHistoryRow struct {
-	LoanID        string  `json:"loan_id"`
-	ApplicantName string  `json:"applicant_name"`
-	MemberNo      string  `json:"member_no"`
-	Amount        float64 `json:"amount"`
-	Status        string  `json:"status"`
-	ReviewedBy    string  `json:"reviewed_by"`
-	Decision      string  `json:"decision"`
-	Comments      *string `json:"comments,omitempty"`
-	ReviewedAt    string  `json:"reviewed_at"`
+	LoanID        string          `json:"loan_id"`
+	ApplicantName string          `json:"applicant_name"`
+	MemberNo      string          `json:"member_no"`
+	Amount        decimal.Decimal `json:"amount"`
+	Status        string          `json:"status"`
+	ReviewedBy    string          `json:"reviewed_by"`
+	Decision      string          `json:"decision"`
+	Comments      *string         `json:"comments,omitempty"`
+	ReviewedAt    string          `json:"reviewed_at"`
 }
 
 type CommitteeActivityReport struct {
@@ -260,17 +264,17 @@ type DateRange struct {
 // Welfare module request types
 
 type CreateWelfareEventRequest struct {
-	MemberID        string  `json:"member_id" validate:"required"`
-	EventType       string  `json:"event_type" validate:"required,oneof=MSIBA HARUSI DHARURA MATIBABU KUZALIWA ELIMU"`
-	Description     string  `json:"description" validate:"required"`
-	AmountRequested float64 `json:"amount_requested" validate:"required,gt=0"`
-	FundingSource   string  `json:"funding_source" validate:"required,oneof=TREASURY MEMBER_CONTRIBUTION BOTH"`
-	TreasuryAmount  float64 `json:"treasury_amount"`
-	MemberAmount    float64 `json:"member_amount"`
+	MemberID        string          `json:"member_id" validate:"required"`
+	EventType       string          `json:"event_type" validate:"required,oneof=MSIBA HARUSI DHARURA MATIBABU KUZALIWA ELIMU"`
+	Description     string          `json:"description" validate:"required"`
+	AmountRequested decimal.Decimal `json:"amount_requested" validate:"required,gt=0"`
+	FundingSource   string          `json:"funding_source" validate:"required,oneof=TREASURY MEMBER_CONTRIBUTION BOTH"`
+	TreasuryAmount  decimal.Decimal `json:"treasury_amount"`
+	MemberAmount    decimal.Decimal `json:"member_amount"`
 }
 
 type ApproveWelfareEventRequest struct {
-	ApprovedAmount float64 `json:"approved_amount" validate:"required,gt=0"`
+	ApprovedAmount decimal.Decimal `json:"approved_amount" validate:"required,gt=0"`
 }
 
 type RejectWelfareEventRequest struct {
@@ -278,7 +282,7 @@ type RejectWelfareEventRequest struct {
 }
 
 type RecordWelfarePaymentRequest struct {
-	Amount float64 `json:"amount" validate:"required,gt=0"`
+	Amount decimal.Decimal `json:"amount" validate:"required,gt=0"`
 }
 
 // User Management request types
@@ -326,39 +330,39 @@ type UserManagementDashboard struct {
 // Welfare module dashboard types
 
 type WelfareDashboard struct {
-	TotalEvents            int64   `json:"total_events"`
-	PendingApproval        int64   `json:"pending_approval"`
-	ActiveEvents           int64   `json:"active_events"`
-	CompletedEvents        int64   `json:"completed_events"`
-	RejectedEvents         int64   `json:"rejected_events"`
-	TotalCollected         float64 `json:"total_collected"`
-	TotalFromTreasury      float64 `json:"total_from_treasury"`
-	MyPendingContributions int64   `json:"my_pending_contributions"`
-	MyPaidContributions    int64   `json:"my_paid_contributions"`
+	TotalEvents            int64           `json:"total_events"`
+	PendingApproval        int64           `json:"pending_approval"`
+	ActiveEvents           int64           `json:"active_events"`
+	CompletedEvents        int64           `json:"completed_events"`
+	RejectedEvents         int64           `json:"rejected_events"`
+	TotalCollected         decimal.Decimal `json:"total_collected"`
+	TotalFromTreasury      decimal.Decimal `json:"total_from_treasury"`
+	MyPendingContributions int64           `json:"my_pending_contributions"`
+	MyPaidContributions    int64           `json:"my_paid_contributions"`
 }
 
 type WelfareEventSummary struct {
-	ID              string  `json:"id"`
-	EventType       string  `json:"event_type"`
-	Description     string  `json:"description"`
-	MemberName      string  `json:"member_name"`
-	MemberNo        string  `json:"member_no"`
-	AmountRequested float64 `json:"amount_requested"`
-	AmountApproved  float64 `json:"amount_approved"`
-	FundingSource   string  `json:"funding_source"`
-	Status          string  `json:"status"`
-	CreatedAt       string  `json:"created_at"`
+	ID              string          `json:"id"`
+	EventType       string          `json:"event_type"`
+	Description     string          `json:"description"`
+	MemberName      string          `json:"member_name"`
+	MemberNo        string          `json:"member_no"`
+	AmountRequested decimal.Decimal `json:"amount_requested"`
+	AmountApproved  decimal.Decimal `json:"amount_approved"`
+	FundingSource   string          `json:"funding_source"`
+	Status          string          `json:"status"`
+	CreatedAt       string          `json:"created_at"`
 }
 
 type WelfareContributionSummary struct {
-	ID         string  `json:"id"`
-	EventID    string  `json:"event_id"`
-	EventType  string  `json:"event_type"`
-	EventDesc  string  `json:"event_desc"`
-	MemberID   string  `json:"member_id"`
-	MemberName string  `json:"member_name"`
-	MemberNo   string  `json:"member_no"`
-	Amount     float64 `json:"amount"`
-	Status     string  `json:"status"`
-	PaidAt     *string `json:"paid_at,omitempty"`
+	ID         string          `json:"id"`
+	EventID    string          `json:"event_id"`
+	EventType  string          `json:"event_type"`
+	EventDesc  string          `json:"event_desc"`
+	MemberID   string          `json:"member_id"`
+	MemberName string          `json:"member_name"`
+	MemberNo   string          `json:"member_no"`
+	Amount     decimal.Decimal `json:"amount"`
+	Status     string          `json:"status"`
+	PaidAt     *string         `json:"paid_at,omitempty"`
 }

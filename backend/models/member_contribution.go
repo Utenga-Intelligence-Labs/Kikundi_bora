@@ -2,6 +2,8 @@ package models
 
 import (
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 // ContributionType represents the type of contribution
@@ -27,7 +29,7 @@ type MemberContribution struct {
 	MemberID              string             `gorm:"type:uuid;not null;index" json:"member_id"`
 	ContributionType      ContributionType   `gorm:"type:varchar(20);not null" json:"contribution_type"`
 	PeriodLabel           string             `gorm:"type:varchar(30);not null" json:"period_label"`
-	Amount                float64            `gorm:"type:decimal(12,2);not null" json:"amount"`
+	Amount                decimal.Decimal    `gorm:"type:decimal(12,2);not null" json:"amount"`
 	ProofImageURL         string             `gorm:"type:text" json:"proof_image_url,omitempty"`
 	ProofMessage          string             `gorm:"type:text" json:"proof_message,omitempty"`
 	Status                ContributionStatus `gorm:"type:varchar(20);not null;default:'PENDING_VERIFICATION'" json:"status"`

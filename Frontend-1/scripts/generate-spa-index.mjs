@@ -19,6 +19,15 @@ if (!fs.existsSync(assetsDir)) {
   process.exit(1);
 }
 
+// SPA mode (tanstackStart.spa.enabled): the build prerenders _shell.html with
+// all window.$_TSR boot data. Serving it as index.html is the whole story.
+const shellPath = path.join(clientDir, "_shell.html");
+if (fs.existsSync(shellPath)) {
+  fs.copyFileSync(shellPath, path.join(clientDir, "index.html"));
+  console.log(`SPA shell → index.html (copied from _shell.html)`);
+  process.exit(0);
+}
+
 const files = fs.readdirSync(assetsDir);
 const js = files.find((f) => /^index-.*\.js$/.test(f));
 const cssIndex = files.find((f) => /^index-.*\.css$/.test(f));

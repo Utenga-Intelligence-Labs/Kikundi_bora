@@ -10,6 +10,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -77,7 +78,7 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 
-	if req.Amount <= 0 {
+	if req.Amount.LessThanOrEqual(decimal.Zero) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha malipo lazima kiwe zaidi ya sifuri"})
 	}
 
@@ -107,15 +108,14 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 	}
 
 	balance := *loan.BalanceRemaining
-	if req.Amount > balance {
+	if req.Amount.GreaterThan(balance) {
 		tx.Rollback()
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Kiasi kimezidi salio. Salio ni TZS %.2f", balance)})
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": fmt.Sprintf("Kiasi kimezidi salio. Salio ni TZS %s", balance.StringFixed(2))})
 	}
 
-	newBalance := balance - req.Amount
+	newBalance := balance.Sub(req.Amount)
 	newStatus := models.LoanOutstanding
-	const epsilon = 0.001
-	if newBalance < epsilon {
+	if newBalance.LessThan(decimal.NewFromFloat(0.001)) {
 		newStatus = models.LoanClosed
 	}
 

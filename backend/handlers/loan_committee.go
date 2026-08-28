@@ -9,6 +9,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -555,14 +556,14 @@ func (h *LoanCommitteeHandler) GetHistory(c *fiber.Ctx) error {
 
 	type Row struct {
 		LoanID        string  `json:"loan_id"`
-		ApplicantName string  `json:"applicant_name"`
-		MemberNo      string  `json:"member_no"`
-		Amount        float64 `json:"amount"`
-		Status        string  `json:"status"`
-		ReviewedBy    string  `json:"reviewed_by"`
-		Decision      string  `json:"decision"`
-		Comments      *string `json:"comments,omitempty"`
-		ReviewedAt    string  `json:"reviewed_at"`
+		ApplicantName string          `json:"applicant_name"`
+		MemberNo      string          `json:"member_no"`
+		Amount        decimal.Decimal `json:"amount"`
+		Status        string          `json:"status"`
+		ReviewedBy    string          `json:"reviewed_by"`
+		Decision      string          `json:"decision"`
+		Comments      *string         `json:"comments,omitempty"`
+		ReviewedAt    string          `json:"reviewed_at"`
 	}
 
 	var total int64
@@ -677,14 +678,14 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 
 	type HistoryRow struct {
 		LoanID        string  `json:"loan_id"`
-		ApplicantName string  `json:"applicant_name"`
-		MemberNo      string  `json:"member_no"`
-		Amount        float64 `json:"amount"`
-		Status        string  `json:"status"`
-		ReviewedBy    string  `json:"reviewed_by"`
-		Decision      string  `json:"decision"`
-		Comments      *string `json:"comments,omitempty"`
-		ReviewedAt    string  `json:"reviewed_at"`
+		ApplicantName string          `json:"applicant_name"`
+		MemberNo      string          `json:"member_no"`
+		Amount        decimal.Decimal `json:"amount"`
+		Status        string          `json:"status"`
+		ReviewedBy    string          `json:"reviewed_by"`
+		Decision      string          `json:"decision"`
+		Comments      *string         `json:"comments,omitempty"`
+		ReviewedAt    string          `json:"reviewed_at"`
 	}
 
 	var history []HistoryRow

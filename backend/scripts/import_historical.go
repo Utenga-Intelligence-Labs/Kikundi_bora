@@ -13,6 +13,8 @@ import (
 	"kikundibora/config"
 	"kikundibora/database"
 	"kikundibora/models"
+
+	"github.com/shopspring/decimal"
 )
 
 // CSV format: member_code, amount, type, date, status
@@ -104,7 +106,7 @@ func main() {
 			MemberID:           member.ID,
 			ContributionType:   models.ContributionType(contribType),
 			PeriodLabel:        parsedDate.Format("2006-01"),
-			Amount:             amount,
+			Amount:             decimal.NewFromFloat(amount),
 			Status:             models.ContributionStatus(status),
 			IsHistoricalImport: true,
 			ReviewedAt:         time.Now(),

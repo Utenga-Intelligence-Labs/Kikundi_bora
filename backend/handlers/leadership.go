@@ -9,6 +9,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -115,7 +116,7 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 	role := middleware.GetUserRole(c)
 
 	var req struct {
-		ApprovedAmount float64 `json:"approved_amount"`
+		ApprovedAmount decimal.Decimal `json:"approved_amount"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
@@ -181,7 +182,7 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		// Final approval: all four have approved
 		loan.Status = models.LoanApproved
 		loan.ApprovedAmount = &loan.Amount
-		if req.ApprovedAmount > 0 {
+		if req.ApprovedAmount.GreaterThan(decimal.Zero) {
 			loan.ApprovedAmount = &req.ApprovedAmount
 		}
 		loan.ReviewedBy = &userID

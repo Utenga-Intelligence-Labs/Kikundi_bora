@@ -10,6 +10,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -39,17 +40,17 @@ func (h *WelfareHandler) CreateEvent(c *fiber.Ctx) error {
 
 	// Validate funding source amounts
 	if req.FundingSource == string(models.FundTreasury) {
-		if req.TreasuryAmount <= 0 {
+		if req.TreasuryAmount.LessThanOrEqual(decimal.Zero) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha hazina lazima kiwe zaidi ya sifuri"})
 		}
-		req.MemberAmount = 0
+		req.MemberAmount = decimal.Zero
 	} else if req.FundingSource == string(models.FundMemberContribution) {
-		if req.MemberAmount <= 0 {
+		if req.MemberAmount.LessThanOrEqual(decimal.Zero) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha wanachama lazima kiwe zaidi ya sifuri"})
 		}
-		req.TreasuryAmount = 0
+		req.TreasuryAmount = decimal.Zero
 	} else if req.FundingSource == string(models.FundBoth) {
-		if req.TreasuryAmount <= 0 || req.MemberAmount <= 0 {
+		if req.TreasuryAmount.LessThanOrEqual(decimal.Zero) || req.MemberAmount.LessThanOrEqual(decimal.Zero) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha hazina na wanachama lazima viwe zaidi ya sifuri"})
 		}
 	}
@@ -116,7 +117,7 @@ func (h *WelfareHandler) ApproveEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tukio haliwezi kuidhinishwa. Hali yake ni: " + string(event.Status)})
 	}
 
-	if req.ApprovedAmount <= 0 {
+	if req.ApprovedAmount.LessThanOrEqual(decimal.Zero) {
 		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi kilichoidhinishwa lazima kiwe zaidi ya sifuri"})
 	}
@@ -283,19 +284,19 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 
 	// Check if all contributions are collected (for member-funded events)
 	if event.FundingSource == models.FundMemberContribution || event.FundingSource == models.FundBoth {
-		var totalCollected float64
+		var totalCollected decimal.Decimal
 		tx.Model(&models.WelfareContribution{}).
 			Where("event_id = ? AND status = ?", event.ID, models.WelfareContribPaid).
 			Select("COALESCE(SUM(amount), 0)").
 			Scan(&totalCollected)
 
-		var totalRequired float64
+		var totalRequired decimal.Decimal
 		tx.Model(&models.WelfareContribution{}).
 			Where("event_id = ?", event.ID).
 			Select("COALESCE(SUM(amount), 0)").
 			Scan(&totalRequired)
 
-		if totalCollected < totalRequired {
+		if totalCollected.LessThan(totalRequired) {
 			tx.Rollback()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"message": fmt.Sprintf("Michango haijakamilika. Imekusanywa: TZS %s, Inahitajika: TZS %s", formatMoney(totalCollected), formatMoney(totalRequired)),
@@ -305,7 +306,7 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 
 	// Calculate disbursement amount
 	disbursementAmount := event.AmountApproved
-	if disbursementAmount == nil || *disbursementAmount <= 0 {
+	if disbursementAmount == nil || disbursementAmount.LessThanOrEqual(decimal.Zero) {
 		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha kutolewa si sahihi"})
 	}
@@ -620,14 +621,14 @@ func (h *WelfareHandler) GetEvent(c *fiber.Ctx) error {
 		Find(&contributions)
 
 	// Calculate stats
-	var totalPaid, totalPending float64
+	var totalPaid, totalPending decimal.Decimal
 	var paidCount, pendingCount int64
 	for _, c := range contributions {
 		if c.Status == models.WelfareContribPaid {
-			totalPaid += c.Amount
+			totalPaid = totalPaid.Add(c.Amount)
 			paidCount++
 		} else if c.Status == models.WelfareContribPending {
-			totalPending += c.Amount
+			totalPending = totalPending.Add(c.Amount)
 			pendingCount++
 		}
 	}
@@ -766,7 +767,7 @@ func (h *WelfareHandler) generateMemberContributions(tx *gorm.DB, event models.W
 		memberTotal = *event.AmountApproved
 	}
 
-	perMember := memberTotal / float64(len(activeMembers))
+	perMember := memberTotal.Div(decimal.NewFromInt(int64(len(activeMembers))))
 
 	for _, m := range activeMembers {
 		contrib := models.WelfareContribution{

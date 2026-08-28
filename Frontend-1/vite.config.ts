@@ -4,6 +4,10 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
+    // Static hosting (nginx/docker): disable SSR hydration entirely so the
+    // client bundle boots from a prerendered shell instead of expecting
+    // server-injected window.__TSS data (which caused "Invariant failed").
+    spa: { enabled: true, maskPath: "/" },
   },
   vite: {
     plugins: [
