@@ -46,8 +46,9 @@ export function requireUserRole(
   ...roles: string[]
 ) {
   requireAuth(user);
-  if (user && user.role === "admin") return;
-  if (user && !roles.includes(user.role)) {
+  if (!user) return; // still loading, requireAuth already checked token exists
+  if (user.role === "admin") return;
+  if (!roles.includes(user.role)) {
     throw redirect({ to: "/dashibodi" });
   }
 }
