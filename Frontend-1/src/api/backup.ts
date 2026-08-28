@@ -1,4 +1,5 @@
 import { api } from "./client";
+import type { PaginatedResponse } from "./types";
 
 export interface BackupHistory {
   id: string;
@@ -18,13 +19,6 @@ export interface BackupSettings {
   email: string;
   backup_type: string;
   frequency: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
 }
 
 export const backupApi = {
