@@ -214,7 +214,7 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 	if contribution.Member != nil && contribution.Member.UserID != nil {
 		services.NotifyUser(*contribution.Member.UserID, models.NotifSystem,
 			"Mchango Wako Umeithibitishwa",
-			fmt.Sprintf("Mchango wako wa TZS %.0f umethibitishwa.", contribution.Amount),
+			fmt.Sprintf("Mchango wako wa TZS %s umethibitishwa.", contribution.Amount.StringFixed(0)),
 		)
 	}
 
@@ -298,7 +298,7 @@ func (h *MemberContributionHandler) Reject(c *fiber.Ctx) error {
 	if contribution.Member != nil && contribution.Member.UserID != nil {
 		services.NotifyUser(*contribution.Member.UserID, models.NotifSystem,
 			"Mchango Wako Umekataliwa",
-			fmt.Sprintf("Mchango wako wa TZS %.0f umekataliwa. Sababu: %s", contribution.Amount, req.Reason),
+			fmt.Sprintf("Mchango wako wa TZS %s umekataliwa. Sababu: %s", contribution.Amount.StringFixed(0), req.Reason),
 		)
 	}
 

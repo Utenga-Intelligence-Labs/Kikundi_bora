@@ -160,7 +160,7 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 	}
 
 	loanClosed := newStatus == models.LoanClosed
-	msg := fmt.Sprintf("Malipo yamerekodiwa. Salio lililobaki: TZS %.2f", newBalance)
+	msg := fmt.Sprintf("Malipo yamerekodiwa. Salio lililobaki: TZS %s", newBalance.StringFixed(2))
 	if loanClosed {
 		msg = "Malipo yamerekodiwa. Mkopo umefungwa kikamilifu!"
 	}

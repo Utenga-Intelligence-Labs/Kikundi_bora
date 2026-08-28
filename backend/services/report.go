@@ -115,7 +115,7 @@ func GenerateContributionsReport(month string) (*ReportData, error) {
 			memberName,
 			memberNo,
 			memberPhone,
-			fmt.Sprintf("%.0f", c.Amount),
+			c.Amount.StringFixed(0),
 			c.Month.Format("2006-01"),
 			c.PaidAt.Format("2006-01-02"),
 			c.PaymentMethod,
@@ -179,7 +179,7 @@ func GenerateLoansReport(status string) (*ReportData, error) {
 		w.Write([]string{
 			memberName,
 			memberNo,
-			fmt.Sprintf("%.0f", l.Amount),
+			l.Amount.StringFixed(0),
 			approved,
 			balance,
 			purpose,
