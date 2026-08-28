@@ -179,6 +179,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	})
 
 	token, expiresAt := h.generateToken(user.ID, user.Role)
+	if token == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza tokeni"})
+	}
 
 	session := models.UserSession{
 		UserID:       user.ID,
@@ -251,6 +254,9 @@ func (h *AuthHandler) FirstLoginSetup(c *fiber.Ctx) error {
 	})
 
 	token, expiresAt := h.generateToken(user.ID, user.Role)
+	if token == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza tokeni"})
+	}
 
 	session := models.UserSession{
 		UserID:       user.ID,
