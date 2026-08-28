@@ -195,8 +195,9 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 
 	// Update contribution
 	now := time.Now()
+	reviewedBy := reviewerMember.ID
 	contribution.Status = models.ContributionConfirmed
-	contribution.ReviewedByMemberID = reviewerMember.ID
+	contribution.ReviewedByMemberID = &reviewedBy
 	contribution.ReviewedAt = now
 
 	if err := database.DB.Save(&contribution).Error; err != nil {
@@ -277,8 +278,9 @@ func (h *MemberContributionHandler) Reject(c *fiber.Ctx) error {
 
 	// Update contribution
 	now := time.Now()
+	reviewedBy := reviewerMember.ID
 	contribution.Status = models.ContributionRejected
-	contribution.ReviewedByMemberID = reviewerMember.ID
+	contribution.ReviewedByMemberID = &reviewedBy
 	contribution.ReviewReason = req.Reason
 	contribution.ReviewedAt = now
 

@@ -113,7 +113,8 @@ func main() {
 		}
 
 		if status == "CONFIRMED" || status == "REJECTED" {
-			contribution.ReviewedByMemberID = member.ID // Self-reviewed for historical
+			selfReviewed := member.ID // Self-reviewed for historical
+			contribution.ReviewedByMemberID = &selfReviewed
 		}
 
 		if err := database.DB.Create(&contribution).Error; err != nil {

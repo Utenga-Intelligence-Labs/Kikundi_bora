@@ -33,7 +33,7 @@ type MemberContribution struct {
 	ProofImageURL         string             `gorm:"type:text" json:"proof_image_url,omitempty"`
 	ProofMessage          string             `gorm:"type:text" json:"proof_message,omitempty"`
 	Status                ContributionStatus `gorm:"type:varchar(20);not null;default:'PENDING_VERIFICATION'" json:"status"`
-	ReviewedByMemberID    string             `gorm:"type:uuid" json:"reviewed_by_member_id,omitempty"`
+	ReviewedByMemberID    *string            `gorm:"type:uuid" json:"reviewed_by_member_id,omitempty"`
 	ReviewReason          string             `gorm:"type:text" json:"review_reason,omitempty"`
 	IsHistoricalImport    bool               `gorm:"not null;default:false" json:"is_historical_import"`
 	CreatedAt             time.Time          `gorm:"autoCreateTime" json:"created_at"`

@@ -155,7 +155,8 @@ func (h *ImportHandler) ImportContributions(c *fiber.Ctx) error {
 		}
 
 		if status == "CONFIRMED" || status == "REJECTED" {
-			contribution.ReviewedByMemberID = member.ID
+			selfReviewed := member.ID // Self-reviewed for historical
+			contribution.ReviewedByMemberID = &selfReviewed
 			contribution.ReviewedAt = time.Now()
 		}
 
