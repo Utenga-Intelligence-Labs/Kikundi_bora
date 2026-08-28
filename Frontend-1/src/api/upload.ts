@@ -12,7 +12,6 @@ export const uploadApi = {
     return api.request<UploadResponse>("/upload/avatar", {
       method: "POST",
       body: form,
-      headers: { "Content-Type": undefined as unknown as string },
     });
   },
 
@@ -23,7 +22,6 @@ export const uploadApi = {
     return api.request<UploadResponse>("/upload/doc", {
       method: "POST",
       body: form,
-      headers: { "Content-Type": undefined as unknown as string },
     });
   },
 };

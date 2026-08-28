@@ -28,7 +28,8 @@ class ApiClient {
   }
 
   async request<T>(path: string, opts: RequestInit = {}): Promise<T> {
-    const merged: Record<string, string> = { "Content-Type": "application/json" };
+    const isFormData = opts.body instanceof FormData;
+    const merged: Record<string, string> = isFormData ? {} : { "Content-Type": "application/json" };
     const token = this.getToken?.();
     if (token) merged["Authorization"] = `Bearer ${token}`;
     if (opts.headers) {
@@ -90,6 +91,40 @@ class ApiClient {
 
   delete<T>(path: string) {
     return this.request<T>(path, { method: "DELETE" });
+  }
+
+  async download(path: string, filename: string): Promise<void> {
+    const merged: Record<string, string> = {};
+    const token = this.getToken?.();
+    if (token) merged["Authorization"] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}${path}`, { headers: merged });
+
+    if (res.status === 401) {
+      const hasToken = !!this.getToken?.();
+      if (hasToken) {
+        this.onUnauthorized?.();
+        throw new ApiError("Session imeisha. Tafadhali ingia tena.", 401);
+      }
+    }
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(
+        body.message || `Hitilafu ya seva (${res.status})`,
+        res.status
+      );
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 }
 
