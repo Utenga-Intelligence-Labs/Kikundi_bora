@@ -25,6 +25,8 @@ func AutoMigrate() {
 		&models.LeadershipPosition{},
 		&models.MemberContribution{},
 		&models.PendingAction{},
+		&models.Group{},
+		&models.GroupSettingProposal{},
 
 		// Member & financial tables
 		&models.Member{},

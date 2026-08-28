@@ -32,8 +32,12 @@ func main() {
 	database.Connect()
 	services.InitEmail()
 
-	// Ensure leadership positions exist on every startup (idempotent)
+	// Ensure leadership positions and group defaults exist on every startup (idempotent)
 	database.EnsureLeadershipSetup()
+	database.EnsureGroupSetup()
+
+	// Background scheduler: contribution due-date notifications
+	services.StartScheduler()
 
 	if *migrateFlag {
 		database.AutoMigrate()
@@ -94,6 +98,7 @@ func main() {
 	api := app.Group("/api/v1")
 
 	authHandler := handlers.NewAuthHandler()
+	groupSettingsHandler := handlers.NewGroupSettingsHandler()
 	memberHandler := handlers.NewMemberHandler()
 	contribHandler := handlers.NewContributionHandler()
 	loanHandler := handlers.NewLoanHandler()
@@ -138,6 +143,16 @@ func main() {
 	protected.Post("/upload/doc", uploadHandler.UploadDoc)
 
 	protected.Get("/dashboard", dashHandler.Summary)
+
+	// Group contribution settings (single-group deployment).
+	// Chair proposes; only secretary approval applies changes.
+	groups := protected.Group("/groups")
+	groups.Get("/current", groupSettingsHandler.GetCurrent)
+	settings := groups.Group("/:id/contribution-settings")
+	settings.Get("/", groupSettingsHandler.GetSettings)
+	settings.Post("/propose", middleware.RequireRoles(models.RoleChair), groupSettingsHandler.Propose)
+	settings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Approve)
+	settings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Reject)
 
 	// User Management routes (Mwenyekiti creates, Katibu approves)
 	users := protected.Group("/users")

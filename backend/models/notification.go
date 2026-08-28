@@ -17,6 +17,7 @@ const (
 	NotifCommitteeRemove   NotificationType = "COMMITTEE_REMOVED"
 	NotifRepayment         NotificationType = "REPAYMENT"
 	NotifContribution      NotificationType = "CONTRIBUTION"
+	NotifContributionDue   NotificationType = "CONTRIBUTION_DUE"
 	NotifSystem            NotificationType = "SYSTEM"
 	NotifWelfareCreated    NotificationType = "WELFARE_CREATED"
 	NotifWelfareApproved   NotificationType = "WELFARE_APPROVED"

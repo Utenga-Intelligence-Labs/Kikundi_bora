@@ -1,13 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
 import { api } from "@/api/client";
 import { uploadApi } from "@/api/upload";
 import { AppShell } from "@/components/AppShell";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon, CalendarDays } from "lucide-react";
 import { MfukoContributionForm } from "@/components/MfukoContributionForm";
+import { groupsApi, INTERVAL_LABELS } from "@/api/groups";
 
 export const Route = createFileRoute("/weka-mchango")({
   beforeLoad: () => {
@@ -20,6 +21,25 @@ function WekaMchangoPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Group contribution settings (approved) — banner + fixed amount enforcement
+  const { data: settingsData } = useQuery({
+    queryKey: ["groups", "settings"],
+    queryFn: () => groupsApi.current(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const fixedAmount =
+    settingsData?.data?.fixed_contribution_amount != null
+      ? Number(settingsData.data.fixed_contribution_amount)
+      : null;
+  const nextDue = settingsData?.next_due_date ?? null;
+
+  // Prefill the fixed amount for AKIBA when configured
+  useEffect(() => {
+    if (fixedAmount != null) {
+      setFormData((f) => ({ ...f, amount: String(fixedAmount) }));
+    }
+  }, [fixedAmount]);
 
   const [formData, setFormData] = useState({
     contribution_type: "AKIBA",
@@ -146,6 +166,18 @@ function WekaMchangoPage() {
   return (
     <AppShell title="Weka Mchango" subtitle="Wasilisha mchango wako kwa uthibitisho">
       <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+        {(fixedAmount != null || nextDue) && (
+          <div className="card-surface p-4 border-l-4 border-l-primary">
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <CalendarDays className="h-3 w-3" /> Mipangilio ya michango ya kikundi
+            </p>
+            <p className="text-sm font-semibold mt-0.5">
+              {fixedAmount != null && <>TZS {fixedAmount.toLocaleString()}</>}
+              {fixedAmount != null && settingsData && <> · {INTERVAL_LABELS[settingsData.data.contribution_interval]}</>}
+              {nextDue && <> · mchango ujao: {nextDue}</>}
+            </p>
+          </div>
+        )}
         <div className="card-surface p-6">
           <h3 className="font-display text-lg font-semibold mb-4">Aina ya Mchango</h3>
           <div className="space-y-3">
@@ -197,7 +229,9 @@ function WekaMchangoPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Kiasi (TZS)</label>
+            <label className="block text-sm font-medium mb-1">
+              Kiasi (TZS){fixedAmount != null ? " — lililopangwa na kikundi" : ""}
+            </label>
             <input
               type="number"
               step="0.01"
@@ -205,9 +239,15 @@ function WekaMchangoPage() {
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               placeholder="0.00"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              readOnly={fixedAmount != null}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-70 read-only:bg-muted/40"
               required
             />
+            {fixedAmount != null && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Kikundi kimepanga mchango wa TZS {fixedAmount.toLocaleString()} — kiasi hiki hakiwezi kubadilishwa.
+              </p>
+            )}
           </div>
 
           <div>

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
+import { ContributionSettingsCard } from "@/components/ContributionSettingsCard";
 import { useMembers } from "@/hooks/use-members";
 import {
   useCommitteeMembers,
@@ -85,7 +86,8 @@ function MipangilioPage() {
 
   return (
     <AppShell title="Mipangilio" subtitle="Sanidi mfumo kulingana na kikundi chako">
-      <div className="grid gap-4 lg:grid-cols-2">
+      <ContributionSettingsCard />
+      <div className="grid gap-4 lg:grid-cols-2 mt-4">
         <Card icon={Cog} title="Taarifa za Kikundi">
           <Row k="Jina la kikundi" v="Money Seeking" />
           <Row k="Mahali" v="Iringa, Tanzania" />

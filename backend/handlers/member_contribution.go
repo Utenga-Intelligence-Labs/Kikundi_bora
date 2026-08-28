@@ -67,6 +67,18 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 		})
 	}
 
+	// Fixed contribution amount enforcement (group settings) — AKIBA is the
+	// periodic contribution governed by the interval setting. MFUKO_WA_KIJAMII
+	// amounts follow the welfare event, so they are not fixed.
+	if req.ContributionType == "AKIBA" {
+		var group models.Group
+		if err := database.DB.First(&group).Error; err == nil {
+			if err := services.CheckFixedContributionAmount(group.FixedContributionAmount, req.Amount); err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
+			}
+		}
+	}
+
 	// MFUKO_WA_KIJAMII must reference an approved, member-funded welfare event
 	var welfareEventID *string
 	if req.ContributionType == "MFUKO_WA_KIJAMII" {

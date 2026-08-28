@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { useMembers } from "@/hooks/use-members";
 import { useLoans } from "@/hooks/use-loans";
@@ -7,10 +8,11 @@ import { AppShell } from "@/components/AppShell";
 import { tzs } from "@/lib/format";
 import { useAuth } from "@/lib/auth-provider";
 import { roleMap } from "@/api/types";
+import { groupsApi, INTERVAL_LABELS } from "@/api/groups";
 import { roleSubtitle } from "@/lib/roles";
 import { requireAuth } from "@/lib/role-guards";
 import { useSystemHealth } from "@/hooks/use-admin";
-import { ArrowRight, Users, PiggyBank, Banknote, Receipt, TrendingUp, AlertCircle, ShieldCheck, Wallet, ClipboardList, CheckCircle2, Loader2, Shield, Activity, Settings } from "lucide-react";
+import { ArrowRight, Users, PiggyBank, Banknote, Receipt, TrendingUp, AlertCircle, ShieldCheck, Wallet, ClipboardList, CheckCircle2, Loader2, Shield, Activity, Settings, CalendarDays } from "lucide-react";
 
 export const Route = createFileRoute("/dashibodi")({
   head: () => ({
@@ -173,6 +175,17 @@ function MemberView({ userId, userName, memberId, memberCode, userPhone }: { use
   const me = memberId ? { id: memberId, member_no: memberCode, phone: userPhone } : null;
   const memberIdVal = me?.id;
 
+  // Group contribution settings — due-date banner for members
+  const { data: settingsData } = useQuery({
+    queryKey: ["groups", "settings"],
+    queryFn: () => groupsApi.current(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const fixedAmount = settingsData?.data?.fixed_contribution_amount != null
+    ? Number(settingsData.data.fixed_contribution_amount)
+    : null;
+  const nextDue = settingsData?.next_due_date ?? null;
+
   // Personal totals only — never show group dashboard as "Akiba Yangu"
   const { data: contribsData, isLoading: contribsLoading } = useContributions({
     member_id: memberIdVal,
@@ -213,6 +226,24 @@ function MemberView({ userId, userName, memberId, memberCode, userPhone }: { use
 
   return (
     <>
+      {(fixedAmount != null || nextDue) && (
+        <div className="card-surface p-4 mb-4 border-l-4 border-l-primary flex items-center gap-3">
+          <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="text-sm font-semibold">
+              Mchango ujao
+              {fixedAmount != null && <>: TZS {fixedAmount.toLocaleString()}</>}
+              {nextDue && <> · ifikapo {nextDue}</>}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Kipindi: {settingsData ? INTERVAL_LABELS[settingsData.data.contribution_interval] : "—"} · Wasilisha kupitia "Weka Mchango"
+            </p>
+          </div>
+          <Link to="/weka-mchango" className="ml-auto shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+            Weka Mchango
+          </Link>
+        </div>
+      )}
       <HeroBalance label="Akiba Yangu" value={tzs(totalContributions)} stats={[
         ["Michango", String(myContributions.length)],
         ["Mikopo wazi", String(outstandingLoans.length)],
