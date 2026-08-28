@@ -420,6 +420,14 @@ func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
 	}
 	if req.Phone != nil {
 		user.Phone = strings.TrimSpace(*req.Phone)
+		if user.Phone == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nambari ya simu haliwezi kuwa tupu"})
+		}
+		var count int64
+		database.DB.Model(&models.User{}).Where("phone = ? AND id != ? AND deleted_at IS NULL", user.Phone, userID).Count(&count)
+		if count > 0 {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Nambari ya simu tayari imetumika na mtumiaji mwingine"})
+		}
 		updates["phone"] = user.Phone
 	}
 	if req.AvatarURL != nil {
