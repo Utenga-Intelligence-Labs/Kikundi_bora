@@ -20,6 +20,6 @@ func SetupCORS() fiber.Handler {
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		ExposeHeaders:    "Content-Length",
 		AllowCredentials: true,
-		MaxAge:           int(12 * time.Hour),
+		MaxAge:           int((12 * time.Hour).Seconds()),
 	})
 }
