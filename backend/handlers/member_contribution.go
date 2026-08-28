@@ -39,8 +39,9 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 		ContributionType string  `json:"contribution_type"`
 		PeriodLabel      string  `json:"period_label"`
 		Amount           decimal.Decimal `json:"amount"`
-		ProofImageURL    string          `json:"proof_image_url"`
-		ProofMessage     string          `json:"proof_message"`
+		ProofImageURL    string  `json:"proof_image_url"`
+		ProofMessage     string  `json:"proof_message"`
+		WelfareEventID   string  `json:"welfare_event_id"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -66,6 +67,31 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 		})
 	}
 
+	// MFUKO_WA_KIJAMII must reference an approved, member-funded welfare event
+	var welfareEventID *string
+	if req.ContributionType == "MFUKO_WA_KIJAMII" {
+		if req.WelfareEventID == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"message": "Lazima uchague mfuko wa kijamii unaochangia",
+			})
+		}
+		var event models.WelfareEvent
+		if err := database.DB.
+			Where("id = ? AND status = ? AND funding_source IN ?",
+				req.WelfareEventID, models.WelfareApproved,
+				[]models.WelfareFundingSource{models.FundMemberContribution, models.FundBoth}).
+			First(&event).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"message": "Mfuko wa kijamii haujapatikana au haukuidhinishwa kuchangia",
+			})
+		}
+		welfareEventID = &req.WelfareEventID
+	} else if req.WelfareEventID != "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Kuchagua mfuko kunatumika kwa MFUKO_WA_KIJAMII tu",
+		})
+	}
+
 	// Create contribution
 	contribution := models.MemberContribution{
 		MemberID:         member.ID,
@@ -74,6 +100,7 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 		Amount:           req.Amount,
 		ProofImageURL:    req.ProofImageURL,
 		ProofMessage:     req.ProofMessage,
+		WelfareEventID:   welfareEventID,
 		Status:           models.ContributionPending,
 	}
 
@@ -107,7 +134,10 @@ func (h *MemberContributionHandler) MyContributions(c *fiber.Ctx) error {
 	}
 
 	var contributions []models.MemberContribution
-	database.DB.Where("member_id = ?", member.ID).
+	database.DB.Preload("WelfareEvent", func(db *gorm.DB) *gorm.DB {
+		return db.Select("id, event_type, description, status")
+	}).
+		Where("member_id = ?", member.ID).
 		Order("created_at DESC").
 		Find(&contributions)
 
@@ -124,6 +154,9 @@ func (h *MemberContributionHandler) AllContributions(c *fiber.Ctx) error {
 	database.DB.Preload("Member", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id, member_no, full_name, phone")
 	}).
+		Preload("WelfareEvent", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, event_type, description, status")
+		}).
 		Order("created_at DESC").
 		Find(&contributions)
 

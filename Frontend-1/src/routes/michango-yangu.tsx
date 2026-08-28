@@ -19,6 +19,12 @@ interface MemberContribution {
   contribution_type: "AKIBA" | "MFUKO_WA_KIJAMII";
   period_label: string;
   amount: string; // backend decimal.Decimal serializes as string
+  welfare_event?: {
+    id: string;
+    event_type: string;
+    description: string;
+    status: string;
+  };
   proof_image_url?: string;
   proof_message?: string;
   status: "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED";
@@ -77,6 +83,11 @@ function MichangoYanguPage() {
                       </span>
                     </div>
                     <p className="font-display text-lg font-bold">TZS {Number(contrib.amount).toLocaleString()}</p>
+                    {contrib.welfare_event && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Mfuko: {contrib.welfare_event.event_type} — {contrib.welfare_event.description}
+                      </p>
+                    )}
                     <p className="text-sm text-muted-foreground mt-1">Kipindi: {contrib.period_label}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       Tarehe: {new Date(contrib.created_at).toLocaleDateString("sw-TZ")}

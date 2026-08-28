@@ -533,6 +533,27 @@ func (h *WelfareHandler) maybeCompleteWelfareEvent(tx *gorm.DB, eventID string) 
 	return nil
 }
 
+// ---------- LIST: Events members can contribute to ----------
+
+// ListContributeEvents returns APPROVED events funded (fully or partly) by
+// member contributions — these are the "mifuko" a member can submit a
+// contribution against from the Weka Mchango page.
+// GET /api/v1/welfare/contribute-events
+func (h *WelfareHandler) ListContributeEvents(c *fiber.Ctx) error {
+	var events []models.WelfareEvent
+	database.DB.
+		Preload("Member", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, member_no, full_name")
+		}).
+		Where("status = ? AND funding_source IN ?",
+			models.WelfareApproved,
+			[]models.WelfareFundingSource{models.FundMemberContribution, models.FundBoth}).
+		Order("created_at DESC").
+		Find(&events)
+
+	return c.JSON(fiber.Map{"data": events, "total": len(events)})
+}
+
 // ---------- LIST: Events (role-filtered) ----------
 
 func (h *WelfareHandler) ListEvents(c *fiber.Ctx) error {

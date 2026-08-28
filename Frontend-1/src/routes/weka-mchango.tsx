@@ -7,6 +7,7 @@ import { uploadApi } from "@/api/upload";
 import { AppShell } from "@/components/AppShell";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon } from "lucide-react";
+import { MfukoContributionForm } from "@/components/MfukoContributionForm";
 
 export const Route = createFileRoute("/weka-mchango")({
   beforeLoad: () => {
@@ -179,6 +180,10 @@ function WekaMchangoPage() {
           </div>
         </div>
 
+        {formData.contribution_type === "MFUKO_WA_KIJAMII" ? (
+          <MfukoContributionForm />
+        ) : (
+          <>
         <div className="card-surface p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Kipindi (Mwezi)</label>
@@ -313,6 +318,8 @@ function WekaMchangoPage() {
             </>
           )}
         </button>
+          </>
+        )}
       </form>
     </AppShell>
   );

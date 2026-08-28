@@ -209,6 +209,9 @@ func main() {
 	// Dashboard — all authenticated users
 	welfare.Get("/dashboard", welfareHandler.Dashboard)
 
+	// Events members can contribute to (approved, member-funded)
+	welfare.Get("/contribute-events", welfareHandler.ListContributeEvents)
+
 	// Events — all can view, treasurer creates, chair OR secretary approves
 	welfare.Get("/events", welfareHandler.ListEvents)
 	welfare.Get("/events/:id", welfareHandler.GetEvent)

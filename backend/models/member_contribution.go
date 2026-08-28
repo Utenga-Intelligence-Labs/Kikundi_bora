@@ -36,9 +36,11 @@ type MemberContribution struct {
 	ReviewedByMemberID    *string            `gorm:"type:uuid" json:"reviewed_by_member_id,omitempty"`
 	ReviewReason          string             `gorm:"type:text" json:"review_reason,omitempty"`
 	IsHistoricalImport    bool               `gorm:"not null;default:false" json:"is_historical_import"`
+	WelfareEventID        *string            `gorm:"type:uuid" json:"welfare_event_id,omitempty"`
 	CreatedAt             time.Time          `gorm:"autoCreateTime" json:"created_at"`
 	ReviewedAt            time.Time          `json:"reviewed_at,omitempty"`
 
-	Member         *Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
-	ReviewedBy     *Member `gorm:"foreignKey:ReviewedByMemberID" json:"reviewed_by,omitempty"`
+	Member         *Member       `gorm:"foreignKey:MemberID" json:"member,omitempty"`
+	ReviewedBy     *Member       `gorm:"foreignKey:ReviewedByMemberID" json:"reviewed_by,omitempty"`
+	WelfareEvent   *WelfareEvent `gorm:"foreignKey:WelfareEventID" json:"welfare_event,omitempty"`
 }

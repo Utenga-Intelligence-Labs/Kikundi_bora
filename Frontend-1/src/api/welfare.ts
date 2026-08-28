@@ -117,6 +117,10 @@ export const welfareApi = {
   getDashboard: () =>
     api.get<{ data: WelfareDashboard }>("/welfare/dashboard"),
 
+  // Events members can contribute to (approved, member-funded "mifuko")
+  contributeEvents: () =>
+    api.get<{ data: WelfareEvent[]; total: number }>("/welfare/contribute-events"),
+
   // Events
   listEvents: (params?: {
     page?: number;
