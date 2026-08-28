@@ -36,6 +36,7 @@ func Seed() {
 }
 
 func seedUsers() {
+	// WARNING: Demo password only. Never use in production.
 	hashed, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.DefaultCost)
 	pwd := string(hashed)
 
