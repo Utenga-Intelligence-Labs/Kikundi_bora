@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -88,7 +89,9 @@ func (h *PendingActionHandler) Approve(c *fiber.Ctx) error {
 	var req struct {
 		Remarks string `json:"remarks"`
 	}
-	c.BodyParser(&req)
+	if err := c.BodyParser(&req); err != nil {
+		log.Printf("WARN: BodyParser error: %v", err)
+	}
 
 	var action models.PendingAction
 	if err := database.DB.First(&action, "id = ?", id).Error; err != nil {
@@ -136,7 +139,9 @@ func (h *PendingActionHandler) Reject(c *fiber.Ctx) error {
 	var req struct {
 		Remarks string `json:"remarks"`
 	}
-	c.BodyParser(&req)
+	if err := c.BodyParser(&req); err != nil {
+		log.Printf("WARN: BodyParser error: %v", err)
+	}
 
 	var action models.PendingAction
 	if err := database.DB.First(&action, "id = ?", id).Error; err != nil {

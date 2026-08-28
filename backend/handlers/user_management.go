@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -197,7 +198,10 @@ func (h *UserManagementHandler) ApproveUser(c *fiber.Ctx) error {
 	userID := c.Params("id")
 
 	var req models.ApproveUserRequest
-	c.BodyParser(&req) // optional, no error if empty
+	if err := c.BodyParser(&req); err != nil {
+		// Body is optional, but log malformed JSON for debugging
+		log.Printf("WARN: BodyParser error in ApproveUser: %v", err)
+	}
 
 	var user models.User
 	if err := database.DB.Where("deleted_at IS NULL").First(&user, "id = ?", userID).Error; err != nil {
