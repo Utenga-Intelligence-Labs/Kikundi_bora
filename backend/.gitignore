@@ -1,5 +1,7 @@
 kikundi-api
 .env
+uploads/contributions/
+uploads/reports/
 *.exe
 *.dll
 *.so
