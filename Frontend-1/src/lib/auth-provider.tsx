@@ -18,6 +18,10 @@ interface AuthContextValue {
   login: (data: LoginRequest) => Promise<AuthResponse>;
   register: (data: RegisterRequest) => Promise<AuthResponse>;
   logout: () => Promise<void>;
+  isMember: boolean;
+  isLeadership: boolean;
+  isAdmin: boolean;
+  hasLeadershipRole: (...roles: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
