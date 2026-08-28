@@ -218,7 +218,9 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
 	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
 
 	services.LogAudit(c, &userID, models.AuditLoanReview, "loans", &loan.ID, nil, map[string]interface{}{
 		"status": string(loan.Status), "role": string(role),

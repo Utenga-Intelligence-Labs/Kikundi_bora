@@ -1,6 +1,8 @@
 package services
 
 import (
+	"log"
+
 	"kikundibora/database"
 	"kikundibora/models"
 )
@@ -13,7 +15,9 @@ func NotifyUser(userID string, notifType models.NotificationType, title, message
 		Title:   title,
 		Message: message,
 	}
-	database.DB.Create(&notif)
+	if err := database.DB.Create(&notif).Error; err != nil {
+		log.Printf("ERROR: Failed to create notification for user %s: %v", userID, err)
+	}
 }
 
 // NotifyUsers sends a notification to multiple users.
