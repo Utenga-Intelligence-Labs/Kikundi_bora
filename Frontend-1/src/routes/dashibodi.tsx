@@ -231,7 +231,7 @@ function MemberView({ userId, userName, memberId, memberCode, userPhone }: { use
         <div className="card-surface p-4">
           <p className="text-xs text-muted-foreground">Namba ya simu</p>
           <p className="font-display text-lg font-bold">{me.phone}</p>
-          <p className="text-xs text-muted-foreground">{me.address ?? "—"}</p>
+          <p className="text-xs text-muted-foreground">{me.member_no ?? "—"}</p>
         </div>
       </div>
 
