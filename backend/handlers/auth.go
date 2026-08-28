@@ -191,7 +191,10 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		LastActiveAt: now,
 		ExpiresAt:    time.Now().Add(24 * time.Hour),
 	}
-	database.DB.Create(&session)
+	if err := database.DB.Create(&session).Error; err != nil {
+		log.Printf("ERROR: Failed to create session: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuanzisha kikao"})
+	}
 
 	return c.JSON(models.AuthResponse{
 		Token:              token,
@@ -266,7 +269,10 @@ func (h *AuthHandler) FirstLoginSetup(c *fiber.Ctx) error {
 		LastActiveAt: time.Now(),
 		ExpiresAt:    time.Now().Add(24 * time.Hour),
 	}
-	database.DB.Create(&session)
+	if err := database.DB.Create(&session).Error; err != nil {
+		log.Printf("ERROR: Failed to create session: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuanzisha kikao"})
+	}
 
 	return c.JSON(models.AuthResponse{
 		Token:              token,
