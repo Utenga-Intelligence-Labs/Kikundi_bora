@@ -22,7 +22,7 @@ cd "$ROOT"
 BACKEND_PORT="${BACKEND_PORT:-8080}"
 FRONTEND_PORT="${FRONTEND_PORT:-8081}"
 DB_HOST_PORT="${DB_HOST_PORT:-5433}"   # avoid clashing with a local Postgres on 5432
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-AdminPass123!}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
 
 NO_START=0
 RESET_DB=0
@@ -54,11 +54,12 @@ if [ -f backend/.env ]; then
   ok "backend/.env already exists — keeping it"
 else
   JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  DB_PASSWORD="$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   cat > backend/.env <<EOF
 DB_HOST=db
 DB_PORT=5432
 DB_USER=kikundi
-DB_PASSWORD=kikundi_secret_2024
+DB_PASSWORD=$DB_PASSWORD
 DB_NAME=kikundi_db
 DB_SSLMODE=disable
 JWT_SECRET=$JWT_SECRET
