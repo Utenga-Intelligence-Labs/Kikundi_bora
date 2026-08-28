@@ -106,9 +106,21 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		user.ID,
 	)
 
+	// Return safe user object without internal fields
+	safeUser := fiber.Map{
+		"id":     user.ID,
+		"name":   user.Name,
+		"phone":  user.Phone,
+		"role":   user.Role,
+		"status": user.Status,
+	}
+	if user.Email != nil {
+		safeUser["email"] = *user.Email
+	}
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Usajili umekamilika. Akaunti yako inasubiri kuidhinishwa na Katibu.",
-		"data":    user,
+		"data":    safeUser,
 	})
 }
 
