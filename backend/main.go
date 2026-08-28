@@ -149,7 +149,7 @@ func main() {
 
 	members := protected.Group("/members")
 	members.Get("/", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberHandler.List)
-	members.Get("/:id", memberHandler.Get)
+	members.Get("/:id", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberHandler.Get)
 	members.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), memberHandler.Create)
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)
 	members.Delete("/:id", middleware.RequireRoles(models.RoleChair), memberHandler.Delete)
