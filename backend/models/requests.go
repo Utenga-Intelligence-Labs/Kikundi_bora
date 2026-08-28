@@ -11,7 +11,7 @@ type RegisterRequest struct {
 	Name     string `json:"name" validate:"required,min=2"`
 	Email    string `json:"email" validate:"required,email"`
 	Phone    string `json:"phone" validate:"required"`
-	Password string `json:"password" validate:"required,min=6"`
+	Password string `json:"password" validate:"required,min=8"`
 	Role     Role   `json:"role" validate:"required,oneof=chair treasurer secretary member"`
 }
 
@@ -39,7 +39,7 @@ type UpdateProfileRequest struct {
 
 type ResetPasswordRequest struct {
 	Email       string `json:"email" validate:"required,email"`
-	NewPassword string `json:"new_password" validate:"required,min=6"`
+	NewPassword string `json:"new_password" validate:"required,min=8"`
 }
 
 type CreateMemberRequest struct {
@@ -298,7 +298,7 @@ type RejectUserRequest struct {
 }
 
 type FirstLoginSetupRequest struct {
-	NewPassword     string `json:"new_password" validate:"required,min=6"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
 	ConfirmPassword string `json:"confirm_password" validate:"required"`
 }
 

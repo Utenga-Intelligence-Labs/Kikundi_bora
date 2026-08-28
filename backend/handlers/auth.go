@@ -378,8 +378,8 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
 	}
 
-	if len(body.NewPassword) < 6 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri jipya lazima liwe na angalau herufi 6"})
+	if len(body.NewPassword) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri jipya lazima liwe na angalau herufi 8"})
 	}
 
 	var user models.User
