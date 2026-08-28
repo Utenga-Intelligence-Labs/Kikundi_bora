@@ -15,8 +15,8 @@ export const Route = createFileRoute("/uongozi/mikopo")({
 });
 
 interface Loan {
-  id: string; member_id: string; amount: number; approved_amount?: number;
-  balance_remaining?: number; purpose?: string; due_date: string; status: string;
+  id: string; member_id: string; amount: string; approved_amount?: string;
+  balance_remaining?: string; purpose?: string; due_date: string; status: string;
   rejection_reason?: string; applied_at: string;
   hazina_approved_at?: string; katibu_approved_at?: string; bodi_approved_at?: string; mwenyekiti_approved_at?: string;
   member?: { id: string; member_no: string; full_name: string; phone: string };
@@ -54,7 +54,7 @@ function MikopoPage() {
   const { data: membersData } = useMembers({ limit: 50 });
 
   const approveMutation = useMutation({
-    mutationFn: async ({ loanId, amount }: { loanId: string; amount: number }) => {
+    mutationFn: async ({ loanId, amount }: { loanId: string; amount: string | number }) => {
       const token = tokenStorage.get();
       const base = import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/v1";
       const res = await fetch(`${base}/uongozi/mikopo/${loanId}/approve`, {
@@ -84,7 +84,7 @@ function MikopoPage() {
   });
 
   const handleApprove = async (loan: Loan) => {
-    const confirmed = window.confirm(`Idhinisha mkopo wa TZS ${loan.amount.toLocaleString()}?`);
+    const confirmed = window.confirm(`Idhinisha mkopo wa TZS ${Number(loan.amount).toLocaleString()}?`);
     if (!confirmed) return;
     setActionLoading(loan.id);
     try { await approveMutation.mutateAsync({ loanId: loan.id, amount: loan.amount }); alert("Umeidhinisha!"); }
@@ -140,7 +140,7 @@ function MikopoPage() {
                     </div>
                     <h3 className="font-display text-lg font-semibold">{loan.member?.full_name}</h3>
                     <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                      <div><p className="text-muted-foreground">Kiasi</p><p className="font-semibold">TZS {loan.amount.toLocaleString()}</p></div>
+                      <div><p className="text-muted-foreground">Kiasi</p><p className="font-semibold">TZS {Number(loan.amount).toLocaleString()}</p></div>
                       <div><p className="text-muted-foreground">Tarehe ya Kulipa</p><p className="font-semibold">{new Date(loan.due_date).toLocaleDateString("sw-TZ")}</p></div>
                     </div>
 

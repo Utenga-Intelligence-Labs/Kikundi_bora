@@ -1,5 +1,7 @@
-export const tzs = (n: number) =>
-  new Intl.NumberFormat("sw-TZ", { maximumFractionDigits: 0 }).format(n || 0) + " TZS";
+// Backend decimal.Decimal amounts arrive as JSON strings — coerce before
+// formatting. (Intl.NumberFormat also accepts strings, but be explicit.)
+export const tzs = (n: number | string) =>
+  new Intl.NumberFormat("sw-TZ", { maximumFractionDigits: 0 }).format(Number(n) || 0) + " TZS";
 
 export const tarehe = (d: string | Date) => {
   const x = typeof d === "string" ? new Date(d) : d;

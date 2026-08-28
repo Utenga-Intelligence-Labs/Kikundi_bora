@@ -22,7 +22,7 @@ function MarejeshoPage() {
 
   const { data: repaymentsData, isLoading, error, refetch } = useRepayments({ limit: 200 });
   const repayments = repaymentsData?.data ?? [];
-  const jumla = repayments.reduce((s, r) => s + r.amount, 0);
+  const jumla = repayments.reduce((s, r) => s + Number(r.amount), 0);
 
   return (
     <AppShell
@@ -102,7 +102,7 @@ function Form({ onClose }: { onClose: () => void }) {
   const [loanId, setLoanId] = useState("");
   useEffect(() => { if (!loanId && openLoans[0]?.id) setLoanId(String(openLoans[0].id)); }, [openLoans]);
   const selectedLoan = openLoans.find((l) => String(l.id) === loanId);
-  const bal = selectedLoan?.balance_remaining ?? 0;
+  const bal = Number(selectedLoan?.balance_remaining ?? 0);
 
   const [f, setF] = useState({ kiasi: "", tarehe: new Date().toISOString().slice(0, 10), maelezo: "" });
   const kiasiN = Number(f.kiasi);

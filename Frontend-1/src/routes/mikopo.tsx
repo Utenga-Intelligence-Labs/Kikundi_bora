@@ -68,7 +68,7 @@ function MikopoPage() {
 
   const jumlaWazi = visible
     .filter((l) => l.status === "OUTSTANDING")
-    .reduce((s, l) => s + (l.balance_remaining ?? 0), 0);
+    .reduce((s, l) => s + Number(l.balance_remaining ?? 0), 0);
 
   return (
     <AppShell
@@ -117,8 +117,8 @@ function MikopoPage() {
 
       <div className="mt-3 space-y-2.5">
         {list.map((l) => {
-          const bal = l.balance_remaining ?? (l.status === "APPROVED" ? (l.approved_amount ?? l.amount) : 0);
-          const pct = l.approved_amount ? Math.min(100, (((l.approved_amount ?? 0) - bal) / (l.approved_amount ?? 1)) * 100) : 0;
+          const bal = Number(l.balance_remaining ?? (l.status === "APPROVED" ? (l.approved_amount ?? l.amount) : 0));
+          const pct = l.approved_amount ? Math.min(100, ((Number(l.approved_amount) - bal) / Number(l.approved_amount)) * 100) : 0;
           return (
             <div key={l.id} className="card-surface p-4">
               <div className="flex items-start justify-between gap-3">

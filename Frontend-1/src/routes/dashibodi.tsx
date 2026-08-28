@@ -56,7 +56,7 @@ function ChairmanView() {
 
   return (
     <>
-      <HeroBalance label="Salio la Kikundi" value={tzs((dash?.total_contributions ?? 0) + (dash?.total_repayments ?? 0) - (dash?.total_loans_issued ?? 0))} stats={[
+      <HeroBalance label="Salio la Kikundi" value={tzs(Number(dash?.total_contributions ?? 0) + Number(dash?.total_repayments ?? 0) - Number(dash?.total_loans_issued ?? 0))} stats={[
         ["Wanachama hai", String(dash?.total_active_members ?? 0)],
         ["Mikopo wazi", String(dash?.count_outstanding_loans ?? 0)],
         ["Deni bado", tzs(dash?.total_outstanding_balance ?? 0)],
@@ -99,7 +99,7 @@ function TreasurerView() {
 
   return (
     <>
-      <HeroBalance label="Mapato ya Mwezi Huu" value={tzs((dash?.total_contributions_this_month ?? 0) + (dash?.total_repayments_this_month ?? 0))} stats={[
+      <HeroBalance label="Mapato ya Mwezi Huu" value={tzs(Number(dash?.total_contributions_this_month ?? 0) + Number(dash?.total_repayments_this_month ?? 0))} stats={[
         ["Michango", tzs(dash?.total_contributions_this_month ?? 0)],
         ["Marejesho", tzs(dash?.total_repayments_this_month ?? 0)],
         ["Walipa", String(walipa.length)],
@@ -206,9 +206,9 @@ function MemberView({ userId, userName, memberId, memberCode, userPhone }: { use
 
   const myContributions = contribsData?.data ?? [];
   const myLoans = loansData?.data ?? [];
-  const totalContributions = myContributions.reduce((s, c) => s + c.amount, 0);
+  const totalContributions = myContributions.reduce((s, c) => s + Number(c.amount), 0);
   const outstandingLoans = myLoans.filter((l) => l.status === "OUTSTANDING");
-  const outstandingBalance = outstandingLoans.reduce((s, l) => s + (l.balance_remaining ?? 0), 0);
+  const outstandingBalance = outstandingLoans.reduce((s, l) => s + Number(l.balance_remaining ?? 0), 0);
   const closedLoans = myLoans.filter((l) => l.status === "CLOSED").length;
 
   return (

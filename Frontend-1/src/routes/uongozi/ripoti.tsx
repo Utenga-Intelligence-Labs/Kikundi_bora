@@ -16,14 +16,14 @@ export const Route = createFileRoute("/uongozi/ripoti")({
 
 interface QuickStats {
   total_members: number;
-  contributions_month: number;
+  contributions_month: string; // decimal.Decimal → string
   pending_contributions: number;
   outstanding_loans: number;
   pending_loans: number;
-  treasury_balance: number;
-  total_contributions: number;
-  total_repayments: number;
-  total_disbursed: number;
+  treasury_balance: string; // decimal.Decimal → string
+  total_contributions: string; // decimal.Decimal → string
+  total_repayments: string; // decimal.Decimal → string
+  total_disbursed: string; // decimal.Decimal → string
 }
 
 function RipotiPage() {
@@ -135,7 +135,7 @@ function RipotiPage() {
               <StatCard
                 icon={PiggyBank}
                 label="Michango Mwezi Huu"
-                value={`TZS ${stats.contributions_month.toLocaleString()}`}
+                value={`TZS ${Number(stats.contributions_month).toLocaleString()}`}
                 color="green"
               />
               <StatCard
@@ -147,7 +147,7 @@ function RipotiPage() {
               <StatCard
                 icon={TrendingUp}
                 label="Hazina"
-                value={`TZS ${stats.treasury_balance.toLocaleString()}`}
+                value={`TZS ${Number(stats.treasury_balance).toLocaleString()}`}
                 color="purple"
               />
               {stats.pending_contributions > 0 && (

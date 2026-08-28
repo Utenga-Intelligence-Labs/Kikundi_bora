@@ -18,7 +18,7 @@ interface Activity {
   id: string;
   type: "CONTRIBUTION" | "LOAN" | "REPAYMENT";
   date: string;
-  amount: number;
+  amount: string; // backend decimal.Decimal serializes as string
   status: string;
   description: string;
   detail?: string;
@@ -211,7 +211,7 @@ function HistoriaYanguPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className={`font-display text-base font-bold ${activity.type === "REPAYMENT" ? "text-green-600" : ""}`}>
-                          {activity.type === "REPAYMENT" ? "+" : ""}TZS {activity.amount.toLocaleString()}
+                          {activity.type === "REPAYMENT" ? "+" : ""}TZS {Number(activity.amount).toLocaleString()}
                         </p>
                         <span className={`chip ${activity.bgColor} ${activity.color} text-[10px] font-semibold px-2 py-0.5 rounded mt-1 inline-block`}>
                           {statusLabel(activity.status)}

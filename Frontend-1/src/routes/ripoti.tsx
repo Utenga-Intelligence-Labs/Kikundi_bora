@@ -98,7 +98,7 @@ function RipotiPage() {
 
       <Card title="R-03 / R-05 · Shughuli za Mikopo" icon={Banknote}>
         <Row label="Mikopo wazi" value={String(dash?.count_outstanding_loans ?? 0)} />
-        <Row label="Malipo yote" value={dash?.total_repayments ? `TZS ${dash.total_repayments.toLocaleString()}` : "—"} />
+        <Row label="Malipo yote" value={dash?.total_repayments ? `TZS ${Number(dash.total_repayments).toLocaleString()}` : "—"} />
       </Card>
       </div>
 

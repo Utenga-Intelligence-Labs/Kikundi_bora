@@ -661,8 +661,8 @@ function ReportsTab() {
   const events = eventsData?.data ?? [];
 
   const completedCount = events.filter((e) => e.status === "COMPLETED").length;
-  const totalRequested = events.reduce((s, e) => s + e.amount_requested, 0);
-  const totalApproved = events.reduce((s, e) => s + (e.amount_approved ?? 0), 0);
+  const totalRequested = events.reduce((s, e) => s + Number(e.amount_requested), 0);
+  const totalApproved = events.reduce((s, e) => s + Number(e.amount_approved ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -703,7 +703,7 @@ function ReportsTab() {
           {(["MSIBA", "HARUSI", "DHARURA", "MATIBABU", "KUZALIWA", "ELIMU"] as WelfareEventType[]).map((et) => {
             const count = events.filter((e) => e.event_type === et).length;
             if (count === 0) return null;
-            const total = events.filter((e) => e.event_type === et).reduce((s, e) => s + e.amount_requested, 0);
+            const total = events.filter((e) => e.event_type === et).reduce((s, e) => s + Number(e.amount_requested), 0);
             return (
               <div key={et} className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-sm">
                 <span>{eventTypeLabels[et]}</span>
