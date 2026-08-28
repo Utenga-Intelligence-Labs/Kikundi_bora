@@ -65,6 +65,7 @@ class ApiClient {
       );
     }
 
+    if (res.status === 204) return {} as T;
     return res.json();
   }
 
