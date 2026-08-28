@@ -1,3 +1,18 @@
+// SECURITY NOTE: Token storage uses sessionStorage (not httpOnly cookies).
+// Tradeoffs:
+// - sessionStorage: cleared when tab closes, but vulnerable to XSS token theft
+// - httpOnly cookies: immune to XSS, but vulnerable to CSRF and harder to use
+//   with SPAs that need to read the token for API calls
+//
+// Mitigations in place:
+// - Content-Security-Policy headers prevent inline script injection
+// - X-Content-Type-Options prevents MIME sniffing
+// - Token expiry reduced to 30 minutes with auto-refresh
+// - Server verifies role from DB on every request (stale token can't escalate)
+//
+// To switch to httpOnly cookies, the backend would need to set the cookie
+// and the frontend would need to use credentials: 'include' on all fetch calls.
+
 let accessToken: string | null = null;
 
 export const tokenStorage = {
