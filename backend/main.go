@@ -158,11 +158,11 @@ func main() {
 	contribs.Get("/", contribHandler.List)
 	contribs.Post("/", middleware.RequirePosition(models.PositionTreasurer), contribHandler.Create)
 	contribs.Put("/:id", middleware.RequirePosition(models.PositionTreasurer), contribHandler.Edit)
-	contribs.Get("/monthly-report", contribHandler.MonthlyReport)
+	contribs.Get("/monthly-report", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), contribHandler.MonthlyReport)
 
 	loans := protected.Group("/loans")
 	loans.Get("/", loanHandler.List)
-	loans.Get("/outstanding-report", loanHandler.OutstandingReport)
+	loans.Get("/outstanding-report", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), loanHandler.OutstandingReport)
 	loans.Get("/:id", loanHandler.Get)
 	loans.Post("/apply", loanHandler.Apply)
 	// Chair/treasurer can approve (legacy direct path); committee unanimous path also finalizes
