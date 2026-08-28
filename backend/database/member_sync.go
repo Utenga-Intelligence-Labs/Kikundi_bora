@@ -75,18 +75,27 @@ func EnsureMemberForUser(db *gorm.DB, user models.User, registeredBy string) err
 }
 
 // NextMemberNo returns the next KKK-NNNN membership number.
+// Retries up to 5 times if a duplicate is detected (race condition).
 func NextMemberNo(db *gorm.DB) (string, error) {
-	var maxNum int
-	// Lock sequence via max of numeric suffix (KKK-0001 …)
-	if err := db.Raw(`
-		SELECT COALESCE(MAX(CAST(SUBSTRING(member_no FROM 5) AS INTEGER)), 0)
-		FROM members
-		WHERE deleted_at IS NULL
-		  AND member_no ~ '^KKK-[0-9]+$'
-	`).Scan(&maxNum).Error; err != nil {
-		return "", err
+	for attempt := 0; attempt < 5; attempt++ {
+		var maxNum int
+		if err := db.Raw(`
+			SELECT COALESCE(MAX(CAST(SUBSTRING(member_no FROM 5) AS INTEGER)), 0)
+			FROM members
+			WHERE deleted_at IS NULL
+			  AND member_no ~ '^KKK-[0-9]+$'
+		`).Scan(&maxNum).Error; err != nil {
+			return "", err
+		}
+		candidate := fmt.Sprintf("KKK-%04d", maxNum+1+attempt)
+		// Verify uniqueness
+		var count int64
+		db.Model(&models.Member{}).Where("member_no = ? AND deleted_at IS NULL", candidate).Count(&count)
+		if count == 0 {
+			return candidate, nil
+		}
 	}
-	return fmt.Sprintf("KKK-%04d", maxNum+1), nil
+	return "", fmt.Errorf("failed to generate unique member number after 5 attempts")
 }
 
 // BackfillMembersFromUsers creates/links member rows for existing non-admin users
