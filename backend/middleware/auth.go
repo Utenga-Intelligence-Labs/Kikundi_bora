@@ -69,11 +69,6 @@ func AuthRequired(c *fiber.Ctx) error {
 		})
 	}
 
-	// Update last active timestamp
-	database.DB.Model(&models.UserSession{}).
-		Where("user_id = ? AND token_hash = ? AND revoked_at IS NULL", userID, tokenHash).
-		Updates(map[string]interface{}{"last_active_at": time.Now()})
-
 	// Verify role from database to prevent stale role from JWT
 	var user models.User
 	if err := database.DB.Select("role").Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
