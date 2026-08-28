@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth-provider";
 import { blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
 import { api } from "@/api/client";
+import { withUploadToken } from "@/api/upload";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CheckCircle, XCircle, Clock, Loader2, Eye, ImageIcon, X, Filter } from "lucide-react";
@@ -203,7 +204,7 @@ function MichangoPage() {
                     {contrib.proof_image_url ? (
                       <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border bg-muted">
                         <img
-                          src={contrib.proof_image_url}
+                          src={withUploadToken(contrib.proof_image_url)}
                           alt="Uthibitisho"
                           className="h-full w-full object-cover"
                         />
@@ -267,7 +268,7 @@ function MichangoPage() {
               {viewingContrib.proof_image_url && (
                 <div className="rounded-xl overflow-hidden border bg-muted">
                   <img
-                    src={viewingContrib.proof_image_url}
+                    src={withUploadToken(viewingContrib.proof_image_url)}
                     alt="Picha ya uthibitisho"
                     className="w-full max-h-80 object-contain"
                   />

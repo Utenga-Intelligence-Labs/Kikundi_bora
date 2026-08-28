@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
 import { api } from "@/api/client";
+import { withUploadToken } from "@/api/upload";
 import { AppShell } from "@/components/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
@@ -84,7 +85,7 @@ function MichangoYanguPage() {
                       <div className="mt-3">
                         <p className="text-xs text-muted-foreground mb-1">Picha ya Uthibitisho:</p>
                         <img
-                          src={contrib.proof_image_url}
+                          src={withUploadToken(contrib.proof_image_url)}
                           alt="Uthibitisho"
                           className="max-h-48 rounded-lg border object-contain"
                         />

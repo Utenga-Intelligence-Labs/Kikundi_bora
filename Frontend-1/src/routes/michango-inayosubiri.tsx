@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
 import { requireRole } from "@/lib/role-guards";
 import { api } from "@/api/client";
+import { withUploadToken } from "@/api/upload";
 import { AppShell } from "@/components/AppShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -118,7 +119,7 @@ function TaarifaWanaosubiriPage() {
 
                   {m.proof_image_url && (
                     <button onClick={() => setViewing(m)} className="shrink-0 h-12 w-12 overflow-hidden rounded-lg border bg-muted">
-                      <img src={m.proof_image_url} alt="Proof" className="h-full w-full object-cover" />
+                      <img src={withUploadToken(m.proof_image_url)} alt="Proof" className="h-full w-full object-cover" />
                     </button>
                   )}
 
@@ -157,7 +158,7 @@ function TaarifaWanaosubiriPage() {
             <div className="p-5 space-y-4">
               {viewing.proof_image_url && (
                 <div className="rounded-xl overflow-hidden border bg-muted">
-                  <img src={viewing.proof_image_url} alt="Proof" className="w-full max-h-80 object-contain" />
+                  <img src={withUploadToken(viewing.proof_image_url)} alt="Proof" className="w-full max-h-80 object-contain" />
                 </div>
               )}
               <div className="grid grid-cols-2 gap-4">

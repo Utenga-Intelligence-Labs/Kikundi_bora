@@ -15,13 +15,19 @@ import (
 
 func AuthRequired(c *fiber.Ctx) error {
 	header := c.Get("Authorization")
-	if header == "" || !strings.HasPrefix(header, "Bearer ") {
+	tokenStr := ""
+	if strings.HasPrefix(header, "Bearer ") {
+		tokenStr = strings.TrimPrefix(header, "Bearer ")
+	} else if qt := c.Query("token"); qt != "" {
+		// <img>/<a> tags cannot send an Authorization header — allow the
+		// token via query parameter (e.g. /uploads/...?token=<jwt>).
+		tokenStr = qt
+	}
+	if tokenStr == "" {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Token ya ukaguzi haijapatikana",
 		})
 	}
-
-	tokenStr := strings.TrimPrefix(header, "Bearer ")
 
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
