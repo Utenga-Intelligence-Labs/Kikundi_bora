@@ -66,10 +66,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: kikundi
-      POSTGRES_PASSWORD: kikundi_secret_2024
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
       POSTGRES_DB: kikundi_db
     ports:
-      - "${DB_HOST_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_HOST_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
