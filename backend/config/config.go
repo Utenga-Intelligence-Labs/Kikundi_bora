@@ -46,7 +46,7 @@ func Load() {
 		DBUser:        getEnv("DB_USER", "postgres"),
 		DBPassword:    getEnv("DB_PASSWORD", ""),
 		DBName:        getEnv("DB_NAME", "kikundi_db"),
-		DBSSLMode:     getEnv("DB_SSLMODE", "disable"),
+		DBSSLMode:     getEnv("DB_SSLMODE", "require"),
 		JWTSecret:     secret,
 		Port:          getEnv("PORT", "8080"),
 		CORSOrigins:   getEnv("CORS_ORIGINS", ""),
