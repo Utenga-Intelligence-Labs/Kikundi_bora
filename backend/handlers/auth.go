@@ -485,12 +485,41 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Umetoka kwenye akaunti"})
 }
 
+func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
+	token, expiresAt := h.generateToken(userID, role)
+	if token == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza tokeni"})
+	}
+
+	// Create new session for the refreshed token
+	session := models.UserSession{
+		UserID:       userID,
+		TokenHash:    sha256Hex(token),
+		IPAddress:    c.IP(),
+		UserAgent:    c.Get("User-Agent"),
+		LastActiveAt: time.Now(),
+		ExpiresAt:    time.Now().Add(30 * time.Minute),
+	}
+	if err := database.DB.Create(&session).Error; err != nil {
+		log.Printf("ERROR: Failed to create session for refresh: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuanzisha kikao"})
+	}
+
+	return c.JSON(models.AuthResponse{
+		Token:     token,
+		ExpiresAt: expiresAt,
+	})
+}
+
 func sha256Hex(s string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(s)))
 }
 
 func (h *AuthHandler) generateToken(userID string, role models.Role) (string, string) {
-	expiresAt := time.Now().Add(24 * time.Hour)
+	expiresAt := time.Now().Add(30 * time.Minute)
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"role":    role,

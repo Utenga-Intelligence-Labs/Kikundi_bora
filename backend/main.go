@@ -130,6 +130,7 @@ func main() {
 	protected.Post("/auth/change-password", authHandler.ChangePassword)
 	protected.Post("/auth/logout", authHandler.Logout)
 	protected.Post("/auth/first-login-setup", authHandler.FirstLoginSetup)
+	protected.Post("/auth/refresh", authHandler.RefreshToken)
 
 	// File upload routes
 	protected.Post("/upload/avatar", uploadHandler.UploadAvatar)

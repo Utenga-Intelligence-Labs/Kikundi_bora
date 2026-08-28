@@ -46,6 +46,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   }, [qc]);
 
+  // Auto-refresh token before expiry
+  useEffect(() => {
+    if (!tokenStorage.exists()) return;
+
+    const refreshToken = async () => {
+      try {
+        const res = await authApi.refreshToken();
+        tokenStorage.set(res.token);
+      } catch {
+        // Refresh failed, token will expire naturally
+      }
+    };
+
+    // Refresh every 25 minutes (token expires in 30)
+    const interval = setInterval(refreshToken, 25 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const { data: user, isLoading } = useQuery({
     queryKey: ["auth", "me"],
     queryFn: async () => {

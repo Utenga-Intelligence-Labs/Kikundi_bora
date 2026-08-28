@@ -25,4 +25,5 @@ export const authApi = {
     api.post<MessageResponse>("/auth/reset-password", data),
   firstLoginSetup: (data: FirstLoginSetupRequest) =>
     api.post<AuthResponse>("/auth/first-login-setup", data),
+  refreshToken: () => api.post<AuthResponse>("/auth/refresh"),
 };
