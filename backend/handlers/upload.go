@@ -125,7 +125,7 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 	}
 
 	userID := middleware.GetUserID(c)
-	filename := fmt.Sprintf("%s_%d%s", userID, time.Now().Unix(), ext)
+	filename := fmt.Sprintf("%s_%d%s", userID, time.Now().UnixNano(), ext)
 	savePath := filepath.Join("uploads", "avatars", filename)
 
 	if err := c.SaveFile(file, savePath); err != nil {
@@ -190,7 +190,7 @@ func (h *UploadHandler) UploadDoc(c *fiber.Ctx) error {
 	}
 
 	userID := middleware.GetUserID(c)
-	filename := fmt.Sprintf("%s_%d%s", userID, time.Now().Unix(), ext)
+	filename := fmt.Sprintf("%s_%d%s", userID, time.Now().UnixNano(), ext)
 	savePath := filepath.Join("uploads", category, filename)
 
 	dir := filepath.Join("uploads", category)
