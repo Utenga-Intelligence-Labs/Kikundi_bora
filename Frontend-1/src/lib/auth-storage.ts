@@ -28,6 +28,10 @@ export const tokenStorage = {
     }
     return false;
   },
+  // Decode JWT payload for UI role gating only.
+  // SECURITY: This is NOT used for authorization — the server verifies
+  // the role from the database on every request (see middleware/auth.go).
+  // Client-side role checks are purely for UX (showing/hiding UI elements).
   getRole: (): string | null => {
     const token = tokenStorage.get();
     if (!token) return null;
