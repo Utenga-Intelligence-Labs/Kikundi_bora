@@ -660,7 +660,7 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 	var appointed []models.LoanCommitteeMember
 	database.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id, name, role")
-	}).Where("is_active = TRUE").Find(&appointed)
+	}).Where("is_active = TRUE AND deleted_at IS NULL").Find(&appointed)
 
 	for _, m := range appointed {
 		if m.User == nil {
@@ -797,7 +797,7 @@ func (h *LoanCommitteeHandler) countActiveCommitteeMembers(db *gorm.DB) int64 {
 
 	// Appointed committee members
 	var appointed []models.LoanCommitteeMember
-	db.Where("is_active = TRUE").Find(&appointed)
+	db.Where("is_active = TRUE AND deleted_at IS NULL").Find(&appointed)
 	for _, a := range appointed {
 		eligible[a.UserID] = struct{}{}
 	}

@@ -264,7 +264,7 @@ func (h *AdminHandler) GetSystemHealth(c *fiber.Ctx) error {
 
 	oneDayAgo := time.Now().Add(-24 * time.Hour)
 	database.DB.Model(&models.User{}).Where("last_login_at > ? AND deleted_at IS NULL", oneDayAgo).Count(&stats.RecentLogins)
-	database.DB.Model(&models.Member{}).Where("is_active = TRUE").Count(&stats.TotalMembers)
+	database.DB.Model(&models.Member{}).Where("is_active = TRUE AND deleted_at IS NULL").Count(&stats.TotalMembers)
 	database.DB.Model(&models.Loan{}).Count(&stats.TotalLoans)
 
 	return c.JSON(stats)

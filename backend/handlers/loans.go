@@ -190,7 +190,7 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 	services.NotifyRole(models.RoleTreasurer, models.NotifLoanRequest, "Ombi Jipya la Mkopo", msg, "")
 
 	var appointed []models.LoanCommitteeMember
-	database.DB.Where("is_active = TRUE").Find(&appointed)
+	database.DB.Where("is_active = TRUE AND deleted_at IS NULL").Find(&appointed)
 	for _, m := range appointed {
 		services.NotifyUser(m.UserID, models.NotifLoanRequest, "Ombi Jipya la Mkopo", msg)
 	}
