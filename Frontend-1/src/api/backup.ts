@@ -41,6 +41,6 @@ export const backupApi = {
 
   downloadUrl: (id: string) => {
     const base = import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/v1";
-    return `${base.replace("/api/v1", "")}/api/v1/admin/backup/download/${id}`;
+    return `${base}/admin/backup/download/${id}`;
   },
 };
