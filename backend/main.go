@@ -84,6 +84,7 @@ func main() {
 
 	app.Use(middleware.SetupCORS())
 	app.Use(middleware.SecurityHeaders())
+	app.Use(middleware.GlobalRateLimiter())
 	app.Use(middleware.RequestLogger())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
