@@ -167,7 +167,7 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 
 	// Find contribution
 	var contribution models.MemberContribution
-	if err := database.DB.First(&contribution, "id = ?", contribID).Error; err != nil {
+	if err := database.DB.Preload("Member").First(&contribution, "id = ?", contribID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": "Mchango haujapatikana",
 		})
@@ -249,7 +249,7 @@ func (h *MemberContributionHandler) Reject(c *fiber.Ctx) error {
 
 	// Find contribution
 	var contribution models.MemberContribution
-	if err := database.DB.First(&contribution, "id = ?", contribID).Error; err != nil {
+	if err := database.DB.Preload("Member").First(&contribution, "id = ?", contribID).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"message": "Mchango haujapatikana",
 		})
