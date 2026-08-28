@@ -378,6 +378,10 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
 	}
 
+	if len(body.NewPassword) < 6 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri jipya lazima liwe na angalau herufi 6"})
+	}
+
 	var user models.User
 	if err := database.DB.Where("id = ? AND deleted_at IS NULL", userID).First(&user).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
