@@ -119,7 +119,7 @@ function WasifuPage() {
     try {
       await createMember.mutateAsync({
         full_name: jina || user.name,
-        phone: simu || "0700000000",
+        phone: simu || user.phone,
         address: anwani || undefined,
         joined_at: new Date().toISOString().slice(0, 10),
       });
