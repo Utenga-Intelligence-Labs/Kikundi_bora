@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -61,8 +62,12 @@ func (h *ImportHandler) ImportContributions(c *fiber.Ctx) error {
 	}
 	defer src.Close()
 
+	// Limit CSV file size to 10MB to prevent memory exhaustion
+	const maxCSVSize = 10 * 1024 * 1024
+	limitedReader := io.LimitReader(src, maxCSVSize+1)
+
 	// Read CSV
-	reader := csv.NewReader(src)
+	reader := csv.NewReader(limitedReader)
 	records, err := reader.ReadAll()
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
