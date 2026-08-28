@@ -268,30 +268,35 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 	id := c.Params("id")
 	userID := middleware.GetUserID(c)
 
+	tx := database.DB.Begin()
+
 	var event models.WelfareEvent
-	if err := database.DB.First(&event, "id = ?", id).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&event, "id = ?", id).Error; err != nil {
+		tx.Rollback()
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
 	}
 
 	if event.Status != models.WelfareApproved {
+		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tukio haliwezi kutolewa. Hali yake ni: " + string(event.Status)})
 	}
 
 	// Check if all contributions are collected (for member-funded events)
 	if event.FundingSource == models.FundMemberContribution || event.FundingSource == models.FundBoth {
 		var totalCollected float64
-		database.DB.Model(&models.WelfareContribution{}).
+		tx.Model(&models.WelfareContribution{}).
 			Where("event_id = ? AND status = ?", event.ID, models.WelfareContribPaid).
 			Select("COALESCE(SUM(amount), 0)").
 			Scan(&totalCollected)
 
 		var totalRequired float64
-		database.DB.Model(&models.WelfareContribution{}).
+		tx.Model(&models.WelfareContribution{}).
 			Where("event_id = ?", event.ID).
 			Select("COALESCE(SUM(amount), 0)").
 			Scan(&totalRequired)
 
 		if totalCollected < totalRequired {
+			tx.Rollback()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"message": fmt.Sprintf("Michango haijakamilika. Imekusanywa: TZS %s, Inahitajika: TZS %s", formatMoney(totalCollected), formatMoney(totalRequired)),
 			})
@@ -301,10 +306,9 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 	// Calculate disbursement amount
 	disbursementAmount := event.AmountApproved
 	if disbursementAmount == nil || *disbursementAmount <= 0 {
+		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi cha kutolewa si sahihi"})
 	}
-
-	tx := database.DB.Begin()
 
 	// Update event status to completed
 	now := time.Now()
