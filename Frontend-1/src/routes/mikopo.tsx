@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { useLoans, useApplyLoan, useApproveLoan, useRejectLoan, useDisburseLoan } from "@/hooks/use-loans";
+import { useLoans, useApplyLoan } from "@/hooks/use-loans";
 import { Field } from "@/components/Field";
 import { tzs, tarehe } from "@/lib/format";
-import { X, Check, Ban, Send, Wallet, Loader2 } from "lucide-react";
+import { X, Send, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-provider";
 import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
-import { roleMap, type LoanStatus } from "@/api/types";
+import { type LoanStatus } from "@/api/types";
 
 export const Route = createFileRoute("/mikopo")({
   head: () => ({
@@ -38,29 +38,15 @@ function MikopoPage() {
   const { user } = useAuth();
   if (!user) return null;
 
-  const jukumu = roleMap[user.role] ?? "Mwanachama";
-  const isMember = jukumu === "Mwanachama";
-  const isChair = jukumu === "Mwenyekiti";
-  const isTreasurer = jukumu === "Mweka Hazina";
-
-  const [tab, setTab] = useState<Tab>(isMember ? "OUTSTANDING" : isChair ? "PENDING" : isTreasurer ? "APPROVED" : "OUTSTANDING");
+  const [tab, setTab] = useState<Tab>("OUTSTANDING");
   const [openRequest, setOpenRequest] = useState(false);
-  const [rejecting, setRejecting] = useState<string | null>(null);
-  const [disbursing, setDisbursing] = useState<string | null>(null);
 
   const { data: loansData, isLoading } = useLoans({ limit: 200 });
-  const approveLoan = useApproveLoan();
-  const rejectLoan = useRejectLoan();
-  const disburseLoan = useDisburseLoan();
-
   const loans = loansData?.data ?? [];
-  // Money identity: key off the authenticated user's member row (member_id
-  // from /me) — NEVER via the leadership-only GET /members listing.
+  // Personal view — EVERY user (including leadership, dual plane) sees only
+  // their own loans here. Group-wide management lives on /uongozi/mikopo.
   const myMemberId = user.member_id || null;
-
-  const visible = isMember && myMemberId
-    ? loans.filter((l) => l.member_id === myMemberId)
-    : loans;
+  const visible = myMemberId ? loans.filter((l) => l.member_id === myMemberId) : [];
   const list = visible.filter((l) => l.status === tab);
   const tabs: Tab[] = ["PENDING", "UNDER_REVIEW", "APPROVED", "OUTSTANDING", "CLOSED", "REJECTED"];
 
@@ -70,8 +56,8 @@ function MikopoPage() {
 
   return (
     <AppShell
-      title={isMember ? "Mikopo Yangu" : "Mikopo"}
-      subtitle={isMember ? "Omba na fuatilia mikopo yako" : "Simamia mikopo ya kikundi"}
+      title="Mikopo Yangu"
+      subtitle="Omba na fuatilia mikopo yako"
       action={
         myMemberId ? (
           <button
@@ -91,7 +77,7 @@ function MikopoPage() {
       )}
 
       <div className="hero-surface px-5 py-5">
-        <p className="text-xs text-primary-foreground/70">{isMember ? "Salio la mikopo yangu" : "Mizania ya mikopo wazi"}</p>
+        <p className="text-xs text-primary-foreground/70">Salio la mikopo yangu</p>
         <p className="mt-1 font-display text-3xl font-extrabold">{tzs(jumlaWazi)}</p>
         <p className="mt-1 text-xs text-primary-foreground/70">{visible.filter((l) => l.status === "OUTSTANDING").length} mikopo wazi</p>
         {myMemberId && (
@@ -128,8 +114,8 @@ function MikopoPage() {
             <div key={l.id} className="card-surface p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-semibold">{l.member?.full_name ?? `Mwanachama #${l.member_id}`}</p>
-                  <p className="text-xs text-muted-foreground">{l.purpose || "—"}</p>
+                  <p className="truncate font-semibold">{l.purpose || "Mkopo wa kikundi"}</p>
+                  <p className="text-xs text-muted-foreground">Kilitumwa {tarehe(l.applied_at || l.due_date)}</p>
                 </div>
                 <span className={`chip text-[10px] ${statusClass(l.status)}`}>{tabLabels[l.status as Tab] ?? l.status}</span>
               </div>
@@ -147,32 +133,10 @@ function MikopoPage() {
                 </div>
               )}
               {l.rejection_reason && <p className="mt-2 text-xs text-destructive">Sababu: {l.rejection_reason}</p>}
-
-              {isChair && l.status === "PENDING" && (
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => approveLoan.mutate({ id: l.id, data: { approved_amount: l.amount } })}
-                    disabled={approveLoan.isPending}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-success px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                  >
-                    <Check className="h-3.5 w-3.5" /> Idhinisha
-                  </button>
-                  <button
-                    onClick={() => setRejecting(l.id)}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
-                  >
-                    <Ban className="h-3.5 w-3.5" /> Kataa
-                  </button>
-                </div>
-              )}
-              {isTreasurer && l.status === "APPROVED" && (
-                <button
-                  onClick={() => setDisbursing(l.id)}
-                  disabled={disburseLoan.isPending}
-                  className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
-                >
-                  <Wallet className="h-3.5 w-3.5" /> Toa Fedha
-                </button>
+              {l.status === "PENDING" && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Ombi lako linapitiwa: Hazina → Katibu → Bodi → Mwenyekiti (uonekano wa mfuatano: /uongozi/mikopo).
+                </p>
               )}
             </div>
           );
@@ -181,19 +145,6 @@ function MikopoPage() {
       </div>
 
       {openRequest && myMemberId && <RequestForm memberId={myMemberId} onClose={() => setOpenRequest(false)} />}
-      {rejecting != null && <RejectDialog onClose={() => setRejecting(null)} onConfirm={(reason) => { rejectLoan.mutate({ id: rejecting, data: { reason } }); setRejecting(null); }} />}
-      {disbursing != null && (() => {
-        const l = loans.find((x) => x.id === disbursing);
-        return (
-          <DisburseDialog
-            loan={l}
-            onClose={() => setDisbursing(null)}
-            onConfirm={() => { disburseLoan.mutate(disbursing); setDisbursing(null); }}
-            isPending={disburseLoan.isPending}
-            error={disburseLoan.error ? (disburseLoan.error.message) : null}
-          />
-        );
-      })()}
     </AppShell>
   );
 }
@@ -240,43 +191,6 @@ function RequestForm({ memberId, onClose }: { memberId: string; onClose: () => v
         {applyLoan.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Tuma Ombi
       </button>
       <p className="mt-2 text-center text-xs text-muted-foreground">Mwenyekiti ataidhinisha kisha Mweka Hazina atakutolea fedha.</p>
-    </Modal>
-  );
-}
-
-function DisburseDialog({ loan, onClose, onConfirm, isPending, error }: { loan?: { id: string; amount: number; approved_amount?: number; member?: { full_name?: string } }; onClose: () => void; onConfirm: () => void; isPending: boolean; error: string | null }) {
-  return (
-    <Modal title="Toa Fedha za Mkopo" onClose={onClose}>
-      <div className="space-y-3">
-        <p className="text-sm">
-          Unatoa mkopo wa <span className="font-semibold">{tzs(loan?.approved_amount ?? loan?.amount ?? 0)}</span>
-          {loan?.member?.full_name ? <> kwa <span className="font-semibold">{loan.member.full_name}</span></> : null}
-        </p>
-        <p className="text-xs text-muted-foreground">Hakikisha umemkabidhi mwanachama fedha kabla ya kubofya.</p>
-      </div>
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
-      <div className="mt-4 flex gap-3">
-        <button onClick={onClose} className="flex-1 rounded-xl border border-border py-2.5 text-sm font-semibold">Ghairi</button>
-        <button onClick={onConfirm} disabled={isPending} className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50 inline-flex items-center justify-center gap-2">
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
-          Thibitisha Kutolea
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-function RejectDialog({ onClose, onConfirm }: { onClose: () => void; onConfirm: (sababu: string) => void }) {
-  const [s, setS] = useState("");
-  return (
-    <Modal title="Kataa Ombi" onClose={onClose}>
-      <Field label="Sababu" value={s} onChange={setS} />
-      <button
-        onClick={() => onConfirm(s || "Haijatolewa sababu")}
-        className="mt-5 w-full rounded-xl bg-destructive py-3 text-sm font-semibold text-white"
-      >
-        Thibitisha Kukataa
-      </button>
     </Modal>
   );
 }
