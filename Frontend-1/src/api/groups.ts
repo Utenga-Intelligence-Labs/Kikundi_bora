@@ -29,10 +29,18 @@ export interface GroupSettingProposal {
   proposer?: { id: string; name: string; role: string };
 }
 
+export interface MyContributionStatus {
+  /** "none" = not yet contributed this cycle; "pending" = submitted, awaiting verification; "confirmed" = done */
+  status: "none" | "pending" | "confirmed";
+  period_due_date?: string;
+}
+
 export interface GroupSettingsResponse {
   data: GroupInfo;
   pending_proposal: GroupSettingProposal | null;
   next_due_date: string | null;
+  /** Only present when the signed-in user holds a member row and the group has a due date configured. */
+  my_contribution?: MyContributionStatus | null;
 }
 
 export interface ProposeSettingsRequest {

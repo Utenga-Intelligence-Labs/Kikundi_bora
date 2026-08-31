@@ -146,6 +146,66 @@ func CheckFixedContributionAmount(fixed *decimal.Decimal, amount decimal.Decimal
 	return nil
 }
 
+// PreviousContributionDueDate returns the due date immediately before the
+// given due date for the interval. Used to compute the current cycle window.
+func PreviousContributionDueDate(interval models.ContributionInterval, spec string, due time.Time) (time.Time, bool) {
+	loc := due.Location()
+	switch interval {
+	case models.IntervalWeekly:
+		return due.AddDate(0, 0, -7), true
+	case models.IntervalMonthly:
+		day, err := strconv.Atoi(spec)
+		if err != nil || day < 1 || day > 31 {
+			return time.Time{}, false
+		}
+		return monthDayClamped(due.Year(), due.Month()-1, day, loc), true
+	case models.IntervalSemiAnnual:
+		_, dd, ok := parseMmDd(spec)
+		if !ok {
+			return time.Time{}, false
+		}
+		return monthDayClamped(due.Year(), due.Month()-6, dd, loc), true
+	case models.IntervalYearly:
+		_, dd, ok := parseMmDd(spec)
+		if !ok {
+			return time.Time{}, false
+		}
+		return monthDayClamped(due.Year()-1, due.Month(), dd, loc), true
+	}
+	return time.Time{}, false
+}
+
+func parseMmDd(spec string) (int, int, bool) {
+	parts := strings.Split(spec, "-")
+	if len(parts) != 2 {
+		return 0, 0, false
+	}
+	mm, err1 := strconv.Atoi(parts[0])
+	dd, err2 := strconv.Atoi(parts[1])
+	if err1 != nil || err2 != nil || mm < 1 || mm > 12 || dd < 1 || dd > 31 {
+		return 0, 0, false
+	}
+	return mm, dd, true
+}
+
+// ContributionCycleWindow returns the (start, end] window of the currently
+// open contribution cycle: a contribution dated inside this window counts
+// for the cycle that closes at `end`.
+func ContributionCycleWindow(g *models.Group, now time.Time) (start, end time.Time, ok bool) {
+	if g == nil || g.ContributionDueDate == nil || g.ContributionInterval == "" {
+		return time.Time{}, time.Time{}, false
+	}
+	due, valid := NextContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, now)
+	if !valid {
+		return time.Time{}, time.Time{}, false
+	}
+	prev, valid := PreviousContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, due)
+	if !valid {
+		return time.Time{}, time.Time{}, false
+	}
+	return prev, due, true
+}
+
 // ---------- Due-date notifications ----------
 
 // ContributionDueStatus decides whether a due-date notification should go

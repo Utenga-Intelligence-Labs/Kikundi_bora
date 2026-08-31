@@ -118,6 +118,8 @@ function WekaMchangoPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["michango"] });
+      // Refresh cycle status so the dashboard "Mchango ujao" banner updates
+      qc.invalidateQueries({ queryKey: ["groups", "settings"] });
       showModal({ title: "Imefanikiwa", message: "Mchango umewasilishwa!", variant: "success", primaryLabel: "Sawa" });
       setFormData({
         contribution_type: "AKIBA",

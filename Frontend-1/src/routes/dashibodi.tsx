@@ -304,6 +304,11 @@ function MemberView({
       ? Number(settingsData.data.fixed_contribution_amount)
       : null;
   const nextDue = settingsData?.next_due_date ?? null;
+  // Cycle state: once the member's contribution for the current round is
+  // confirmed, the "Mchango ujao" banner disappears; pending shows feedback.
+  const cycleStatus = settingsData?.my_contribution?.status ?? "none";
+  const hideBanner = cycleStatus === "confirmed";
+  const isPendingCycle = cycleStatus === "pending";
 
   const {
     data: memberData,
@@ -352,25 +357,38 @@ function MemberView({
 
   return (
     <>
-      {(fixedAmount != null || nextDue) && (
-        <div className="card-surface p-4 mb-4 border-l-4 border-l-primary flex items-center gap-3">
-          <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+      {(fixedAmount != null || nextDue) && !hideBanner && (
+        <div className={`card-surface p-4 mb-4 border-l-4 flex items-center gap-3 ${isPendingCycle ? "border-l-warning" : "border-l-primary"}`}>
+          <CalendarDays className={`h-5 w-5 shrink-0 ${isPendingCycle ? "text-warning" : "text-primary"}`} />
           <div>
-            <p className="text-sm font-semibold">
-              Mchango ujao
-              {fixedAmount != null && <>: TZS {fixedAmount.toLocaleString()}</>}
-              {nextDue && <> · ifikapo {nextDue}</>}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Kipindi: {settingsData ? INTERVAL_LABELS[settingsData.data.contribution_interval] : "—"} · Wasilisha kupitia "Weka Mchango"
-            </p>
+            {isPendingCycle ? (
+              <>
+                <p className="text-sm font-semibold">Mchango wa kipindi hiki umeshapokelewa ✓</p>
+                <p className="text-xs text-muted-foreground">
+                  Unasubiri uthibitisho wa Hazina{nextDue ? ` · kipindi kijacho kinaanza baada ya ${nextDue}` : ""}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-semibold">
+                  Mchango ujao
+                  {fixedAmount != null && <>: TZS {fixedAmount.toLocaleString()}</>}
+                  {nextDue && <> · ifikapo {nextDue}</>}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Kipindi: {settingsData ? INTERVAL_LABELS[settingsData.data.contribution_interval] : "—"} · Wasilisha kupitia "Weka Mchango"
+                </p>
+              </>
+            )}
           </div>
-          <Link
-            to="/weka-mchango"
-            className="ml-auto shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            Weka Mchango
-          </Link>
+          {!isPendingCycle && (
+            <Link
+              to="/weka-mchango"
+              className="ml-auto shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              Weka Mchango
+            </Link>
+          )}
         </div>
       )}
       <HeroBalance

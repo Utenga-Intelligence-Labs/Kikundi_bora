@@ -207,4 +207,56 @@ func TestContributionDueStatusDisabled(t *testing.T) {
 	}
 }
 
+// ---------- Cycle window / previous due date ----------
+
+func TestPreviousContributionDueDate(t *testing.T) {
+	loc := time.UTC
+
+	// Monthly day 5: previous due before Sep 5 = Aug 5
+	d, ok := PreviousContributionDueDate(models.IntervalMonthly, "5",
+		time.Date(2026, 9, 5, 9, 0, 0, 0, loc))
+	if !ok || d.Format("2006-01-02") != "2026-08-05" {
+		t.Errorf("monthly prev due = %v (%v), want 2026-08-05", d, ok)
+	}
+
+	// Monthly day 31: previous before Feb 28 (clamped) = Jan 31
+	d, _ = PreviousContributionDueDate(models.IntervalMonthly, "31",
+		time.Date(2026, 2, 28, 9, 0, 0, 0, loc))
+	if d.Format("2006-01-02") != "2026-01-31" {
+		t.Errorf("monthly clamped prev due = %v, want 2026-01-31", d)
+	}
+
+	// Weekly: previous Monday before Mon Aug 31 = Mon Aug 24
+	d, _ = PreviousContributionDueDate(models.IntervalWeekly, "1",
+		time.Date(2026, 8, 31, 9, 0, 0, 0, loc))
+	if d.Format("2006-01-02") != "2026-08-24" {
+		t.Errorf("weekly prev due = %v, want 2026-08-24", d)
+	}
+
+	// Yearly 03-15: previous before Mar 15 2026 = Mar 15 2025
+	d, _ = PreviousContributionDueDate(models.IntervalYearly, "03-15",
+		time.Date(2026, 3, 15, 9, 0, 0, 0, loc))
+	if d.Format("2006-01-02") != "2025-03-15" {
+		t.Errorf("yearly prev due = %v, want 2025-03-15", d)
+	}
+}
+
+func TestContributionCycleWindow(t *testing.T) {
+	// Monthly day 5, today Sep 3 2026 → open cycle window (Aug 5, Sep 5]
+	g := &models.Group{
+		ContributionInterval: models.IntervalMonthly,
+		ContributionDueDate:  strPtr("5"),
+	}
+	start, end, ok := ContributionCycleWindow(g, time.Date(2026, 9, 3, 9, 0, 0, 0, time.UTC))
+	if !ok || start.Format("2006-01-02") != "2026-08-05" || end.Format("2006-01-02") != "2026-09-05" {
+		t.Errorf("cycle window = (%v, %v], ok=%v; want (2026-08-05, 2026-09-05]", start, end, ok)
+	}
+
+	// No due date → no window
+	g2 := &models.Group{ContributionInterval: models.IntervalMonthly}
+	if _, _, ok := ContributionCycleWindow(g2, time.Now()); ok {
+		t.Error("group without due date should have no cycle window")
+	}
+}
+
 func strPtr(s string) *string { return &s }

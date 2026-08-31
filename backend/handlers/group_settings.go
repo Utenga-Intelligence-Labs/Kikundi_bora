@@ -58,11 +58,69 @@ func (h *GroupSettingsHandler) settingsResponse(c *fiber.Ctx, g *models.Group) e
 			nextDue = due.Format("2006-01-02")
 		}
 	}
+
+	// Per-member current-cycle contribution status: has the requesting user
+	// (if they hold a member row) already submitted their AKIBA contribution
+	// for the currently open cycle?
+	var myContribution *myCycleStatus
+	if userID := middleware.GetUserID(c); userID != "" {
+		var member models.Member
+		if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).
+			First(&member).Error; err == nil {
+			myContribution = h.cycleStatusForMember(g, member.ID, time.Now())
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"data":              g,
 		"pending_proposal":  loadPendingProposal(g.ID),
 		"next_due_date":     nextDue,
+		"my_contribution":   myContribution,
 	})
+}
+
+type myCycleStatus struct {
+	Status        string `json:"status"` // "none" | "pending" | "confirmed"
+	PeriodDueDate string `json:"period_due_date,omitempty"`
+}
+
+// cycleStatusForMember checks BOTH contribution stores inside the current
+// cycle window (prevDue, due]:
+//   - member_contributions: self-submitted (Weka Mchango), created_at
+//     CONFIRMED → "confirmed"; only PENDING_VERIFICATION → "pending"
+//   - contributions: treasurer-recorded (Pokea Mchango), PAID paid_at → "confirmed"
+func (h *GroupSettingsHandler) cycleStatusForMember(g *models.Group, memberID string, now time.Time) *myCycleStatus {
+	start, end, ok := services.ContributionCycleWindow(g, now)
+	if !ok {
+		return nil
+	}
+	dueStr := end.Format("2006-01-02")
+
+	var mcConfirmed, legacyConfirmed int64
+	database.DB.Model(&models.MemberContribution{}).
+		Where("member_id = ? AND contribution_type = ? AND status = ? AND created_at > ? AND created_at <= ?",
+			memberID, models.ContributionAkiba, models.ContributionConfirmed, start, end).
+		Count(&mcConfirmed)
+	database.DB.Model(&models.Contribution{}).
+		Where("member_id = ? AND status = ? AND paid_at > ? AND paid_at <= ?",
+			memberID, "PAID", start, end).
+		Count(&legacyConfirmed)
+	confirmed := mcConfirmed + legacyConfirmed
+
+	if confirmed > 0 {
+		return &myCycleStatus{Status: "confirmed", PeriodDueDate: dueStr}
+	}
+
+	var pending int64
+	database.DB.Model(&models.MemberContribution{}).
+		Where("member_id = ? AND contribution_type = ? AND status = ? AND created_at > ? AND created_at <= ?",
+			memberID, models.ContributionAkiba, models.ContributionPending, start, end).
+		Count(&pending)
+	if pending > 0 {
+		return &myCycleStatus{Status: "pending", PeriodDueDate: dueStr}
+	}
+
+	return &myCycleStatus{Status: "none", PeriodDueDate: dueStr}
 }
 
 type proposeRequest struct {
