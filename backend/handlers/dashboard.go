@@ -37,7 +37,16 @@ func (h *DashboardHandler) Summary(c *fiber.Ctx) error {
 		Where("is_active = TRUE AND deleted_at IS NULL").Count(&activeMembers)
 
 	database.DB.Model(&models.Contribution{}).
+		Where("status = ?", "PAID").
 		Select("COALESCE(SUM(amount), 0)").Scan(&totalContributions)
+	// FIX (data binding): also include CONFIRMED member-submitted contributions
+	// ("Weka Mchango" flow) — previously only treasurer-recorded rows were
+	// counted, so confirmed self-submissions never appeared in any total.
+	var confirmedMemberContributions decimal.Decimal
+	database.DB.Model(&models.MemberContribution{}).
+		Where("status = ?", models.ContributionConfirmed).
+		Select("COALESCE(SUM(amount), 0)").Scan(&confirmedMemberContributions)
+	totalContributions = totalContributions.Add(confirmedMemberContributions)
 
 	database.DB.Model(&models.Loan{}).
 		Where("status != ?", models.LoanRejected).
@@ -56,14 +65,27 @@ func (h *DashboardHandler) Summary(c *fiber.Ctx) error {
 	database.DB.Model(&models.Loan{}).
 		Where("status = ?", models.LoanPending).Count(&countPending)
 
-	database.DB.Model(&models.Contribution{}).
-		Where("month = ? AND member_id IN (SELECT id FROM members WHERE is_active = TRUE AND deleted_at IS NULL)", monthFirst).
-		Distinct("member_id").
-		Count(&membersPaid)
+	// FIX (data binding): members who paid this period — union of BOTH stores
+	// (treasurer-recorded legacy rows AND confirmed self-submissions),
+	// counted via one query so a member in both stores is not double-counted.
+	database.DB.Raw(`
+		SELECT COUNT(DISTINCT member_id) FROM (
+			SELECT member_id FROM contributions WHERE month = ? AND status = 'PAID'
+			UNION
+			SELECT member_id FROM member_contributions WHERE period_label = ? AND status = ?
+		) paid
+	`, monthFirst, monthFirst.Format("2006-01"), models.ContributionConfirmed).Scan(&membersPaid)
 
 	database.DB.Model(&models.Contribution{}).
-		Where("month = ?", monthFirst).
+		Where("month = ? AND status = ?", monthFirst, "PAID").
 		Select("COALESCE(SUM(amount), 0)").Scan(&totalContributionsMonth)
+	// FIX (data binding): current-month confirmed member-submissions too
+	// (period_label is the "YYYY-MM" string used by the "Weka Mchango" flow).
+	var confirmedMemberContributionsMonth decimal.Decimal
+	database.DB.Model(&models.MemberContribution{}).
+		Where("period_label = ? AND status = ?", monthFirst.Format("2006-01"), models.ContributionConfirmed).
+		Select("COALESCE(SUM(amount), 0)").Scan(&confirmedMemberContributionsMonth)
+	totalContributionsMonth = totalContributionsMonth.Add(confirmedMemberContributionsMonth)
 
 	database.DB.Model(&models.Repayment{}).
 		Where("paid_at >= ? AND paid_at < ?", monthFirst, monthFirst.AddDate(0, 1, 0)).

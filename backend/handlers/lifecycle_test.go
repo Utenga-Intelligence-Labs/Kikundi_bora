@@ -14,21 +14,11 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 )
 
 func fullApp() *fiber.App {
-	config.AppConfig = &config.Config{
-		DBHost:      "127.0.0.1",
-		DBPort:      "5432",
-		DBUser:      "dahdio",
-		DBPassword:  "devpass123",
-		DBName:      "kikundi_db",
-		DBSSLMode:   "disable",
-		JWTSecret:   "test-secret-key-at-least-32-characters!!",
-		Port:        "0",
-		CORSOrigins: "http://localhost:3000",
-		Environment: "test",
-	}
+	config.AppConfig = testConfig()
 	database.Connect()
 	services.InitEmail()
 
@@ -205,7 +195,7 @@ func TestLoanLifecycleDB(t *testing.T) {
 	// Apply
 	loan := models.Loan{
 		MemberID: member.ID,
-		Amount:   100000,
+		Amount:   decimal.NewFromInt(100000),
 		Status:   models.LoanPending,
 	}
 	if err := database.DB.Create(&loan).Error; err != nil {
@@ -243,7 +233,7 @@ func TestLoanLifecycleDB(t *testing.T) {
 	if reloaded.Status != models.LoanOutstanding {
 		t.Fatalf("loan not outstanding: %s", reloaded.Status)
 	}
-	if reloaded.BalanceRemaining == nil || *reloaded.BalanceRemaining != 100000 {
+	if reloaded.BalanceRemaining == nil || !reloaded.BalanceRemaining.Equal(decimal.NewFromInt(100000)) {
 		t.Fatalf("balance incorrect: %v", reloaded.BalanceRemaining)
 	}
 
@@ -251,15 +241,15 @@ func TestLoanLifecycleDB(t *testing.T) {
 	database.DB.Create(&models.Repayment{
 		LoanID:       loan.ID,
 		MemberID:     member.ID,
-		Amount:       40000,
-		BalanceAfter: 60000,
+		Amount:       decimal.NewFromInt(40000),
+		BalanceAfter: decimal.NewFromInt(60000),
 		RecordedBy:   chair.ID,
 	})
 	database.DB.Model(&loan).Update("balance_remaining", 60000.0)
 
 	// Reload
 	database.DB.First(&reloaded, "id = ?", loan.ID)
-	if *reloaded.BalanceRemaining != 60000 {
+	if !reloaded.BalanceRemaining.Equal(decimal.NewFromInt(60000)) {
 		t.Fatalf("balance after repayment: %v", *reloaded.BalanceRemaining)
 	}
 
@@ -267,8 +257,8 @@ func TestLoanLifecycleDB(t *testing.T) {
 	database.DB.Create(&models.Repayment{
 		LoanID:       loan.ID,
 		MemberID:     member.ID,
-		Amount:       60000,
-		BalanceAfter: 0,
+		Amount:       decimal.NewFromInt(60000),
+		BalanceAfter: decimal.NewFromInt(0),
 		RecordedBy:   chair.ID,
 	})
 	database.DB.Model(&loan).Updates(map[string]interface{}{
@@ -347,9 +337,9 @@ func TestWelfareEventLifecycleDB(t *testing.T) {
 		MemberID:        member.ID,
 		EventType:       models.WelfareMedical,
 		Description:     "Matibabu ya dharura",
-		AmountRequested: 50000,
+		AmountRequested: decimal.NewFromInt(50000),
 		FundingSource:   models.FundTreasury,
-		TreasuryAmount:  50000,
+		TreasuryAmount:  decimal.NewFromInt(50000),
 		Status:          models.WelfarePending,
 		CreatedBy:       treasurer.ID,
 	}

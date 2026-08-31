@@ -15,21 +15,11 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/shopspring/decimal"
 )
 
 func fullTestApp() *fiber.App {
-	config.AppConfig = &config.Config{
-		DBHost:      "127.0.0.1",
-		DBPort:      "5432",
-		DBUser:      "dahdio",
-		DBPassword:  "devpass123",
-		DBName:      "kikundi_db",
-		DBSSLMode:   "disable",
-		JWTSecret:   "test-secret-key-at-least-32-characters!!",
-		Port:        "0",
-		CORSOrigins: "http://localhost:3000",
-		Environment: "test",
-	}
+	config.AppConfig = testConfig()
 	database.Connect()
 	services.InitEmail()
 
@@ -133,17 +123,34 @@ func hExtract(t *testing.T, data []byte, key string) string {
 }
 
 func cleanAndSeed() {
-	database.DB.Exec("DELETE FROM loan_reviews")
-	database.DB.Exec("DELETE FROM repayments")
-	database.DB.Exec("DELETE FROM loans")
-	database.DB.Exec("DELETE FROM contribution_edits")
-	database.DB.Exec("DELETE FROM contributions")
-	database.DB.Exec("DELETE FROM user_approvals")
-	database.DB.Exec("DELETE FROM user_sessions")
-	database.DB.Exec("DELETE FROM failed_logins")
-	database.DB.Exec("DELETE FROM loan_committee_members")
-	database.DB.Exec("DELETE FROM members")
-	database.DB.Exec("DELETE FROM users")
+	// Full dependency-ordered cleanup (FK-safe). A partial delete list lets
+	// FK-referenced rows survive, silently aborts later DELETEs and skips the
+	// reseed — leaving tests running against stale data.
+	for _, stmt := range []string{
+		"DELETE FROM loan_reviews",
+		"DELETE FROM repayments",
+		"DELETE FROM loans",
+		"DELETE FROM contribution_edits",
+		"DELETE FROM contributions",
+		"DELETE FROM member_contributions",
+		"DELETE FROM user_approvals",
+		"DELETE FROM user_sessions",
+		"DELETE FROM failed_logins",
+		"DELETE FROM loan_committee_members",
+		"DELETE FROM leadership_positions",
+		"DELETE FROM user_positions",
+		"DELETE FROM notifications",
+		"DELETE FROM audit_logs",
+		"DELETE FROM admin_logs",
+		"DELETE FROM pending_actions",
+		"DELETE FROM welfare_contributions",
+		"DELETE FROM welfare_events",
+		"DELETE FROM group_setting_proposals",
+		"DELETE FROM members",
+		"DELETE FROM users",
+	} {
+		database.DB.Exec(stmt)
+	}
 	var c int64
 	database.DB.Model(&models.User{}).Count(&c)
 	if c == 0 {
@@ -330,8 +337,8 @@ func TestContributionFlow(t *testing.T) {
 	// Verify in DB
 	var c models.Contribution
 	database.DB.First(&c, "id = ?", contribID)
-	if c.Amount != 30000 {
-		t.Errorf("amount mismatch: %f", c.Amount)
+	if !c.Amount.Equal(decimal.NewFromInt(30000)) {
+		t.Errorf("amount mismatch: %s", c.Amount)
 	}
 
 	// Try duplicate (same member + month)

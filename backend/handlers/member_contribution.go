@@ -374,7 +374,10 @@ func (h *MemberContributionHandler) MembersSummary(c *fiber.Ctx) error {
 
 	var rows []MemberRow
 
-	// Left join: all active members with their latest contribution
+	// Left join: all active members with their latest contribution.
+	// FIX: the lateral subquery previously filtered on member_contributions.deleted_at,
+	// a column that does not exist on that table (no soft-delete on member_contributions)
+	// — the whole query failed with a 500. The filter is removed.
 	database.DB.Raw(`
 		SELECT
 			m.id AS member_id,
@@ -392,7 +395,7 @@ func (h *MemberContributionHandler) MembersSummary(c *fiber.Ctx) error {
 		FROM members m
 		LEFT JOIN LATERAL (
 			SELECT * FROM member_contributions
-			WHERE member_id = m.id AND deleted_at IS NULL
+			WHERE member_id = m.id
 			ORDER BY created_at DESC LIMIT 1
 		) mc ON TRUE
 		WHERE m.deleted_at IS NULL AND m.is_active = TRUE

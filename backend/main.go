@@ -148,6 +148,16 @@ func main() {
 	// Chair proposes; only secretary approval applies changes.
 	groups := protected.Group("/groups")
 	groups.Get("/current", groupSettingsHandler.GetCurrent)
+	// Role-scoped group dashboard summaries (leadership + admin only)
+	groups.Get("/:id/dashboard-summary",
+		middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary),
+		dashHandler.GroupSummary)
+	groups.Get("/:id/dashboard-summary/katibu",
+		middleware.RequireLeadership(models.LeadershipSecretary),
+		dashHandler.GroupSummaryKatibu)
+	groups.Get("/:id/dashboard-summary/mweka-hazina",
+		middleware.RequireLeadership(models.LeadershipTreasurer),
+		dashHandler.GroupSummaryMwekaHazina)
 	settings := groups.Group("/:id/contribution-settings")
 	settings.Get("/", groupSettingsHandler.GetSettings)
 	settings.Post("/propose", middleware.RequireRoles(models.RoleChair), groupSettingsHandler.Propose)
@@ -163,10 +173,14 @@ func main() {
 	users.Post("/:id/reject", middleware.RequireRoles(models.RoleSecretary), userMgmtHandler.RejectUser)
 	// Chair may reset non-admin user passwords (temp returned once); not full admin powers
 	users.Post("/:id/reset-password", middleware.RequireRoles(models.RoleChair), userMgmtHandler.ResetUserPassword)
+	// Roles a user holds (self / leadership / admin — used for the role-switch toggle)
+	users.Get("/:id/roles", dashHandler.UserRoles)
 
 	members := protected.Group("/members")
 	members.Get("/", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberHandler.List)
 	members.Get("/:id", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberHandler.Get)
+	// Role-scoped dashboard summaries (self / leadership / admin — see handler)
+	members.Get("/:id/dashboard-summary", dashHandler.MemberSummary)
 	members.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), memberHandler.Create)
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)
 	members.Delete("/:id", middleware.RequireRoles(models.RoleChair), memberHandler.Delete)

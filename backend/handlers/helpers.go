@@ -52,7 +52,7 @@ func upsertUserPosition(db *gorm.DB, userID string, role models.Role) error {
 		}
 		return nil
 	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 

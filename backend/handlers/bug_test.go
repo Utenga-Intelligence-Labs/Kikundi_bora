@@ -17,18 +17,7 @@ import (
 )
 
 func minimalApp() *fiber.App {
-	config.AppConfig = &config.Config{
-		DBHost:      "127.0.0.1",
-		DBPort:      "5432",
-		DBUser:      "dahdio",
-		DBPassword:  "devpass123",
-		DBName:      "kikundi_db",
-		DBSSLMode:   "disable",
-		JWTSecret:   "test-secret-key-at-least-32-characters!!",
-		Port:        "0",
-		CORSOrigins: "http://localhost:3000",
-		Environment: "test",
-	}
+	config.AppConfig = testConfig()
 	database.Connect()
 	services.InitEmail()
 

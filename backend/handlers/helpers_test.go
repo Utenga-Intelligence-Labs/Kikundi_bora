@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"testing"
+
+	"github.com/shopspring/decimal"
 )
 
 func TestEscapeLike(t *testing.T) {
@@ -33,19 +35,19 @@ func TestLikePattern(t *testing.T) {
 
 func TestFormatMoney(t *testing.T) {
 	tests := []struct {
-		input float64
+		input decimal.Decimal
 		want  string
 	}{
-		{0, "0.00"},
-		{1000, "1000.00"},
-		{1234.5, "1234.50"},
-		{1234.567, "1234.57"},
+		{decimal.NewFromInt(0), "0.00"},
+		{decimal.NewFromInt(1000), "1000.00"},
+		{decimal.RequireFromString("1234.5"), "1234.50"},
+		{decimal.RequireFromString("1234.567"), "1234.57"},
 	}
 
 	for _, tt := range tests {
 		got := formatMoney(tt.input)
 		if got != tt.want {
-			t.Errorf("formatMoney(%f) = %q, want %q", tt.input, got, tt.want)
+			t.Errorf("formatMoney(%s) = %q, want %q", tt.input, got, tt.want)
 		}
 	}
 }

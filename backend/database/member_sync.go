@@ -34,7 +34,7 @@ func EnsureMemberForUser(db *gorm.DB, user models.User, registeredBy string) err
 	if err == nil {
 		return nil
 	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 
@@ -52,7 +52,7 @@ func EnsureMemberForUser(db *gorm.DB, user models.User, registeredBy string) err
 		}
 		return fmt.Errorf("simu %s tayari imesajiliwa kwa mwanachama mwingine", user.Phone)
 	}
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 

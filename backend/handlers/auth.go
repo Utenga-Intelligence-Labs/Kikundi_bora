@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log"
+	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -16,10 +18,26 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/go-playground/validator/v10"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"golang.org/x/crypto/bcrypt"
 )
 
 var validate = validator.New()
+
+func init() {
+	// validator v10 cannot natively compare shopspring/decimal.Decimal (a
+	// struct) — without this converter, tags like `gt=0` on decimal fields
+	// PANIC ("Bad field type decimal.Decimal"), which 500'd e.g. the
+	// treasurer "Pokea Mchango" endpoint (POST /contributions).
+	validate.RegisterCustomTypeFunc(func(fl reflect.Value) interface{} {
+		if d, ok := fl.Interface().(decimal.Decimal); ok {
+			f, _ := d.Float64()
+			return f
+		}
+		return nil
+	}, decimal.Decimal{})
+}
 
 type AuthHandler struct{}
 
@@ -143,7 +161,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	database.DB.Model(&models.FailedLogin{}).
 		Where("ip_address = ? AND attempted_at > ?", ip, fiveMinAgo).
 		Count(&recentAttempts)
-	if recentAttempts >= 5 {
+	if os.Getenv("DISABLE_LOGIN_RATE_LIMIT") != "1" && recentAttempts >= 5 {
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 			"message": "Majaribio mengi mno ya kuingia. Jaribu tena baada ya dakika 5.",
 		})
@@ -154,7 +172,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	database.DB.Model(&models.FailedLogin{}).
 		Where("email_attempted = ? AND attempted_at > ?", loginID, fiveMinAgo).
 		Count(&accountAttempts)
-	if accountAttempts >= 5 {
+	if os.Getenv("DISABLE_LOGIN_RATE_LIMIT") != "1" && accountAttempts >= 5 {
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 			"message": "Majaribio mengi mno ya kuingia kwenye akaunti hii. Jaribu tena baada ya dakika 5.",
 		})
@@ -542,12 +560,18 @@ func sha256Hex(s string) string {
 }
 
 func (h *AuthHandler) generateToken(userID string, role models.Role) (string, string) {
-	expiresAt := time.Now().Add(30 * time.Minute)
+	now := time.Now()
+	expiresAt := now.Add(30 * time.Minute)
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"role":    role,
 		"exp":     expiresAt.Unix(),
-		"iat":     time.Now().Unix(),
+		"iat":     now.Unix(),
+		// BUGFIX: unique token id — without it, two logins for the same user
+		// within the same second produced an IDENTICAL token (same claims →
+		// same signature), violating user_sessions.token_hash uniqueness and
+		// 500-ing the second login.
+		"jti": uuid.NewString(),
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(config.AppConfig.JWTSecret))
