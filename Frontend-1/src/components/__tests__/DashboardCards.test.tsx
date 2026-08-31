@@ -108,7 +108,7 @@ describe("DashboardCards - Rendering", () => {
       </QueryClientProvider>
     );
 
-    const skeleton = document.querySelector(".animate-pulse");
+    const skeleton = document.querySelector(".animate-spin");
     expect(skeleton).toBeTruthy();
   });
 
@@ -119,7 +119,7 @@ describe("DashboardCards - Rendering", () => {
       </QueryClientProvider>
     );
 
-    const skeleton = document.querySelector(".animate-pulse");
+    const skeleton = document.querySelector(".animate-spin");
     expect(skeleton).toBeTruthy();
   });
 });

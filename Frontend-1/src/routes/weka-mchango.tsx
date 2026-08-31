@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon, CalendarDays } from "lucide-react";
 import { MfukoContributionForm } from "@/components/MfukoContributionForm";
 import { groupsApi, INTERVAL_LABELS } from "@/api/groups";
+import { useAppModal } from "@/components/AppModal";
 
 export const Route = createFileRoute("/weka-mchango")({
   beforeLoad: () => {
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/weka-mchango")({
 function WekaMchangoPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { showModal } = useAppModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Group contribution settings (approved) — banner + fixed amount enforcement
@@ -116,7 +118,7 @@ function WekaMchangoPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["michango"] });
-      alert("Mchango umewasilishwa!");
+      showModal({ title: "Imefanikiwa", message: "Mchango umewasilishwa!", variant: "success", primaryLabel: "Sawa" });
       setFormData({
         contribution_type: "AKIBA",
         period_label: new Date().toISOString().slice(0, 7),
@@ -126,7 +128,7 @@ function WekaMchangoPage() {
       removeFile();
     },
     onError: (err: Error) => {
-      alert(err.message);
+      showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" });
     },
   });
 
@@ -136,13 +138,13 @@ function WekaMchangoPage() {
     e.preventDefault();
 
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      alert("Kiasi kinahitajika");
+      showModal({ title: "Hitilafu", message: "Kiasi kinahitajika", variant: "warning", primaryLabel: "Sawa" });
       return;
     }
 
     // Must have either a file or a message
     if (!selectedFile && !formData.proof_message) {
-      alert("Lazima uweke picha ya uthibitisho au ujumbe wa muamala");
+      showModal({ title: "Hitilafu", message: "Lazima uweke picha ya uthibitisho au ujumbe wa muamala", variant: "warning", primaryLabel: "Sawa" });
       return;
     }
 

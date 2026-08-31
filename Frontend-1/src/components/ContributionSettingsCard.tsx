@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Clock, CalendarDays, CheckCircle2, XCircle, Loader2, PiggyBank, Send } from "lucide-react";
 import { useAuth } from "@/lib/auth-provider";
+import { useAppModal } from "@/components/AppModal";
 import {
   groupsApi,
   INTERVAL_LABELS,
@@ -19,6 +20,7 @@ const INTERVALS: ContributionInterval[] = ["weekly", "monthly", "semi_annual", "
 export function ContributionSettingsCard() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { showModal } = useAppModal();
   const isChair = user?.role === "chair";
   const isSecretary = user?.role === "secretary";
 
@@ -56,30 +58,30 @@ export function ContributionSettingsCard() {
         fixed_contribution_amount: form.amount ? parseFloat(form.amount) : undefined,
       }),
     onSuccess: () => {
-      alert("Pendekezo limetumwa kwa Katibu kwa idhini.");
+      showModal({ title: "Imefanikiwa", message: "Pendekezo limetumwa kwa Katibu kwa idhini.", variant: "success", primaryLabel: "Sawa" });
       invalidate();
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => showModal({ title: "Hitilafu", message: e.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   const approveMutation = useMutation({
     mutationFn: () => groupsApi.approve(group!.id),
     onSuccess: () => {
-      alert("Mipangilio imeidhinishwa na sasa inatumika.");
+      showModal({ title: "Imefanikiwa", message: "Mipangilio imeidhinishwa na sasa inatumika.", variant: "success", primaryLabel: "Sawa" });
       invalidate();
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => showModal({ title: "Hitilafu", message: e.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   const rejectMutation = useMutation({
     mutationFn: () => groupsApi.reject(group!.id, rejectReason),
     onSuccess: () => {
-      alert("Pendekezo limekataliwa.");
+      showModal({ title: "Imefanikiwa", message: "Pendekezo limekataliwa.", variant: "success", primaryLabel: "Sawa" });
       setRejectMode(false);
       setRejectReason("");
       invalidate();
     },
-    onError: (e: Error) => alert(e.message),
+    onError: (e: Error) => showModal({ title: "Hitilafu", message: e.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   if (isLoading) {

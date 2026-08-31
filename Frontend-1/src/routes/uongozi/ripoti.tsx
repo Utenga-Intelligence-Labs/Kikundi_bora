@@ -6,6 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { FileBarChart2, Download, Users, PiggyBank, Banknote, TrendingUp, Loader2, Clock } from "lucide-react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAppModal } from "@/components/AppModal";
 
 export const Route = createFileRoute("/uongozi/ripoti")({
   beforeLoad: () => {
@@ -28,6 +29,7 @@ interface QuickStats {
 
 function RipotiPage() {
   const { user, isLeadership } = useAuth();
+  const { showModal } = useAppModal();
   const [reportType, setReportType] = useState("summary");
   const [loading, setLoading] = useState(false);
 
@@ -59,7 +61,7 @@ function RipotiPage() {
       );
     } catch (err) {
       console.error(err);
-      alert("Imeshindikana kupakua ripoti");
+      showModal({ title: "Hitilafu", message: "Imeshindikana kupakua ripoti", variant: "error", primaryLabel: "Sawa" });
     } finally {
       setLoading(false);
     }

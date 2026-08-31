@@ -7,6 +7,7 @@ import { AppShell } from "@/components/AppShell";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { CheckCircle, XCircle, Clock, Loader2, Eye, ImageIcon, X, AlertTriangle, UserCheck } from "lucide-react";
+import { useAppModal } from "@/components/AppModal";
 
 export const Route = createFileRoute("/michango-inayosubiri")({
   beforeLoad: () => {
@@ -40,6 +41,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: any }>
 function TaarifaWanaosubiriPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const { showModal } = useAppModal();
   const [viewing, setViewing] = useState<MemberRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectInput, setShowRejectInput] = useState(false);
@@ -61,7 +63,7 @@ function TaarifaWanaosubiriPage() {
       qc.invalidateQueries({ queryKey: ["michango"] });
       setViewing(null);
     },
-    onError: (err: Error) => alert(err.message),
+    onError: (err: Error) => showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   const rejectMutation = useMutation({
@@ -74,7 +76,7 @@ function TaarifaWanaosubiriPage() {
       setRejectReason("");
       setShowRejectInput(false);
     },
-    onError: (err: Error) => alert(err.message),
+    onError: (err: Error) => showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   if (!user) return null;

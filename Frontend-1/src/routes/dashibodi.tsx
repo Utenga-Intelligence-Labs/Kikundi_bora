@@ -185,11 +185,11 @@ function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: str
         <QuickAction to="/marejesho" icon={Receipt} label="Pokea Marejesho" />
         <QuickAction to="/mikopo" icon={Wallet} label="Simamia Mikopo" />
       </div>
-      {hazinData.recent_disbursements.length > 0 && (
+      {(hazinData.recent_disbursements ?? []).length > 0 && (
         <>
           <SectionTitle>Mikopo iliyopewa karibuni</SectionTitle>
           <div className="card-surface divide-y divide-border">
-            {hazinData.recent_disbursements.slice(0, 5).map((d) => (
+            {(hazinData.recent_disbursements ?? []).slice(0, 5).map((d) => (
               <div key={d.loan_id} className="flex items-center justify-between px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{d.full_name}</p>
@@ -257,11 +257,11 @@ function SecretaryView({ groupId, memberId }: { groupId?: string; memberId?: str
         <QuickAction to="/michango" icon={PiggyBank} label="Kumbukumbu" />
         <QuickAction to="/ripoti" icon={TrendingUp} label="Andaa Ripoti" />
       </div>
-      {katibuData.late_payments.length > 0 && (
+      {(katibuData.late_payments ?? []).length > 0 && (
         <>
           <SectionTitle>Wanachama walio chelezo</SectionTitle>
           <div className="card-surface divide-y divide-border">
-            {katibuData.late_payments.slice(0, 8).map((p, i) => (
+            {(katibuData.late_payments ?? []).slice(0, 8).map((p, i) => (
               <div
                 key={`${p.member_id}-${i}`}
                 className="flex items-center justify-between px-4 py-3"
@@ -402,13 +402,13 @@ function MemberView({
       </div>
 
       <SectionTitle>Michango Yangu</SectionTitle>
-      {memberData.recent_contributions.length === 0 ? (
+      {(memberData.recent_contributions ?? []).length === 0 ? (
         <div className="card-surface p-6 text-center text-sm text-muted-foreground">
           Hakuna michango iliyorekodiwa bado.
         </div>
       ) : (
         <div className="card-surface divide-y divide-border">
-          {memberData.recent_contributions.slice(0, 6).map((c, i) => (
+          {(memberData.recent_contributions ?? []).slice(0, 6).map((c, i) => (
             <div key={`${c.created_at}-${i}`} className="flex items-center justify-between px-4 py-3">
               <div>
                 <p className="text-sm font-medium">{tzs(c.amount)}</p>

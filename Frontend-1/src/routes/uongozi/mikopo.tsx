@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
 import { useMembers } from "@/hooks/use-members";
 import { useState } from "react";
+import { useAppModal } from "@/components/AppModal";
 
 export const Route = createFileRoute("/uongozi/mikopo")({
   beforeLoad: () => { requireAuth(); },
@@ -25,6 +26,7 @@ interface Loan {
 function MikopoPage() {
   const { user, isLeadership } = useAuth();
   const qc = useQueryClient();
+  const { showModal } = useAppModal();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showBodiPopup, setShowBodiPopup] = useState(false);
   const [selectedMember, setSelectedMember] = useState("");
@@ -65,7 +67,7 @@ function MikopoPage() {
       return res.json();
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["uongozi", "mikopo"] }); },
-    onError: (err: Error) => alert(err.message),
+    onError: (err: Error) => showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   const appointMutation = useMutation({
@@ -79,17 +81,26 @@ function MikopoPage() {
       if (!res.ok) throw new Error((await res.json()).message || "Imeshindikana");
       return res.json();
     },
-    onSuccess: () => { setShowBodiPopup(false); setSelectedMember(""); alert("Mwanachama ameongezwa kwenye Bodi ya Mikopo!"); },
-    onError: (err: Error) => alert(err.message),
+    onSuccess: () => { setShowBodiPopup(false); setSelectedMember(""); showModal({ title: "Imefanikiwa", message: "Mwanachama ameongezwa kwenye Bodi ya Mikopo!", variant: "success", primaryLabel: "Sawa" }); },
+    onError: (err: Error) => showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
-  const handleApprove = async (loan: Loan) => {
-    const confirmed = window.confirm(`Idhinisha mkopo wa TZS ${Number(loan.amount).toLocaleString()}?`);
-    if (!confirmed) return;
-    setActionLoading(loan.id);
-    try { await approveMutation.mutateAsync({ loanId: loan.id, amount: loan.amount }); alert("Umeidhinisha!"); }
-    catch { /* error handled by mutation */ }
-    finally { setActionLoading(null); }
+  const handleApprove = (loan: Loan) => {
+    showModal({
+      title: "Thibitisha",
+      message: `Idhinisha mkopo wa TZS ${Number(loan.amount).toLocaleString()}?`,
+      variant: "warning",
+      primaryLabel: "Thibitisha",
+      secondaryLabel: "Ghairi",
+      onPrimary: async () => {
+        setActionLoading(loan.id);
+        try {
+          await approveMutation.mutateAsync({ loanId: loan.id, amount: loan.amount });
+          showModal({ title: "Imefanikiwa", message: "Umeidhinisha!", variant: "success", primaryLabel: "Sawa" });
+        } catch { /* error handled by mutation */ }
+        finally { setActionLoading(null); }
+      },
+    });
   };
 
   const getApprovalStep = (loan: Loan) => {

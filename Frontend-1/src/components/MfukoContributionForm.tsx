@@ -4,6 +4,7 @@ import { Loader2, Upload, X, HeartHandshake } from "lucide-react";
 import { welfareApi, type WelfareEvent } from "@/api/welfare";
 import { uploadApi } from "@/api/upload";
 import { api } from "@/api/client";
+import { useAppModal } from "@/components/AppModal";
 
 const EVENT_LABELS: Record<string, string> = {
   MSIBA: "Msiba",
@@ -22,6 +23,7 @@ const EVENT_LABELS: Record<string, string> = {
  */
 export function MfukoContributionForm() {
   const qc = useQueryClient();
+  const { showModal } = useAppModal();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [eventId, setEventId] = useState("");
@@ -93,28 +95,28 @@ export function MfukoContributionForm() {
     }) => api.post("/michango", { contribution_type: "MFUKO_WA_KIJAMII", ...data }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["michango"] });
-      alert("Mchango wa mfuko umewasilishwa! Unasubiri idhini ya Mwenyekiti.");
+      showModal({ title: "Imefanikiwa", message: "Mchango wa mfuko umewasilishwa! Unasubiri idhini ya Mwenyekiti.", variant: "success", primaryLabel: "Sawa" });
       setAmount("");
       setProofMessage("");
       setEventId("");
       removeFile();
     },
-    onError: (err: Error) => alert(err.message),
+    onError: (err: Error) => showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" }),
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!eventId) {
-      alert("Lazima uchague mfuko wa kijamii");
+      showModal({ title: "Hitilafu", message: "Lazima uchague mfuko wa kijamii", variant: "warning", primaryLabel: "Sawa" });
       return;
     }
     if (!amount || parseFloat(amount) <= 0) {
-      alert("Kiasi kinahitajika");
+      showModal({ title: "Hitilafu", message: "Kiasi kinahitajika", variant: "warning", primaryLabel: "Sawa" });
       return;
     }
     if (!selectedFile && !proofMessage) {
-      alert("Lazima uweke picha ya uthibitisho au ujumbe wa muamala");
+      showModal({ title: "Hitilafu", message: "Lazima uweke picha ya uthibitisho au ujumbe wa muamala", variant: "warning", primaryLabel: "Sawa" });
       return;
     }
 

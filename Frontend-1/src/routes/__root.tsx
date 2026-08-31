@@ -21,6 +21,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { registerPWA } from "../lib/pwa-register";
 import { AuthProvider } from "../lib/auth-provider";
+import { AppModalProvider } from "@/components/AppModal";
 import type { RouterContext } from "../router";
 
 function NotFoundComponent() {
@@ -120,7 +121,9 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        <AppModalProvider>
+          <Outlet />
+        </AppModalProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
