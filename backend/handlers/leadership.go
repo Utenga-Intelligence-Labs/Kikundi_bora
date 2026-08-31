@@ -95,7 +95,7 @@ func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 		Preload("Member", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, member_no, full_name, phone")
 		}).
-		Order("created_at DESC").
+		Order("applied_at DESC"). // NOTE: loans has no created_at column
 		Find(&loans).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Imeshindikana kupata mikopo",
