@@ -1,24 +1,41 @@
 /**
- * Role-specific dashboard card components.
- * These cards bind to the role-scoped API endpoints from Task A backend.
+ * Role-specific dashboard card components — styled to match dashibodi-old.tsx
+ * hero-surface / card-surface / chip with same colours.
  */
 
 import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "@/api/dashboard";
 import { tzs } from "@/lib/format";
-import {
-  PiggyBank,
-  Heart,
-  AlertCircle,
-  Loader2,
-  TrendingDown,
-  DollarSign,
-  Clock,
-} from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Loader2, Heart, Clock } from "lucide-react";
+
+// ---------- shared bits (mirrors dashibodi-old.tsx) ----------
+function HeroBalance({ label, value, stats }: { label: string; value: string; stats: [string, string][] }) {
+  return (
+    <section className="hero-surface px-5 py-6 lg:px-7 lg:py-8">
+      <p className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">{label}</p>
+      <p className="mt-2 font-display text-4xl font-extrabold lg:text-5xl">{value}</p>
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+        {stats.map(([k, v]) => (
+          <div key={k} className="rounded-xl bg-white/15 px-3 py-2.5">
+            <p className="text-xs text-primary-foreground/80">{k}</p>
+            <p className="font-semibold">{v}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="flex justify-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 // ============================================================================
-// MEMBER DASHBOARD CARD - "Akiba Yangu"
+// MEMBER DASHBOARD CARD - "Akiba Yangu" (for Mwanachama + leadership personal)
 // ============================================================================
 
 export function MemberAkibaCard({ memberId }: { memberId: string }) {
@@ -28,18 +45,7 @@ export function MemberAkibaCard({ memberId }: { memberId: string }) {
     enabled: !!memberId,
   });
 
-  if (isLoading) {
-    return (
-      <div className="card-surface animate-pulse">
-        <div className="flex items-center justify-between mb-4">
-          <div className="h-5 bg-muted rounded w-32" />
-          <PiggyBank className="h-6 w-6 text-muted" />
-        </div>
-        <div className="h-8 bg-muted rounded w-40 mb-3" />
-        <div className="h-4 bg-muted rounded w-24" />
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingSkeleton />;
 
   if (error || !data) {
     return (
@@ -48,9 +54,7 @@ export function MemberAkibaCard({ memberId }: { memberId: string }) {
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-sm mb-1">Imeshindikana kupakia</h3>
-            <p className="text-xs text-muted-foreground">
-              Haijapatikana data ya akiba yako. Tafadhali jaribu tena.
-            </p>
+            <p className="text-xs text-muted-foreground">Haijapatikana data ya akiba yako. Tafadhali jaribu tena.</p>
           </div>
         </div>
       </div>
@@ -58,88 +62,44 @@ export function MemberAkibaCard({ memberId }: { memberId: string }) {
   }
 
   return (
-    <div className="card-surface">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-sm">Akiba Yangu</h3>
-        <PiggyBank className="h-5 w-5 text-primary" />
-      </div>
-
-      {/* Main amount */}
-      <div className="mb-4">
-        <p className="text-3xl font-bold text-primary">
-          {tzs(Number(data.total_contributions))}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Michango {data.contributions_count}
-        </p>
-      </div>
-
-      {/* Pending contributions warning */}
-      {data.pending_contributions_count > 0 && (
-        <Alert className="mb-3 border-amber-200 bg-amber-50">
-          <Clock className="h-4 w-4 text-amber-700" />
-          <AlertDescription className="text-xs text-amber-700">
-            {data.pending_contributions_count} michango inasubiri uthibitisho
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Rejected contributions alert */}
-      {data.rejected_contributions_count > 0 && (
-        <Alert className="mb-3 border-destructive/50 bg-destructive/5">
-          <AlertCircle className="h-4 w-4 text-destructive" />
-          <AlertDescription className="text-xs text-destructive">
-            {data.rejected_contributions_count} michango yalikataliwa
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Welfare contributions */}
-      {data.welfare_contributions_total !== "0" && (
-        <div className="pt-3 border-t border-border">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Heart className="h-4 w-4 text-pink-500" />
-              <span className="text-xs font-medium">Mfuko wa Kijamii</span>
-            </div>
-            <span className="text-sm font-semibold">
-              {tzs(Number(data.welfare_contributions_total))}
+    <>
+      <HeroBalance
+        label="Akiba Yangu"
+        value={tzs(Number(data.total_contributions ?? 0))}
+        stats={[
+          ["Michango", String(data.contributions_count ?? 0)],
+          ["Mikopo wazi", String(data.outstanding_loans_count ?? 0)],
+          ["Deni bado", tzs(data.outstanding_loans_balance ?? 0)],
+          ["Mikopo iliyofungwa", String(data.closed_loans_count ?? 0)],
+        ]}
+      />
+      {/* extra details — same card-surface / chip colours as old */}
+      {(data.pending_contributions_count > 0 || data.rejected_contributions_count > 0) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {data.pending_contributions_count > 0 && (
+            <span className="chip bg-warning/30 text-foreground flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" /> {data.pending_contributions_count} inasubiri
             </span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Michango {data.welfare_contributions_count}
-          </p>
-        </div>
-      )}
-
-      {/* Loans summary */}
-      {(data.outstanding_loans_count > 0 || data.closed_loans_count > 0) && (
-        <div className="pt-3 border-t border-border">
-          <h4 className="text-xs font-semibold mb-2">Mikopo Yangu</h4>
-          {data.outstanding_loans_count > 0 && (
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">Deni bado:</span>
-              <span className="text-sm font-semibold text-destructive">
-                {tzs(Number(data.outstanding_loans_balance))}
-              </span>
-            </div>
           )}
-          {data.closed_loans_count > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">Imefungwa:</span>
-              <span className="text-sm font-semibold text-green-600">
-                {data.closed_loans_count}
-              </span>
-            </div>
+          {data.rejected_contributions_count > 0 && (
+            <span className="chip bg-destructive/15 text-destructive">{data.rejected_contributions_count} yalikataliwa</span>
           )}
         </div>
       )}
-    </div>
+      {data.welfare_contributions_total !== "0" && (
+        <div className="card-surface mt-3 flex items-center justify-between p-4">
+          <span className="flex items-center gap-2 text-sm font-medium">
+            <Heart className="h-4 w-4 text-pink-500" /> Mfuko wa Kijamii
+          </span>
+          <span className="text-sm font-bold">{tzs(Number(data.welfare_contributions_total))}</span>
+        </div>
+      )}
+    </>
   );
 }
 
 // ============================================================================
-// LEADERSHIP DASHBOARD CARD - "Salio la Kikundi"
+// LEADERSHIP DASHBOARD CARD - "Salio la Kikundi" (for Mwenyekiti/Katibu/Hazina)
 // ============================================================================
 
 export function GroupBalanceCard({ groupId }: { groupId: string }) {
@@ -149,21 +109,7 @@ export function GroupBalanceCard({ groupId }: { groupId: string }) {
     enabled: !!groupId,
   });
 
-  if (isLoading) {
-    return (
-      <div className="card-surface animate-pulse">
-        <div className="flex items-center justify-between mb-4">
-          <div className="h-5 bg-muted rounded w-32" />
-          <DollarSign className="h-6 w-6 text-muted" />
-        </div>
-        <div className="h-8 bg-muted rounded w-40 mb-3" />
-        <div className="grid grid-cols-2 gap-3">
-          <div className="h-10 bg-muted rounded" />
-          <div className="h-10 bg-muted rounded" />
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingSkeleton />;
 
   if (error || !data) {
     return (
@@ -172,9 +118,7 @@ export function GroupBalanceCard({ groupId }: { groupId: string }) {
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-sm mb-1">Imeshindikana kupakia</h3>
-            <p className="text-xs text-muted-foreground">
-              Haijapatikana data ya kikundi. Tafadhali jaribu tena.
-            </p>
+            <p className="text-xs text-muted-foreground">Haijapatikana data ya kikundi. Tafadhali jaribu tena.</p>
           </div>
         </div>
       </div>
@@ -182,80 +126,22 @@ export function GroupBalanceCard({ groupId }: { groupId: string }) {
   }
 
   return (
-    <div className="card-surface">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-sm">Salio la Kikundi</h3>
-        <DollarSign className="h-5 w-5 text-primary" />
-      </div>
-
-      {/* Main balance */}
-      <div className="mb-4">
-        <p className="text-3xl font-bold text-primary">
-          {tzs(Number(data.available_balance))}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          = Michango + Malipo − Zimepewa
-        </p>
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-muted/30 rounded p-2">
-          <p className="text-xs text-muted-foreground mb-1">Michango</p>
-          <p className="font-semibold text-sm">
-            {tzs(Number(data.total_contributions))}
-          </p>
-        </div>
-        <div className="bg-muted/30 rounded p-2">
-          <p className="text-xs text-muted-foreground mb-1">Malipo</p>
-          <p className="font-semibold text-sm">
-            {tzs(Number(data.total_repayments))}
-          </p>
-        </div>
-        <div className="bg-muted/30 rounded p-2">
-          <p className="text-xs text-muted-foreground mb-1">Zimepewa</p>
-          <p className="font-semibold text-sm text-destructive">
-            -{tzs(Number(data.total_disbursed))}
-          </p>
-        </div>
-        <div className="bg-muted/30 rounded p-2">
-          <p className="text-xs text-muted-foreground mb-1">Wanachama</p>
-          <p className="font-semibold text-sm">
-            {data.total_active_members}
-          </p>
-        </div>
-      </div>
-
-      {/* Loans alert */}
-      {data.outstanding_loans_count > 0 && (
-        <div className="mt-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-amber-600" />
-            <div className="text-xs">
-              <span className="font-medium text-amber-700">Deni bado:</span>
-              <span className="ml-1 text-amber-700">
-                {tzs(Number(data.outstanding_loans_balance))} ({data.outstanding_loans_count})
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Pending items alert */}
-      {(data.pending_contributions_count > 0 || data.pending_loans_count > 0) && (
-        <Alert className="mt-3 border-blue-200 bg-blue-50">
-          <Clock className="h-4 w-4 text-blue-700" />
-          <AlertDescription className="text-xs text-blue-700">
-            {data.pending_contributions_count} michango + {data.pending_loans_count} mikopo inasub.
-          </AlertDescription>
-        </Alert>
-      )}
-    </div>
+    <HeroBalance
+      label="Salio la Kikundi"
+      value={tzs(Number(data.available_balance ?? 0))}
+      stats={[
+        ["Wanachama hai", String(data.total_active_members ?? 0)],
+        ["Mikopo wazi", String(data.outstanding_loans_count ?? 0)],
+        ["Deni bado", tzs(data.outstanding_loans_balance ?? 0)],
+        ["Michango", tzs(data.total_contributions ?? 0)],
+      ]}
+    />
   );
 }
 
 // ============================================================================
 // MEMBER PERSONAL CARD (for leadership to view their own member stats)
+// Matches dashibodi-old.tsx Member info cards: card-surface + CheckCircle2
 // ============================================================================
 
 export function PersonalMemberStatsCard({ memberId }: { memberId: string }) {
@@ -265,41 +151,21 @@ export function PersonalMemberStatsCard({ memberId }: { memberId: string }) {
     enabled: !!memberId,
   });
 
-  if (isLoading) {
-    return (
-      <div className="card-surface animate-pulse">
-        <div className="h-5 bg-muted rounded w-40 mb-4" />
-        <div className="h-6 bg-muted rounded w-32 mb-2" />
-        <div className="h-4 bg-muted rounded w-24" />
-      </div>
-    );
-  }
+  if (isLoading) return <LoadingSkeleton />;
 
   if (error || !data) return null;
 
+  // Same hero-surface design as GroupBalanceCard ("Salio la Kikundi") — content unchanged
   return (
-    <div className="card-surface bg-blue-50 border border-blue-200">
-      <h4 className="font-semibold text-sm mb-3">Michango Yangu Binafsi</h4>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Akiba:</span>
-          <span className="font-semibold">
-            {tzs(Number(data.total_contributions))}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">Idadi:</span>
-          <span className="font-semibold">{data.contributions_count}</span>
-        </div>
-        {data.pending_contributions_count > 0 && (
-          <div className="flex items-center justify-between pt-1 border-t border-blue-200">
-            <span className="text-xs text-blue-700">Inasub.:</span>
-            <span className="font-semibold text-blue-700">
-              {data.pending_contributions_count}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
+    <HeroBalance
+      label="Akiba Yangu Binafsi"
+      value={tzs(Number(data.total_contributions ?? 0))}
+      stats={[
+        ["Michango", String(data.contributions_count ?? 0)],
+        ["Mikopo wazi", String(data.outstanding_loans_count ?? 0)],
+        ["Deni bado", tzs(data.outstanding_loans_balance ?? 0)],
+        ["Inasub.", String(data.pending_contributions_count ?? 0)],
+      ]}
+    />
   );
 }

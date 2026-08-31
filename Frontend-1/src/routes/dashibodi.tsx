@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { LegacyDashboard } from "./dashibodi-old";
 import { useQuery } from "@tanstack/react-query";
 import {
   useMemberDashboardSummary,
@@ -9,27 +8,32 @@ import {
 } from "@/hooks/use-scoped-dashboard";
 import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth-provider";
+import { roleMap, type User } from "@/api/types";
+import { roleSubtitle } from "@/lib/roles";
+import { requireAuth } from "@/lib/role-guards";
+import { tzs } from "@/lib/format";
+import { groupsApi, INTERVAL_LABELS } from "@/api/groups";
+import { useSystemHealth } from "@/hooks/use-admin";
 import {
   MemberAkibaCard,
   GroupBalanceCard,
   PersonalMemberStatsCard,
 } from "@/components/DashboardCards";
-import { roleMap, type Jukumu, type User } from "@/api/types";
-import { roleSubtitle } from "@/lib/roles";
-import { requireAuth } from "@/lib/role-guards";
-import { tzs } from "@/lib/format";
-import { groupsApi } from "@/api/groups";
 import {
   Users,
-  ShieldCheck,
-  TrendingUp,
-  Receipt,
   PiggyBank,
+  Receipt,
+  TrendingUp,
+  AlertCircle,
+  ShieldCheck,
   Wallet,
   ClipboardList,
-  AlertCircle,
+  CheckCircle2,
   Loader2,
-  Crown,
+  Shield,
+  Activity,
+  Settings,
+  CalendarDays,
 } from "lucide-react";
 
 export const Route = createFileRoute("/dashibodi")({
@@ -46,7 +50,7 @@ export const Route = createFileRoute("/dashibodi")({
   beforeLoad: () => {
     requireAuth();
   },
-  component: LegacyDashboard,
+  component: Dashibodi,
 });
 
 function Dashibodi() {
@@ -90,123 +94,56 @@ function DashboardContent({ user }: { user: User }) {
       </div>
 
       {displayRole === "Mwenyekiti" && (
-        <ChairmanView
-          userId={user.id}
-          groupId={groupId}
-          memberId={user.member_id}
+        <ChairmanView groupId={groupId} memberId={user.member_id || undefined} />
+      )}
+      {displayRole === "Mweka Hazina" && <TreasurerView groupId={groupId} memberId={user.member_id || undefined} />}
+      {displayRole === "Katibu" && <SecretaryView groupId={groupId} memberId={user.member_id || undefined} />}
+      {displayRole === "Mwanachama" && (
+        <MemberView
+          userName={user.name}
+          memberId={user.member_id || null}
+          memberCode={user.member_code || null}
+          userPhone={user.phone}
         />
       )}
-      {displayRole === "Mweka Hazina" && <TreasurerView groupId={groupId} />}
-      {displayRole === "Katibu" && <SecretaryView groupId={groupId} />}
-      {displayRole === "Mwanachama" && <MemberView memberId={user.member_id} />}
       {displayRole === "Msimamizi" && <AdminView />}
     </>
   );
 }
 
-// ============================================================================
-// MWENYEKITI - Uses groupSummary + memberSummary
-// ============================================================================
+// ---------- MWENYEKITI ----------
+function ChairmanView({ groupId, memberId }: { groupId?: string; memberId?: string }) {
+  const { isLoading: groupLoading } = useGroupDashboardSummary(groupId);
 
-function ChairmanView({
-  userId,
-  groupId,
-  memberId,
-}: {
-  userId: string;
-  groupId?: string;
-  memberId?: string;
-}) {
-  const {
-    data: groupData,
-    isLoading: groupLoading,
-    error: groupError,
-  } = useGroupDashboardSummary(groupId);
-
-  if (!groupId || groupLoading) {
-    return (
-      <div className="space-y-5">
-        <div className="card-surface animate-pulse">
-          <div className="h-12 bg-muted rounded w-40 mb-4" />
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-16 bg-muted rounded" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (groupError || !groupData) {
-    return (
-      <div className="card-surface border border-destructive/50 bg-destructive/5">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-sm mb-1">
-              Imeshindikana kupakia
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Haijapatikana data ya kikundi. Tafadhali jaribu tena.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!groupId || groupLoading) return <LoadingSkeleton />;
 
   return (
     <>
-      {/* Group balance card */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <GroupBalanceCard groupId={groupData.group_id} />
-
-        {/* Personal member stats (if user is also a member) */}
+      {/* Kikundi + Personal — same hero-surface / card-surface colours as dashibodi-old */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <GroupBalanceCard groupId={groupId!} />
         {memberId && <PersonalMemberStatsCard memberId={memberId} />}
       </div>
-
-      {/* Quick actions */}
-      <div className="mt-6">
-        <SectionTitle>Kazi zako kuu</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <QuickAction
-            to="/mikopo"
-            icon={ShieldCheck}
-            label="Idhinisha Mikopo"
-          />
-          <QuickAction to="/wanachama" icon={Users} label="Wanachama" />
-          <QuickAction to="/ripoti" icon={TrendingUp} label="Tazama Ripoti" />
-          <QuickAction to="/marejesho" icon={Receipt} label="Marejesho" />
-        </div>
+      <SectionTitle>Kazi zako kuu</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <QuickAction to="/mikopo" icon={ShieldCheck} label="Idhinisha Mikopo" />
+        <QuickAction to="/wanachama" icon={Users} label="Wanachama" />
+        <QuickAction to="/ripoti" icon={TrendingUp} label="Tazama Ripoti" />
+        <QuickAction to="/marejesho" icon={Receipt} label="Marejesho" />
       </div>
     </>
   );
 }
 
-// ============================================================================
-// MWEKA HAZINA - Uses hazinaSummary
-// ============================================================================
-
-function TreasurerView({ groupId }: { groupId?: string }) {
+// ---------- MWEKA HAZINA ----------
+function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: string }) {
   const {
     data: hazinData,
     isLoading,
     error,
   } = useHazinaDashboardSummary(groupId);
 
-  if (!groupId || isLoading) {
-    return (
-      <div className="card-surface animate-pulse">
-        <div className="h-12 bg-muted rounded w-40 mb-4" />
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 bg-muted rounded" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (!groupId || isLoading) return <LoadingSkeleton />;
 
   if (error || !hazinData) {
     return (
@@ -214,12 +151,8 @@ function TreasurerView({ groupId }: { groupId?: string }) {
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-sm mb-1">
-              Imeshindikana kupakia
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Haijapatikana data ya hazina. Tafadhali jaribu tena.
-            </p>
+            <h3 className="font-semibold text-sm mb-1">Imeshinikana kupakia</h3>
+            <p className="text-xs text-muted-foreground">Haijapatikana data ya hazina. Tafadhali jaribu tena.</p>
           </div>
         </div>
       </div>
@@ -228,70 +161,41 @@ function TreasurerView({ groupId }: { groupId?: string }) {
 
   return (
     <>
-      {/* Mapato section */}
-      <div className="card-surface">
-        <h3 className="font-semibold text-sm mb-4">Mapato ya Mwezi Huu</h3>
-        <p className="text-3xl font-bold text-primary mb-4">
-          {tzs(Number(hazinData.cash_in_this_period))}
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">Imechukuniwa</p>
-            <p className="font-semibold">
-              {tzs(Number(hazinData.cash_in_confirmed))}
-            </p>
-          </div>
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">Inasub.</p>
-            <p className="font-semibold">
-              {tzs(Number(hazinData.cash_in_pending))} (
-              {hazinData.cash_in_pending_count})
-            </p>
-          </div>
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">Malipo</p>
-            <p className="font-semibold">
-              {tzs(Number(hazinData.repayments_this_month))}
-            </p>
-          </div>
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">Salio</p>
-            <p className="font-semibold text-primary">
-              {tzs(Number(hazinData.available_balance))}
-            </p>
-          </div>
-        </div>
+      {/* Kikundi + Personal — same design */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <GroupBalanceCard groupId={groupId!} />
+        {memberId && <PersonalMemberStatsCard memberId={memberId} />}
       </div>
 
-      {/* Quick actions */}
-      <div className="mt-6">
-        <SectionTitle>Kazi zako za leo</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <QuickAction to="/michango" icon={PiggyBank} label="Pokea Mchango" />
-          <QuickAction to="/marejesho" icon={Receipt} label="Pokea Marejesho" />
-          <QuickAction to="/mikopo" icon={Wallet} label="Simamia Mikopo" />
-        </div>
+      <div className="mt-5">
+        <HeroBalance
+          label="Mapato ya Mwezi Huu"
+          value={tzs(Number(hazinData.cash_in_this_period ?? 0))}
+          stats={[
+            ["Imechukuniwa", tzs(hazinData.cash_in_confirmed ?? 0)],
+            ["Inasub.", `${tzs(hazinData.cash_in_pending ?? 0)} (${hazinData.cash_in_pending_count})`],
+            ["Marejesho", tzs(hazinData.repayments_this_month ?? 0)],
+            ["Salio", tzs(hazinData.available_balance ?? 0)],
+          ]}
+        />
       </div>
-
-      {/* Recent disbursements */}
+      <SectionTitle>Kazi zako za leo</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <QuickAction to="/michango" icon={PiggyBank} label="Pokea Mchango" />
+        <QuickAction to="/marejesho" icon={Receipt} label="Pokea Marejesho" />
+        <QuickAction to="/mikopo" icon={Wallet} label="Simamia Mikopo" />
+      </div>
       {hazinData.recent_disbursements.length > 0 && (
         <>
-          <SectionTitle className="mt-6">
-            Mikopo iliyopewa karibuni
-          </SectionTitle>
+          <SectionTitle>Mikopo iliyopewa karibuni</SectionTitle>
           <div className="card-surface divide-y divide-border">
             {hazinData.recent_disbursements.slice(0, 5).map((d) => (
-              <div
-                key={d.loan_id}
-                className="flex items-center justify-between px-4 py-3"
-              >
+              <div key={d.loan_id} className="flex items-center justify-between px-4 py-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{d.full_name}</p>
                   <p className="text-xs text-muted-foreground">{d.member_no}</p>
                 </div>
-                <p className="shrink-0 font-semibold">
-                  {tzs(Number(d.amount))}
-                </p>
+                <p className="shrink-0 text-sm font-semibold">{tzs(Number(d.amount))}</p>
               </div>
             ))}
           </div>
@@ -301,29 +205,15 @@ function TreasurerView({ groupId }: { groupId?: string }) {
   );
 }
 
-// ============================================================================
-// KATIBU - Uses katibuSummary
-// ============================================================================
-
-function SecretaryView({ groupId }: { groupId?: string }) {
+// ---------- KATIBU ----------
+function SecretaryView({ groupId, memberId }: { groupId?: string; memberId?: string }) {
   const {
     data: katibuData,
     isLoading,
     error,
   } = useKatibuDashboardSummary(groupId);
 
-  if (!groupId || isLoading) {
-    return (
-      <div className="card-surface animate-pulse">
-        <div className="h-12 bg-muted rounded w-40 mb-4" />
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-16 bg-muted rounded" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  if (!groupId || isLoading) return <LoadingSkeleton />;
 
   if (error || !katibuData) {
     return (
@@ -331,9 +221,7 @@ function SecretaryView({ groupId }: { groupId?: string }) {
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-sm mb-1">
-              Imeshindikana kupakia
-            </h3>
+            <h3 className="font-semibold text-sm mb-1">Imeshindikana kupakia</h3>
             <p className="text-xs text-muted-foreground">
               Haijapatikana data ya katibu. Tafadhali jaribu tena.
             </p>
@@ -345,62 +233,33 @@ function SecretaryView({ groupId }: { groupId?: string }) {
 
   return (
     <>
-      {/* Members card */}
-      <div className="card-surface">
-        <h3 className="font-semibold text-sm mb-4">Wanachama wa Kikundi</h3>
-        <p className="text-3xl font-bold text-primary mb-4">
-          {katibuData.total_active_members}
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">
-              Wapya mwezi huu
-            </p>
-            <p className="font-semibold">
-              {katibuData.members_joined_this_month}
-            </p>
-          </div>
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">Waliondoka</p>
-            <p className="font-semibold">
-              {katibuData.members_left_this_month}
-            </p>
-          </div>
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">
-              Inasub. idhinisho
-            </p>
-            <p className="font-semibold">{katibuData.pending_user_approvals}</p>
-          </div>
-          <div className="bg-muted/30 rounded p-3">
-            <p className="text-xs text-muted-foreground mb-1">
-              Walicho chelezo
-            </p>
-            <p className="font-semibold text-destructive">
-              {katibuData.late_payments_count}
-            </p>
-          </div>
-        </div>
+      {/* Kikundi + Personal — same design */}
+      <div className="grid gap-5 lg:grid-cols-2">
+        <GroupBalanceCard groupId={groupId!} />
+        {memberId && <PersonalMemberStatsCard memberId={memberId} />}
       </div>
 
-      {/* Quick actions */}
-      <div className="mt-6">
-        <SectionTitle>Kazi zako</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <QuickAction
-            to="/wanachama"
-            icon={ClipboardList}
-            label="Sajili Mwanachama"
-          />
-          <QuickAction to="/michango" icon={PiggyBank} label="Kumbukumbu" />
-          <QuickAction to="/ripoti" icon={TrendingUp} label="Andaa Ripoti" />
-        </div>
+      <div className="mt-5">
+        <HeroBalance
+          label="Wanachama wa Kikundi"
+          value={String(katibuData.total_active_members ?? 0)}
+          stats={[
+            ["Wapya mwezi huu", String(katibuData.members_joined_this_month ?? 0)],
+            ["Waliondoka", String(katibuData.members_left_this_month ?? 0)],
+            ["Inasub. idhinisho", String(katibuData.pending_user_approvals ?? 0)],
+            ["Walichelewa", String(katibuData.late_payments_count ?? 0)],
+          ]}
+        />
       </div>
-
-      {/* Late payments list */}
+      <SectionTitle>Kazi zako</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <QuickAction to="/wanachama" icon={ClipboardList} label="Sajili Mwanachama" />
+        <QuickAction to="/michango" icon={PiggyBank} label="Kumbukumbu" />
+        <QuickAction to="/ripoti" icon={TrendingUp} label="Andaa Ripoti" />
+      </div>
       {katibuData.late_payments.length > 0 && (
         <>
-          <SectionTitle className="mt-6">Wanachama walio chelezo</SectionTitle>
+          <SectionTitle>Wanachama walio chelezo</SectionTitle>
           <div className="card-surface divide-y divide-border">
             {katibuData.late_payments.slice(0, 8).map((p, i) => (
               <div
@@ -413,9 +272,7 @@ function SecretaryView({ groupId }: { groupId?: string }) {
                     {p.member_no} • {p.period_label}
                   </p>
                 </div>
-                <span className="chip bg-destructive/30 text-destructive">
-                  Chelezo
-                </span>
+                <span className="chip bg-destructive/30 text-destructive">Chelezo</span>
               </div>
             ))}
           </div>
@@ -425,44 +282,51 @@ function SecretaryView({ groupId }: { groupId?: string }) {
   );
 }
 
-// ============================================================================
-// MWANACHAMA - Uses memberSummary
-// ============================================================================
+// ---------- MWANACHAMA ----------
+function MemberView({
+  userName,
+  memberId,
+  memberCode,
+  userPhone,
+}: {
+  userName: string;
+  memberId: string | null;
+  memberCode: string | null;
+  userPhone: string;
+}) {
+  const { data: settingsData } = useQuery({
+    queryKey: ["groups", "settings"],
+    queryFn: () => groupsApi.current(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const fixedAmount =
+    settingsData?.data?.fixed_contribution_amount != null
+      ? Number(settingsData.data.fixed_contribution_amount)
+      : null;
+  const nextDue = settingsData?.next_due_date ?? null;
 
-function MemberView({ memberId }: { memberId?: string }) {
   const {
     data: memberData,
     isLoading,
     error,
-  } = useMemberDashboardSummary(memberId);
+  } = useMemberDashboardSummary(memberId || undefined);
+
+  if (memberId && isLoading) return <LoadingSkeleton />;
 
   if (!memberId) {
     return (
-      <div className="card-surface border border-amber-200 bg-amber-50">
-        <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-sm mb-1 text-amber-700">
-              Umefungwa
-            </h3>
-            <p className="text-xs text-amber-700">
-              Unaloanzisha kazi kama mwanachama, lakini baada haijapatikana
-              kiunganisho cha Mwanachama. Tafadhali wasiliana na msimamizi.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="card-surface animate-pulse">
-        <div className="h-12 bg-muted rounded w-40 mb-4" />
-        <div className="space-y-3">
-          <div className="h-16 bg-muted rounded" />
-          <div className="h-16 bg-muted rounded" />
-        </div>
+      <div className="card-surface p-6 text-center">
+        <AlertCircle className="mx-auto h-10 w-10 text-warning" />
+        <h2 className="mt-3 font-display text-lg font-bold">Jisajili kama mwanachama</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Karibu <span className="font-semibold">{userName}</span> — kamilisha usajili wako kupitia ukurasa wa wasifu ili uweze kuomba mikopo na kuona michango yako.
+        </p>
+        <Link
+          to="/wasifu"
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
+        >
+          Nenda kwenye Wasifu
+        </Link>
       </div>
     );
   }
@@ -473,9 +337,7 @@ function MemberView({ memberId }: { memberId?: string }) {
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-sm mb-1">
-              Imeshindikana kupakia
-            </h3>
+            <h3 className="font-semibold text-sm mb-1">Imeshindikana kupakia</h3>
             <p className="text-xs text-muted-foreground">
               Haijapatikana data ya akiba yako. Tafadhali jaribu tena.
             </p>
@@ -485,84 +347,186 @@ function MemberView({ memberId }: { memberId?: string }) {
     );
   }
 
+  const meMemberNo = memberData.member_no || memberCode;
+  const mePhone = userPhone;
+
   return (
     <>
-      {/* Main member card */}
-      <MemberAkibaCard memberId={memberId} />
-
-      {/* Quick actions */}
-      <div className="mt-6">
-        <SectionTitle>Kazi zako</SectionTitle>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <QuickAction
+      {(fixedAmount != null || nextDue) && (
+        <div className="card-surface p-4 mb-4 border-l-4 border-l-primary flex items-center gap-3">
+          <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+          <div>
+            <p className="text-sm font-semibold">
+              Mchango ujao
+              {fixedAmount != null && <>: TZS {fixedAmount.toLocaleString()}</>}
+              {nextDue && <> · ifikapo {nextDue}</>}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Kipindi: {settingsData ? INTERVAL_LABELS[settingsData.data.contribution_interval] : "—"} · Wasilisha kupitia "Weka Mchango"
+            </p>
+          </div>
+          <Link
             to="/weka-mchango"
-            icon={PiggyBank}
-            label="Weka Mchango"
-          />
-          <QuickAction to="/mikopo" icon={Wallet} label="Omba Mkopo" />
-          <QuickAction to="/historia" icon={ClipboardList} label="Historia" />
+            className="ml-auto shrink-0 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Weka Mchango
+          </Link>
         </div>
+      )}
+      <HeroBalance
+        label="Akiba Yangu"
+        value={tzs(Number(memberData.total_contributions ?? 0))}
+        stats={[
+          ["Michango", String(memberData.contributions_count ?? 0)],
+          ["Mikopo wazi", String(memberData.outstanding_loans_count ?? 0)],
+          ["Deni bado", tzs(memberData.outstanding_loans_balance ?? 0)],
+          ["Mikopo iliyofungwa", String(memberData.closed_loans_count ?? 0)],
+        ]}
+      />
+
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="card-surface flex items-center gap-3 p-4">
+          <CheckCircle2 className="h-8 w-8 text-success" />
+          <div>
+            <p className="text-sm font-semibold">
+              {meMemberNo ? `Mwanachama #${meMemberNo}` : `Mwanachama #${memberId?.slice(0, 8)}`}
+            </p>
+            <p className="text-xs text-muted-foreground">Namba ya simu: {mePhone}</p>
+          </div>
+        </div>
+        <div className="card-surface p-4">
+          <p className="text-xs text-muted-foreground">Namba ya simu</p>
+          <p className="font-display text-lg font-bold">{mePhone}</p>
+          <p className="text-xs text-muted-foreground">{meMemberNo ?? "—"}</p>
+        </div>
+      </div>
+
+      <SectionTitle>Michango Yangu</SectionTitle>
+      {memberData.recent_contributions.length === 0 ? (
+        <div className="card-surface p-6 text-center text-sm text-muted-foreground">
+          Hakuna michango iliyorekodiwa bado.
+        </div>
+      ) : (
+        <div className="card-surface divide-y divide-border">
+          {memberData.recent_contributions.slice(0, 6).map((c, i) => (
+            <div key={`${c.created_at}-${i}`} className="flex items-center justify-between px-4 py-3">
+              <div>
+                <p className="text-sm font-medium">{tzs(c.amount)}</p>
+                <p className="text-xs text-muted-foreground">{c.period_label}</p>
+              </div>
+              <span className="chip bg-success/15 text-success">{c.status}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------- MSIMAMIZI ----------
+function AdminView() {
+  const { data: health, isLoading } = useSystemHealth();
+
+  if (isLoading) return <LoadingSkeleton />;
+
+  return (
+    <>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="card-surface flex items-center gap-4 p-5">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
+            <Users className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold">{health?.total_users ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Watumiaji wote</p>
+          </div>
+        </div>
+        <div className="card-surface flex items-center gap-4 p-5">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-amber-100 text-amber-700">
+            <Activity className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold">{health?.active_users ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Wanaotumia</p>
+          </div>
+        </div>
+        <div className="card-surface flex items-center gap-4 p-5">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-destructive/10 text-destructive">
+            <AlertCircle className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold">{health?.pending_users ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Wanaosubiri</p>
+          </div>
+        </div>
+        <div className="card-surface flex items-center gap-4 p-5">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-success/15 text-success">
+            <Users className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold">{health?.total_members ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Wanachama</p>
+          </div>
+        </div>
+        <div className="card-surface flex items-center gap-4 p-5">
+          <span className="grid h-12 w-12 place-items-center rounded-xl bg-amber-100 text-amber-700">
+            <Activity className="h-6 w-6" />
+          </span>
+          <div>
+            <p className="text-2xl font-bold">{health?.recent_logins_24h ?? 0}</p>
+            <p className="text-xs text-muted-foreground">Waliingia leo</p>
+          </div>
+        </div>
+      </div>
+
+      <SectionTitle>Haraka</SectionTitle>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <QuickAction to="/admin" icon={Settings} label="Simamia Watumiaji" />
+        <QuickAction to="/admin-logs" icon={Activity} label="Kumbukumbu" />
+        <QuickAction to="/wanachama" icon={Users} label="Wanachama" />
+        <QuickAction to="/wasifu" icon={Shield} label="Wasifu Wangu" />
       </div>
     </>
   );
 }
 
-// ============================================================================
-// MSIMAMIZI - Admin view
-// ============================================================================
-
-function AdminView() {
+// ---------- shared bits ----------
+function HeroBalance({ label, value, stats }: { label: string; value: string; stats: [string, string][] }) {
   return (
-    <div className="card-surface">
-      <h3 className="font-semibold text-sm">Zana za Msimamizi</h3>
-      <p className="text-sm text-muted-foreground mt-2">
-        Huduma za utawala ya mfumo - wanachama, watumiaji, na maandalizi.
-      </p>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 mt-4">
-        <QuickAction to="/huduma/watumiaji" icon={Users} label="Watumiaji" />
-        <QuickAction to="/huduma/baadhi" icon={Crown} label="Mipangilio" />
-        <QuickAction to="/huduma/sisi" icon={TrendingUp} label="Safu" />
+    <section className="hero-surface px-5 py-6 lg:px-7 lg:py-8">
+      <p className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">{label}</p>
+      <p className="mt-2 font-display text-4xl font-extrabold lg:text-5xl">{value}</p>
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
+        {stats.map(([k, v]) => (
+          <div key={k} className="rounded-xl bg-white/15 px-3 py-2.5">
+            <p className="text-xs text-primary-foreground/80">{k}</p>
+            <p className="font-semibold">{v}</p>
+          </div>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }
 
-// ============================================================================
-// HELPER COMPONENTS
-// ============================================================================
-
-function SectionTitle({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <h2 className={`font-semibold text-lg mb-4 mt-5 ${className}`}>
-      {children}
-    </h2>
-  );
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="mb-3 mt-7 font-display text-base font-semibold">{children}</h2>;
 }
 
-function QuickAction({
-  to,
-  icon: Icon,
-  label,
-}: {
-  to: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
-  label: string;
-}) {
+function QuickAction({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
   return (
-    <Link
-      to={to}
-      className="card-surface flex items-center gap-3 p-3.5 transition-colors hover:border-primary/40"
-    >
+    <Link to={to} className="card-surface flex items-center gap-3 p-3.5 transition-colors hover:border-primary/40">
       <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground">
         <Icon className="h-5 w-5" strokeWidth={2.25} />
       </span>
       <span className="text-sm font-semibold leading-tight">{label}</span>
     </Link>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="flex justify-center py-12">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
   );
 }
