@@ -545,11 +545,3 @@ export interface HazinaDashboardSummary {
   recent_disbursements: DisbursementRow[];
   available_balance: string;
 }
-
-export interface UserRolesResponse {
-  user_id: string;
-  member_id: string | null;
-  primary_role: string;
-  leadership_positions: string[];
-  roles: string[];
-}

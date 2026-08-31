@@ -120,12 +120,8 @@ function HomePage() {
 
       <footer className="border-t border-border py-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-5 px-4 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-5 text-xs text-muted-foreground sm:flex-row">
+          <div className="flex flex-col items-center justify-center gap-3 border-t border-border pt-5 text-xs text-muted-foreground">
             <p>© 2026 Kikundi · BIG LITE CODE — Iringa, Tanzania</p>
-            <div className="flex gap-4">
-              <Link to="/ingia" className="hover:text-foreground">Ingia</Link>
-              <Link to="/sahau" className="hover:text-foreground">Umesahau nenosiri?</Link>
-            </div>
           </div>
         </div>
       </footer>

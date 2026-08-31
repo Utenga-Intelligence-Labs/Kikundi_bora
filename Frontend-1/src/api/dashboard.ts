@@ -5,7 +5,6 @@ import type {
   GroupDashboardSummary,
   KatibuDashboardSummary,
   HazinaDashboardSummary,
-  UserRolesResponse,
 } from "./types";
 
 export const dashboardApi = {
@@ -25,6 +24,4 @@ export const dashboardApi = {
   groupSummaryHazina: (groupId: string) =>
     api.get<HazinaDashboardSummary>(`/groups/${groupId}/dashboard-summary/mweka-hazina`),
 
-  userRoles: (userId: string) =>
-    api.get<UserRolesResponse>(`/users/${userId}/roles`),
 };

@@ -7,8 +7,6 @@ import { api } from "@/api/client";
 import { roleMap, type Jukumu, type LeadershipRole } from "@/api/types";
 import { getDualPlaneNav, leadershipRoleLabel } from "@/lib/roles";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
-import { RoleSwitchProvider } from "@/lib/role-context";
-import { RoleSwitchToggle } from "./RoleSwitchToggle";
 
 const leadershipLabel: Record<string, string> = {
   MWENYEKITI: "Mwenyekiti",
@@ -80,11 +78,6 @@ export function AppShell({
   const filteredNavSecondary = getNavSecondary(isLeadership || isAdmin);
 
   return (
-    <RoleSwitchProvider
-      primaryRole={jukumu}
-      leadershipRoles={user?.leadership ?? []}
-      memberId={user?.member_id}
-    >
       <div className="min-h-dvh bg-background text-foreground lg:flex">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 border-r border-border bg-card lg:flex lg:flex-col">
@@ -142,10 +135,6 @@ export function AppShell({
                 })}
               </ul>
             </>
-          )}
-          
-          {user && user.leadership && user.leadership.length > 0 && (
-            <RoleSwitchToggle />
           )}
           
           <p className="px-3 pb-1.5 pt-5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Akaunti</p>
@@ -331,7 +320,6 @@ export function AppShell({
         </ul>
       </nav>
     </div>
-    </RoleSwitchProvider>
   );
 }
 

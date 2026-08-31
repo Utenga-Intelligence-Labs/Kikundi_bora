@@ -10,7 +10,6 @@ export const roleScopedDashboardKeys = {
   groupSummary: (groupId: string) => ["group-dashboard-summary", groupId],
   groupSummaryKatibu: (groupId: string) => ["group-dashboard-katibu", groupId],
   groupSummaryHazina: (groupId: string) => ["group-dashboard-hazina", groupId],
-  userRoles: (userId: string) => ["user-roles", userId],
 };
 
 /**
@@ -54,16 +53,5 @@ export function useHazinaDashboardSummary(groupId?: string) {
     queryKey: roleScopedDashboardKeys.groupSummaryHazina(groupId || ""),
     queryFn: () => dashboardApi.groupSummaryHazina(groupId!),
     enabled: !!groupId,
-  });
-}
-
-/**
- * Fetch user's roles (for role-switch toggle)
- */
-export function useUserRoles(userId?: string) {
-  return useQuery({
-    queryKey: roleScopedDashboardKeys.userRoles(userId || ""),
-    queryFn: () => dashboardApi.userRoles(userId!),
-    enabled: !!userId,
   });
 }
