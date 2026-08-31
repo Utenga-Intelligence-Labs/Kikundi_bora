@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { useLoans, useApplyLoan, useApproveLoan, useRejectLoan, useDisburseLoan } from "@/hooks/use-loans";
-import { useMembers } from "@/hooks/use-members";
 import { Field } from "@/components/Field";
 import { tzs, tarehe } from "@/lib/format";
 import { X, Check, Ban, Send, Wallet, Loader2 } from "lucide-react";
@@ -50,18 +49,17 @@ function MikopoPage() {
   const [disbursing, setDisbursing] = useState<string | null>(null);
 
   const { data: loansData, isLoading } = useLoans({ limit: 200 });
-  const { data: membersData } = useMembers({ limit: 200 });
   const approveLoan = useApproveLoan();
   const rejectLoan = useRejectLoan();
   const disburseLoan = useDisburseLoan();
 
   const loans = loansData?.data ?? [];
-  const members = membersData?.data ?? [];
-  // Money identity: require user_id linkage only — never match by full_name
-  const me = members.find((m) => m.user_id === user.id);
+  // Money identity: key off the authenticated user's member row (member_id
+  // from /me) — NEVER via the leadership-only GET /members listing.
+  const myMemberId = user.member_id || null;
 
-  const visible = isMember && me
-    ? loans.filter((l) => l.member_id === me.id)
+  const visible = isMember && myMemberId
+    ? loans.filter((l) => l.member_id === myMemberId)
     : loans;
   const list = visible.filter((l) => l.status === tab);
   const tabs: Tab[] = ["PENDING", "UNDER_REVIEW", "APPROVED", "OUTSTANDING", "CLOSED", "REJECTED"];
@@ -75,18 +73,17 @@ function MikopoPage() {
       title={isMember ? "Mikopo Yangu" : "Mikopo"}
       subtitle={isMember ? "Omba na fuatilia mikopo yako" : "Simamia mikopo ya kikundi"}
       action={
-        isMember ? (
+        myMemberId ? (
           <button
             onClick={() => setOpenRequest(true)}
-            disabled={!me}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
           >
             <Send className="h-4 w-4" /> Omba Mkopo
           </button>
         ) : null
       }
     >
-      {isMember && !me && (
+      {!myMemberId && (
         <div className="card-surface mb-5 p-4">
           <p className="text-sm">Hujasajiliwa kama mwanachama bado.</p>
           <Link to="/wasifu" className="mt-2 inline-block text-sm font-semibold text-primary">Jisajili sasa →</Link>
@@ -97,6 +94,14 @@ function MikopoPage() {
         <p className="text-xs text-primary-foreground/70">{isMember ? "Salio la mikopo yangu" : "Mizania ya mikopo wazi"}</p>
         <p className="mt-1 font-display text-3xl font-extrabold">{tzs(jumlaWazi)}</p>
         <p className="mt-1 text-xs text-primary-foreground/70">{visible.filter((l) => l.status === "OUTSTANDING").length} mikopo wazi</p>
+        {myMemberId && (
+          <button
+            onClick={() => setOpenRequest(true)}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-bold text-primary shadow-lg transition-transform hover:scale-[1.01] sm:w-auto"
+          >
+            <Send className="h-4 w-4" /> Omba Mkopo Mpya
+          </button>
+        )}
       </div>
 
       {isLoading && (
@@ -175,7 +180,7 @@ function MikopoPage() {
         {list.length === 0 && !isLoading && <div className="card-surface p-8 text-center text-sm text-muted-foreground">Hakuna mikopo katika hali hii.</div>}
       </div>
 
-      {openRequest && me && <RequestForm memberId={me.id} onClose={() => setOpenRequest(false)} />}
+      {openRequest && myMemberId && <RequestForm memberId={myMemberId} onClose={() => setOpenRequest(false)} />}
       {rejecting != null && <RejectDialog onClose={() => setRejecting(null)} onConfirm={(reason) => { rejectLoan.mutate({ id: rejecting, data: { reason } }); setRejecting(null); }} />}
       {disbursing != null && (() => {
         const l = loans.find((x) => x.id === disbursing);
