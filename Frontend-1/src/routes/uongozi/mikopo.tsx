@@ -3,10 +3,13 @@ import { useAuth } from "@/lib/auth-provider";
 import { tokenStorage } from "@/lib/auth-storage";
 import { requireAuth } from "@/lib/role-guards";
 import { AppShell } from "@/components/AppShell";
-import { ShieldCheck, Check, X, Clock, Banknote, UserPlus, Users, ChevronRight } from "lucide-react";
+import { ShieldCheck, Check, X, Clock, Banknote, UserPlus, Users, ChevronRight, Wallet } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
+import { useDisburseLoan } from "@/hooks/use-loans";
+import { loansApi } from "@/api/loans";
 import { useMembers } from "@/hooks/use-members";
+import { tzs } from "@/lib/format";
 import { useState } from "react";
 import { useAppModal } from "@/components/AppModal";
 
@@ -54,6 +57,17 @@ function MikopoPage() {
   });
 
   const { data: membersData } = useMembers({ limit: 50 });
+
+  // Fully-approved loans awaiting disbursement (Mweka Hazina's job)
+  const { data: approvedLoansData } = useQuery({
+    queryKey: ["uongozi", "mikopo", "approved"],
+    queryFn: () => loansApi.list({ status: "APPROVED", limit: 50 }),
+    enabled: isHazina,
+  });
+  const approvedLoans = (approvedLoansData?.data ?? []).filter(
+    (l) => l.status === "APPROVED"
+  );
+  const disburseLoan = useDisburseLoan();
 
   const approveMutation = useMutation({
     mutationFn: async ({ loanId, amount }: { loanId: string; amount: string | number }) => {
@@ -180,6 +194,51 @@ function MikopoPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Approved loans awaiting disbursement — Mweka Hazina */}
+      {isHazina && approvedLoans.length > 0 && (
+        <>
+          <div className="mt-7 mb-3 flex items-center gap-2">
+            <Banknote className="h-4 w-4 text-success" />
+            <h2 className="font-display text-base font-semibold">
+              Mikopo Zilizoidhinishwa — Toa Fedha ({approvedLoans.length})
+            </h2>
+          </div>
+          <div className="space-y-3">
+            {approvedLoans.map((l) => (
+              <div key={l.id} className="card-surface flex items-center justify-between gap-4 p-4">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{l.member?.full_name ?? `Mwanachama #${l.member_id}`}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {tzs(Number(l.approved_amount ?? l.amount))} · Idhinishwa {l.mwenyekiti_approved_at ? new Date(l.mwenyekiti_approved_at).toLocaleDateString("sw-TZ") : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    showModal({
+                      title: "Toa Fedha za Mkopo",
+                      message: `Unatoa ${tzs(Number(l.approved_amount ?? l.amount))} kwa ${l.member?.full_name ?? "mwanachama"}. Hakikisha umemkabidhi fedha kabla ya kubofya.`,
+                      variant: "warning",
+                      primaryLabel: "Thibitisha Kutolea",
+                      secondaryLabel: "Ghairi",
+                      onPrimary: async () => {
+                        try {
+                          await disburseLoan.mutateAsync(l.id);
+                          showModal({ title: "Imefanikiwa", message: "Fedha zimetolewa. Mkopo sasa ni Wazi (OUTSTANDING).", variant: "success", primaryLabel: "Sawa" });
+                        } catch { /* handled by mutation */ }
+                      },
+                    })
+                  }
+                  disabled={disburseLoan.isPending}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white hover:bg-success/90 disabled:opacity-50"
+                >
+                  <Wallet className="h-4 w-4" /> Toa Fedha
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Unda Bodi Ya Mikopo Popup */}

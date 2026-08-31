@@ -191,6 +191,11 @@ export interface Loan {
   applied_at: string;
   reviewed_at?: string;
   updated_at: string;
+  // Sequential approval trail (Hazina → Katibu → Bodi → Mwenyekiti)
+  hazina_approved_at?: string;
+  katibu_approved_at?: string;
+  bodi_approved_at?: string;
+  mwenyekiti_approved_at?: string;
   member?: Pick<Member, "id" | "member_no" | "full_name" | "phone">;
   reviewer?: Pick<User, "id" | "name" | "role">;
 }
