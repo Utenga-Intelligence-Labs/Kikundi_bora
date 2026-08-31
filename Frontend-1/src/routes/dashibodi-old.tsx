@@ -24,10 +24,10 @@ export const Route = createFileRoute("/dashibodi-old")({
   beforeLoad: () => {
     requireAuth();
   },
-  component: Dashibodi,
+  component: LegacyDashboard,
 });
 
-function Dashibodi() {
+export function LegacyDashboard() {
   const { user } = useAuth();
   if (!user) return null;
   const jina = user.name.split(" ")[0] || "rafiki";

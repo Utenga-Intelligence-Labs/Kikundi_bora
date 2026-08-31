@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { LegacyDashboard } from "./dashibodi-old";
 import { useQuery } from "@tanstack/react-query";
 import {
   useMemberDashboardSummary,
@@ -45,7 +46,7 @@ export const Route = createFileRoute("/dashibodi")({
   beforeLoad: () => {
     requireAuth();
   },
-  component: Dashibodi,
+  component: LegacyDashboard,
 });
 
 function Dashibodi() {
