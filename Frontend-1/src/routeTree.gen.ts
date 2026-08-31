@@ -28,6 +28,7 @@ import { Route as MarejeshoRouteImport } from './routes/marejesho'
 import { Route as KamatiMikopoRouteImport } from './routes/kamati-mikopo'
 import { Route as IngiaRouteImport } from './routes/ingia'
 import { Route as HistoriaYanguRouteImport } from './routes/historia-yangu'
+import { Route as DashibodiOldRouteImport } from './routes/dashibodi-old'
 import { Route as DashibodiRouteImport } from './routes/dashibodi'
 import { Route as ArifaRouteImport } from './routes/arifa'
 import { Route as AdminLogsRouteImport } from './routes/admin-logs'
@@ -133,6 +134,11 @@ const HistoriaYanguRoute = HistoriaYanguRouteImport.update({
   path: '/historia-yangu',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashibodiOldRoute = DashibodiOldRouteImport.update({
+  id: '/dashibodi-old',
+  path: '/dashibodi-old',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashibodiRoute = DashibodiRouteImport.update({
   id: '/dashibodi',
   path: '/dashibodi',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/admin-logs': typeof AdminLogsRoute
   '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/dashibodi-old': typeof DashibodiOldRoute
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/admin-logs': typeof AdminLogsRoute
   '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/dashibodi-old': typeof DashibodiOldRoute
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/admin-logs': typeof AdminLogsRoute
   '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/dashibodi-old': typeof DashibodiOldRoute
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/admin-logs'
     | '/arifa'
     | '/dashibodi'
+    | '/dashibodi-old'
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/admin-logs'
     | '/arifa'
     | '/dashibodi'
+    | '/dashibodi-old'
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/admin-logs'
     | '/arifa'
     | '/dashibodi'
+    | '/dashibodi-old'
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   AdminLogsRoute: typeof AdminLogsRoute
   ArifaRoute: typeof ArifaRoute
   DashibodiRoute: typeof DashibodiRoute
+  DashibodiOldRoute: typeof DashibodiOldRoute
   HistoriaYanguRoute: typeof HistoriaYanguRoute
   IngiaRoute: typeof IngiaRoute
   KamatiMikopoRoute: typeof KamatiMikopoRoute
@@ -529,6 +542,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoriaYanguRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashibodi-old': {
+      id: '/dashibodi-old'
+      path: '/dashibodi-old'
+      fullPath: '/dashibodi-old'
+      preLoaderRoute: typeof DashibodiOldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashibodi': {
       id: '/dashibodi'
       path: '/dashibodi'
@@ -601,6 +621,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLogsRoute: AdminLogsRoute,
   ArifaRoute: ArifaRoute,
   DashibodiRoute: DashibodiRoute,
+  DashibodiOldRoute: DashibodiOldRoute,
   HistoriaYanguRoute: HistoriaYanguRoute,
   IngiaRoute: IngiaRoute,
   KamatiMikopoRoute: KamatiMikopoRoute,

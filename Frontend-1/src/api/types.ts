@@ -452,3 +452,104 @@ export interface UserPosition {
   is_active: boolean;
   created_at: string;
 }
+
+// Role-scoped dashboard types (Task A backend integration)
+
+export interface RecentContribution {
+  id: string;
+  source: "contribution" | "member_contribution";
+  contribution_type: "AKIBA" | "MFUKO_WA_KIJAMII";
+  period_label: string;
+  amount: string;
+  status: "PAID" | "CONFIRMED" | "PENDING_VERIFICATION" | "REJECTED";
+  paid_at?: string;
+  created_at: string;
+}
+
+export interface MemberDashboardSummary {
+  member_id: string;
+  member_no: string;
+  full_name: string;
+  total_contributions: string;
+  contributions_count: number;
+  welfare_contributions_total: string;
+  welfare_contributions_count: number;
+  pending_contributions_count: number;
+  rejected_contributions_count: number;
+  outstanding_loans_count: number;
+  outstanding_loans_balance: string;
+  closed_loans_count: number;
+  recent_contributions: RecentContribution[];
+}
+
+export interface GroupDashboardSummary {
+  group_id: string;
+  group_name: string;
+  total_active_members: number;
+  total_contributions: string;
+  total_repayments: string;
+  total_disbursed: string;
+  available_balance: string;
+  outstanding_loans_count: number;
+  outstanding_loans_balance: string;
+  pending_loans_count: number;
+  pending_contributions_count: number;
+  contributions_this_period: string;
+  contribution_interval: string;
+  next_due_date?: string;
+}
+
+export interface LatePaymentRow {
+  member_id: string;
+  member_no: string;
+  full_name: string;
+  phone: string;
+  period_label: string;
+  expected_amount?: string;
+}
+
+export interface KatibuDashboardSummary {
+  group_id: string;
+  total_active_members: number;
+  members_joined_this_month: number;
+  members_left_this_month: number;
+  pending_user_approvals: number;
+  announcements_this_month: number;
+  pending_contributions_count: number;
+  current_period_label: string;
+  next_due_date?: string;
+  late_payments_count: number;
+  late_payments: LatePaymentRow[];
+}
+
+export interface DisbursementRow {
+  loan_id: string;
+  member_no: string;
+  full_name: string;
+  amount: string;
+  status: string;
+  disbursed_at: string;
+}
+
+export interface HazinaDashboardSummary {
+  group_id: string;
+  cash_in_confirmed: string;
+  cash_in_pending: string;
+  cash_in_pending_count: number;
+  cash_in_this_period: string;
+  expected_this_period?: string;
+  repayments_total: string;
+  repayments_this_month: string;
+  disbursements_total: string;
+  disbursements_count: number;
+  recent_disbursements: DisbursementRow[];
+  available_balance: string;
+}
+
+export interface UserRolesResponse {
+  user_id: string;
+  member_id: string | null;
+  primary_role: string;
+  leadership_positions: string[];
+  roles: string[];
+}
