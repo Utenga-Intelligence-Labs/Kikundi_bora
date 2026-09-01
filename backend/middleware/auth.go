@@ -18,9 +18,11 @@ func AuthRequired(c *fiber.Ctx) error {
 	tokenStr := ""
 	if strings.HasPrefix(header, "Bearer ") {
 		tokenStr = strings.TrimPrefix(header, "Bearer ")
-	} else if qt := c.Query("token"); qt != "" {
+	} else if qt := c.Query("token"); qt != "" && strings.HasPrefix(c.Path(), "/uploads/") {
 		// <img>/<a> tags cannot send an Authorization header — allow the
-		// token via query parameter (e.g. /uploads/...?token=<jwt>).
+		// token via query parameter ONLY on the uploads static route
+		// (AUTH-02: previously accepted on every route, leaking JWTs into
+		// access logs / Referer for arbitrary endpoints).
 		tokenStr = qt
 	}
 	if tokenStr == "" {

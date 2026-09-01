@@ -126,6 +126,11 @@ func main() {
 	// Serve uploaded files (authenticated only)
 	uploads := app.Group("/uploads")
 	uploads.Use(middleware.AuthRequired)
+	// AUTH-02: JWTs arrive via ?token= for <img> tags — never cache them.
+	uploads.Use(func(c *fiber.Ctx) error {
+		c.Set("Cache-Control", "private, no-store")
+		return c.Next()
+	})
 	uploads.Static("/", "./uploads")
 
 	protected := api.Group("")

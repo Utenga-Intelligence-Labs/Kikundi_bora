@@ -3,10 +3,20 @@ package middleware
 import (
 	"log"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
+
+// Redacts secret material before anything is written to logs (DATA-H02).
+var secretRedactor = regexp.MustCompile(
+	`(?i)("(?:password|new_password|old_password|confirm_password|temp_password|token|secret)"\s*:\s*")[^"]*(")`,
+)
+
+func redactSecrets(body string) string {
+	return secretRedactor.ReplaceAllString(body, `$1[REDACTED]$2`)
+}
 
 func RequestLogger() fiber.Handler {
 	isDev := os.Getenv("ENVIRONMENT") != "production"
@@ -18,7 +28,7 @@ func RequestLogger() fiber.Handler {
 		status := c.Response().StatusCode()
 
 		if isDev {
-			// Detailed logging like Python/Flask
+			// Detailed logging like Python/Flask — with secrets redacted.
 			log.Printf("──────────────────────────────────────────────────")
 			log.Printf("  %s %s", c.Method(), c.OriginalURL())
 			log.Printf("  Status: %d | Latency: %s | IP: %s", status, latency.Round(time.Microsecond), c.IP())
@@ -31,13 +41,13 @@ func RequestLogger() fiber.Handler {
 				log.Printf("  Auth: %s", auth)
 			}
 			if len(c.Body()) > 0 && len(c.Body()) < 2000 {
-				log.Printf("  Body: %s", string(c.Body()))
+				log.Printf("  Body: %s", redactSecrets(string(c.Body())))
 			}
 			if err != nil {
 				log.Printf("  ERROR: %v", err)
 			}
 			if status >= 400 {
-				log.Printf("  Response: %s", string(c.Response().Body()))
+				log.Printf("  Response: %s", redactSecrets(string(c.Response().Body())))
 			}
 			log.Printf("──────────────────────────────────────────────────")
 		} else {
