@@ -18,6 +18,7 @@ import { Route as VitendoVinavyosubiriRouteImport } from './routes/vitendo-vinav
 import { Route as SajiliRouteImport } from './routes/sajili'
 import { Route as SahauRouteImport } from './routes/sahau'
 import { Route as RipotiRouteImport } from './routes/ripoti'
+import { Route as NjiaZaMalipoRouteImport } from './routes/njia-za-malipo'
 import { Route as MipangilioRouteImport } from './routes/mipangilio'
 import { Route as MikopoRouteImport } from './routes/mikopo'
 import { Route as MichangoYanguRouteImport } from './routes/michango-yangu'
@@ -81,6 +82,11 @@ const SahauRoute = SahauRouteImport.update({
 const RipotiRoute = RipotiRouteImport.update({
   id: '/ripoti',
   path: '/ripoti',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NjiaZaMalipoRoute = NjiaZaMalipoRouteImport.update({
+  id: '/njia-za-malipo',
+  path: '/njia-za-malipo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MipangilioRoute = MipangilioRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
+  '/njia-za-malipo': typeof NjiaZaMalipoRoute
   '/ripoti': typeof RipotiRoute
   '/sahau': typeof SahauRoute
   '/sajili': typeof SajiliRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
+  '/njia-za-malipo': typeof NjiaZaMalipoRoute
   '/ripoti': typeof RipotiRoute
   '/sahau': typeof SahauRoute
   '/sajili': typeof SajiliRoute
@@ -256,6 +264,7 @@ export interface FileRoutesById {
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
+  '/njia-za-malipo': typeof NjiaZaMalipoRoute
   '/ripoti': typeof RipotiRoute
   '/sahau': typeof SahauRoute
   '/sajili': typeof SajiliRoute
@@ -288,6 +297,7 @@ export interface FileRouteTypes {
     | '/michango-yangu'
     | '/mikopo'
     | '/mipangilio'
+    | '/njia-za-malipo'
     | '/ripoti'
     | '/sahau'
     | '/sajili'
@@ -318,6 +328,7 @@ export interface FileRouteTypes {
     | '/michango-yangu'
     | '/mikopo'
     | '/mipangilio'
+    | '/njia-za-malipo'
     | '/ripoti'
     | '/sahau'
     | '/sajili'
@@ -348,6 +359,7 @@ export interface FileRouteTypes {
     | '/michango-yangu'
     | '/mikopo'
     | '/mipangilio'
+    | '/njia-za-malipo'
     | '/ripoti'
     | '/sahau'
     | '/sajili'
@@ -379,6 +391,7 @@ export interface RootRouteChildren {
   MichangoYanguRoute: typeof MichangoYanguRoute
   MikopoRoute: typeof MikopoRoute
   MipangilioRoute: typeof MipangilioRoute
+  NjiaZaMalipoRoute: typeof NjiaZaMalipoRoute
   RipotiRoute: typeof RipotiRoute
   SahauRoute: typeof SahauRoute
   SajiliRoute: typeof SajiliRoute
@@ -457,6 +470,13 @@ declare module '@tanstack/react-router' {
       path: '/ripoti'
       fullPath: '/ripoti'
       preLoaderRoute: typeof RipotiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/njia-za-malipo': {
+      id: '/njia-za-malipo'
+      path: '/njia-za-malipo'
+      fullPath: '/njia-za-malipo'
+      preLoaderRoute: typeof NjiaZaMalipoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mipangilio': {
@@ -611,6 +631,7 @@ const rootRouteChildren: RootRouteChildren = {
   MichangoYanguRoute: MichangoYanguRoute,
   MikopoRoute: MikopoRoute,
   MipangilioRoute: MipangilioRoute,
+  NjiaZaMalipoRoute: NjiaZaMalipoRoute,
   RipotiRoute: RipotiRoute,
   SahauRoute: SahauRoute,
   SajiliRoute: SajiliRoute,

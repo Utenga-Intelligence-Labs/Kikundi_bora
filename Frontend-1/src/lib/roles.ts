@@ -1,5 +1,5 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell } from "lucide-react";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark } from "lucide-react";
 import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
@@ -25,6 +25,7 @@ export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] =
   { to: "/michango-inayosubiri", label: "Taarifa za Wanaosubiri", icon: ClipboardList },
   { to: "/marejesho", label: "Taarifa Za Marejesho", icon: Receipt },
   { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
+  { to: "/njia-za-malipo", label: "Njia za Malipo", icon: Landmark, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
   { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },
@@ -36,6 +37,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/dashibodi", label: "Dashibodi", icon: Home },
     { to: "/kamati-mikopo", label: "Kamati ya Mikopo", icon: UserPlus },
     { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
+    { to: "/njia-za-malipo", label: "Njia za Malipo", icon: Landmark },
     { to: "/wanachama", label: "Wanachama", icon: Users },
     { to: "/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
     { to: "/vitendo-vinavyosubiri", label: "Vitendo Vinavyosubiri", icon: FileCheck },
@@ -47,6 +49,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/dashibodi", label: "Dashibodi", icon: Home },
     { to: "/kamati-mikopo", label: "Kamati ya Mikopo", icon: UserPlus },
     { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
+    { to: "/njia-za-malipo", label: "Njia za Malipo", icon: Landmark },
     { to: "/michango", label: "Pokea Michango", icon: PiggyBank },
   { to: "/marejesho", label: "Taarifa Za Marejesho", icon: Receipt },
     { to: "/mikopo", label: "Mikopo", icon: Wallet },

@@ -2,12 +2,12 @@ import { describe, it, expect } from "vitest";
 import { getSidebarNav, mobileNav, sidebarNav, roleSubtitle } from "../roles";
 
 describe("sidebarNav", () => {
-  it("Mwenyekiti has 9 items", () => {
-    expect(sidebarNav["Mwenyekiti"]).toHaveLength(9);
+  it("Mwenyekiti has 10 items", () => {
+    expect(sidebarNav["Mwenyekiti"]).toHaveLength(10);
   });
 
-  it("Mweka Hazina has 8 items", () => {
-    expect(sidebarNav["Mweka Hazina"]).toHaveLength(8);
+  it("Mweka Hazina has 9 items", () => {
+    expect(sidebarNav["Mweka Hazina"]).toHaveLength(9);
   });
 
   it("Katibu has 8 items", () => {
@@ -37,8 +37,8 @@ describe("sidebarNav", () => {
 
 describe("getSidebarNav", () => {
   it("returns same items for Mwenyekiti regardless of committee", () => {
-    expect(getSidebarNav("Mwenyekiti", false)).toHaveLength(9);
-    expect(getSidebarNav("Mwenyekiti", true)).toHaveLength(9);
+    expect(getSidebarNav("Mwenyekiti", false)).toHaveLength(10);
+    expect(getSidebarNav("Mwenyekiti", true)).toHaveLength(10);
   });
 
   it("inserts committee item for Mwanachama who is committee member", () => {
