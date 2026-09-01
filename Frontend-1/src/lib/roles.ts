@@ -1,5 +1,5 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark } from "lucide-react";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase } from "lucide-react";
 import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
@@ -25,6 +25,7 @@ export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] =
   { to: "/michango-inayosubiri", label: "Taarifa za Wanaosubiri", icon: ClipboardList },
   { to: "/marejesho", label: "Taarifa Za Marejesho", icon: Receipt },
   { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
+  { to: "/uongozi/portfolio", label: "Portfolio ya Mikopo", icon: Briefcase },
   { to: "/njia-za-malipo", label: "Njia za Malipo", icon: Landmark, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
   { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },

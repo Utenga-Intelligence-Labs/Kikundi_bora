@@ -166,6 +166,7 @@ func main() {
 
 	// Payment methods (LipaNamba / bank accounts) — members read, chair/treasurer manage
 	paymentMethodHandler := handlers.NewPaymentMethodHandler()
+	portfolioHandler := handlers.NewLoanPortfolioHandler()
 	pms := groups.Group("/:id/payment-methods")
 	pms.Get("/", paymentMethodHandler.List)
 	pms.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Create)
@@ -201,6 +202,7 @@ func main() {
 
 	loans := protected.Group("/loans")
 	loans.Get("/", loanHandler.List)
+	loans.Get("/portfolio", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), portfolioHandler.Portfolio)
 	loans.Get("/outstanding-report", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), loanHandler.OutstandingReport)
 	loans.Get("/:id", loanHandler.Get)
 	loans.Post("/apply", loanHandler.Apply)

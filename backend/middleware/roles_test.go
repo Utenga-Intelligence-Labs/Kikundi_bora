@@ -34,6 +34,10 @@ func newRoleTestApp(role models.Role) *fiber.App {
 	app.Delete("/payment-methods/:pmId", RequireRoles(models.RoleChair, models.RoleTreasurer), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
 	})
+	// Loan portfolio: leadership read-only view
+	app.Get("/loans/portfolio", RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true})
+	})
 	return app
 }
 
@@ -107,4 +111,24 @@ func TestRequireRolesPaymentMethodPermissions(t *testing.T) {
 
 func TestRequireRolesSocialFundPermissions(t *testing.T) {
 	t.Skip("social funds feature removed — welfare events (/mfuko-kijamii) is the single Mfuko wa Kijamii feature")
+}
+
+// Loan portfolio: mwenyekiti/katibu/mweka hazina can view; member cannot.
+func TestRequireRolesLoanPortfolioPermissions(t *testing.T) {
+	cases := []struct {
+		role models.Role
+		code int
+	}{
+		{models.RoleChair, 200},
+		{models.RoleSecretary, 200},
+		{models.RoleTreasurer, 200},
+		{models.RoleMember, 403},
+		{models.RoleAdmin, 200},
+	}
+	for _, tc := range cases {
+		app := newRoleTestApp(tc.role)
+		if got := testRequest(t, app, "GET", "/loans/portfolio"); got != tc.code {
+			t.Errorf("role=%s portfolio: got %d, want %d", tc.role, got, tc.code)
+		}
+	}
 }

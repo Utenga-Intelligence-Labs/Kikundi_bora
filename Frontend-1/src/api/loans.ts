@@ -10,7 +10,52 @@ import type {
   MessageResponse,
 } from "./types";
 
+// --- Loan Disbursement Portfolio (leadership) ---
+
+export interface PortfolioLoan {
+  id: string;
+  member_id: string;
+  member_no: string;
+  full_name: string;
+  principal: string;
+  amount_repaid: string;
+  outstanding: string;
+  status: "OUTSTANDING" | "CLOSED";
+  is_overdue: boolean;
+  disbursed_at?: string;
+  due_date: string;
+}
+
+export interface LoanPortfolioSummary {
+  total_disbursed: string;
+  total_repaid: string;
+  total_outstanding: string;
+  total_overdue: string;
+  count_outstanding: number;
+  count_closed: number;
+  count_overdue: number;
+  status_counts: Record<string, number>;
+  loans: PortfolioLoan[];
+}
+
 export const loansApi = {
+  portfolio: (params?: {
+    status?: string;
+    member_id?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    const q: Record<string, string> = {};
+    if (params?.status) q.status = params.status;
+    if (params?.member_id) q.member_id = params.member_id;
+    if (params?.from) q.from = params.from;
+    if (params?.to) q.to = params.to;
+    const qs = new URLSearchParams(q).toString();
+    return api.get<{ data: LoanPortfolioSummary }>(
+      `/loans/portfolio${qs ? `?${qs}` : ""}`
+    );
+  },
+
   list: (params?: {
     page?: number;
     limit?: number;
