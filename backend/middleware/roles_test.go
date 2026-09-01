@@ -38,6 +38,11 @@ func newRoleTestApp(role models.Role) *fiber.App {
 	app.Get("/loans/portfolio", RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
 	})
+	// "Pokea Michango" (all-contributions listing): treasurer + secretary
+	// only — mwenyekiti removed from receipting.
+	app.Get("/michango", RequireRoles(models.RoleTreasurer, models.RoleSecretary), func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true})
+	})
 	// Member approval workflow: katibu (secretary) only
 	app.Patch("/members/:id/approve", RequireRoles(models.RoleSecretary), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
@@ -161,6 +166,27 @@ func TestRequireRolesLoanPortfolioPermissions(t *testing.T) {
 		app := newRoleTestApp(tc.role)
 		if got := testRequest(t, app, "GET", "/loans/portfolio"); got != tc.code {
 			t.Errorf("role=%s portfolio: got %d, want %d", tc.role, got, tc.code)
+		}
+	}
+}
+
+// "Pokea Michango" (all-contributions listing): mweka hazina + katibu only.
+// KEY ASSERTION: mwenyekiti gets 403 hitting the endpoint directly.
+func TestRequireRolesPokeaMichangoPermissions(t *testing.T) {
+	cases := []struct {
+		role models.Role
+		code int
+	}{
+		{models.RoleChair, 403}, // removed from receipting
+		{models.RoleTreasurer, 200},
+		{models.RoleSecretary, 200}, // katibu keeps records view
+		{models.RoleMember, 403},
+		{models.RoleAdmin, 200},
+	}
+	for _, tc := range cases {
+		app := newRoleTestApp(tc.role)
+		if got := testRequest(t, app, "GET", "/michango"); got != tc.code {
+			t.Errorf("role=%s pokea michango: got %d, want %d", tc.role, got, tc.code)
 		}
 	}
 }

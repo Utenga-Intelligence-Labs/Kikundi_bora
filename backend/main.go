@@ -316,12 +316,16 @@ func main() {
 	reports.Get("/muhtasari", reportHandler.SummaryReport)
 
 	// Member Contribution routes (Phase 4)
+	// "Pokea Michango" (all-contributions listing/receipting) is a TREASURY
+	// function — mwenyekiti (chair) no longer has access (katibu keeps
+	// records view). Chair's MFUKO verification lives on /michango/:id/confirm
+	// (type-gated) and /michango-inayosubiri.
 	michango := protected.Group("/michango")
 	michango.Post("/", memberContribHandler.Submit)
 	michango.Get("/mine", memberContribHandler.MyContributions)
 	michango.Get("/members-summary", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.MembersSummary)
 	michango.Get("/pending", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.PendingContributions)
-	michango.Get("/", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.AllContributions)
+	michango.Get("/", middleware.RequireRoles(models.RoleTreasurer, models.RoleSecretary), memberContribHandler.AllContributions)
 	michango.Post("/:id/confirm", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.Confirm)
 	michango.Post("/:id/reject", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.Reject)
 

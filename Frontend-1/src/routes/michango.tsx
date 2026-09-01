@@ -18,7 +18,9 @@ export const Route = createFileRoute("/michango")({
   }),
   beforeLoad: () => {
     requireAuth();
-    requireRole("chair", "treasurer", "secretary");
+    // "Pokea Michango" — mweka hazina (receipting) + katibu (records);
+    // mwenyekiti hana tena ruhusa hii.
+    requireRole("treasurer", "secretary");
     blockAdminFromPage();
   },
   component: MichangoPage,
