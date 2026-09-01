@@ -2,6 +2,10 @@ package services
 
 import (
 	"archive/zip"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +20,71 @@ import (
 )
 
 const backupDir = "./backups"
+
+// backupEncryptionKey loads BACKUP_ENCRYPTION_KEY (hex-encoded 32-byte AES
+// key). DATA-H01: backups previously stored as plaintext ZIP — a stolen
+// backup.zip contained the full database dump. If the key is unset, backups
+// fail loudly instead of silently going plaintext.
+func backupEncryptionKey() ([]byte, error) {
+	raw := os.Getenv("BACKUP_ENCRYPTION_KEY")
+	if raw == "" {
+		return nil, fmt.Errorf("BACKUP_ENCRYPTION_KEY is required (openssl rand -hex 32)")
+	}
+	key, err := hex.DecodeString(raw)
+	if err != nil || len(key) != 32 {
+		return nil, fmt.Errorf("BACKUP_ENCRYPTION_KEY must be 64 hex chars (32 bytes)")
+	}
+	return key, nil
+}
+
+// encryptFile AES-256-GCM encrypts src into dst: nonce(12B) || ciphertext.
+// Authenticated — tampering fails decryption.
+func encryptFile(src, dst string, key []byte) error {
+	plaintext, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+	out := append(nonce, gcm.Seal(nil, nonce, plaintext, nil)...)
+	return os.WriteFile(dst, out, 0600)
+}
+
+// DecryptBackupStream decrypts a stored backup for the download endpoint —
+// plaintext exists only in memory, never back on disk.
+func DecryptBackupStream(path string) ([]byte, error) {
+	key, err := backupEncryptionKey()
+	if err != nil {
+		return nil, err
+	}
+	blob, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(blob) < gcm.NonceSize() {
+		return nil, fmt.Errorf("backup file too short / not encrypted")
+	}
+	nonce, ciphertext := blob[:gcm.NonceSize()], blob[gcm.NonceSize():]
+	return gcm.Open(nil, nonce, ciphertext, nil)
+}
 
 func GenerateBackup(backupType, userID string) (*models.BackupHistory, error) {
 	if err := os.MkdirAll(backupDir, 0750); err != nil {
@@ -55,7 +124,31 @@ func GenerateBackup(backupType, userID string) (*models.BackupHistory, error) {
 		return &record, err
 	}
 
-	info, err := os.Stat(zipPath)
+	// DATA-H01: encrypt the produced ZIP at rest (AES-256-GCM). The
+	// plaintext zip file is removed; only the .enc file remains on disk.
+	key, keyErr := backupEncryptionKey()
+	if keyErr != nil {
+		record.Status = models.BackupStatusFailed
+		record.ErrorMessage = keyErr.Error()
+		os.Remove(zipPath)
+		database.DB.Save(&record)
+		return &record, keyErr
+	}
+	encPath := zipPath + ".enc"
+	if encErr := encryptFile(zipPath, encPath, key); encErr != nil {
+		record.Status = models.BackupStatusFailed
+		record.ErrorMessage = encErr.Error()
+		os.Remove(zipPath)
+		database.DB.Save(&record)
+		return &record, encErr
+	}
+	os.Remove(zipPath) // remove plaintext zip
+
+	// Record stores the encrypted artifact name so DownloadBackup and the
+	// email sender resolve the actual file on disk.
+	record.Filename = filename + ".enc"
+
+	info, err := os.Stat(encPath)
 	if err != nil {
 		record.Status = models.BackupStatusFailed
 		record.ErrorMessage = err.Error()
@@ -243,7 +336,8 @@ func SendBackupEmail(record *models.BackupHistory, to string) error {
 	record.Status = models.BackupStatusCompleted
 	database.DB.Save(record)
 
-	os.Remove(zipPath)
+	// NOTE: keep the encrypted .enc artifact on disk — DownloadBackup can
+	// still decrypt and serve it later (plaintext is only ever in memory).
 
 	return nil
 }

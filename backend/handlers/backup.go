@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -137,5 +138,20 @@ func (h *BackupHandler) DownloadBackup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Faili ya backup haipatikana"})
 	}
 
-	return c.Download(path, cleaned)
+	// DATA-H01: stored backups are AES-256-GCM encrypted (.zip.enc) —
+	// decrypt in-memory for the admin download; plaintext never lands on
+	// disk. Legacy un-encrypted files (if any) are rejected.
+	plaintext, err := services.DecryptBackupStream(path)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"message": "Imeshindikana kufungua backup (hakikisha BACKUP_ENCRYPTION_KEY ni sahihi): " + err.Error(),
+		})
+	}
+
+	downloadName := strings.TrimSuffix(cleaned, ".enc")
+	c.Status(fiber.StatusOK)
+	c.Set("Content-Type", "application/zip")
+	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", downloadName))
+	c.Set("Cache-Control", "private, no-store")
+	return c.Send(plaintext)
 }
