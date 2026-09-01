@@ -133,7 +133,7 @@ func (h *LoanCommitteeHandler) AppointMember(c *fiber.Ctx) error {
 	}
 
 	var targetUser models.User
-	if err := database.DB.Where("id = ? AND is_active = TRUE AND deleted_at IS NULL", req.UserID).First(&targetUser).Error; err != nil {
+	if err := database.DB.Where("id = ? AND is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'", req.UserID).First(&targetUser).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
 	}
 
@@ -644,7 +644,7 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 	}
 
 	var leaders []models.User
-	database.DB.Where("role IN ? AND is_active = TRUE AND deleted_at IS NULL",
+	database.DB.Where("role IN ? AND is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'",
 		[]models.Role{models.RoleChair, models.RoleSecretary, models.RoleTreasurer}).
 		Find(&leaders)
 
@@ -661,7 +661,7 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 	var appointed []models.LoanCommitteeMember
 	database.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id, name, role")
-	}).Where("is_active = TRUE AND deleted_at IS NULL").Find(&appointed)
+	}).Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&appointed)
 
 	for _, m := range appointed {
 		if m.User == nil {
@@ -798,7 +798,7 @@ func (h *LoanCommitteeHandler) countActiveCommitteeMembers(db *gorm.DB) int64 {
 
 	// Appointed committee members
 	var appointed []models.LoanCommitteeMember
-	db.Where("is_active = TRUE AND deleted_at IS NULL").Find(&appointed)
+	db.Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&appointed)
 	for _, a := range appointed {
 		eligible[a.UserID] = struct{}{}
 	}

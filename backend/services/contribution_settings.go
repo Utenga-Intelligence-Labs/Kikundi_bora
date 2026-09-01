@@ -248,7 +248,7 @@ func SendContributionDueNotifications(g *models.Group, today time.Time) (sent bo
 	}
 
 	var members []models.Member
-	if err := database.DB.Where("is_active = TRUE AND deleted_at IS NULL").Find(&members).Error; err != nil {
+	if err := database.DB.Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&members).Error; err != nil {
 		return false, "", err
 	}
 

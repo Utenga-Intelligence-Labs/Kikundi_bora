@@ -775,7 +775,7 @@ func (h *WelfareHandler) Dashboard(c *fiber.Ctx) error {
 // generateMemberContributions creates contribution obligations for all active members.
 func (h *WelfareHandler) generateMemberContributions(tx *gorm.DB, event models.WelfareEvent) error {
 	var activeMembers []models.Member
-	if err := tx.Where("is_active = TRUE AND deleted_at IS NULL").Find(&activeMembers).Error; err != nil {
+	if err := tx.Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&activeMembers).Error; err != nil {
 		return err
 	}
 

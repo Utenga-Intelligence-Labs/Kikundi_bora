@@ -34,7 +34,7 @@ func (h *DashboardHandler) Summary(c *fiber.Ctx) error {
 	monthFirst := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 
 	database.DB.Model(&models.Member{}).
-		Where("is_active = TRUE AND deleted_at IS NULL").Count(&activeMembers)
+		Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Count(&activeMembers)
 
 	database.DB.Model(&models.Contribution{}).
 		Where("status = ?", "PAID").

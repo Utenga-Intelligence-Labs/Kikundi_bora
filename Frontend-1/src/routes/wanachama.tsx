@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { useMembers, useCreateMember, useUpdateMember } from "@/hooks/use-members";
 import { useCreateUser, useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
+import { tokenStorage } from "@/lib/auth-storage";
 import { tarehe } from "@/lib/format";
 import { Field } from "@/components/Field";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -18,7 +20,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, Phone, X, Loader2, UserCheck, Pencil, KeyRound } from "lucide-react";
+import { Search, UserPlus, Phone, X, Loader2, UserCheck, Pencil, KeyRound, Clock, Send } from "lucide-react";
 
 export const Route = createFileRoute("/wanachama")({
   head: () => ({
@@ -360,13 +362,48 @@ function WanachamaPage() {
 
 function FormDialog({ onClose }: { onClose: () => void }) {
   const createMember = useCreateMember();
+  const qc = useQueryClient();
   const [f, setF] = useState({
     full_name: "",
     phone: "",
     address: "",
+    gender: "",
+    occupation: "",
+    email: "",
+    next_of_kin_name: "",
+    next_of_kin_phone: "",
     joined_at: new Date().toISOString().slice(0, 10),
   });
   const [err, setErr] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoUploading(true);
+    setErr(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const token = tokenStorage.get();
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/v1"}/upload/avatar`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd }
+      );
+      if (!res.ok) throw new Error("Imeshindikana kupakia picha");
+      const data = await res.json();
+      setPhotoUrl(data.url);
+    } catch (e: unknown) {
+      setErr(e instanceof Error ? e.message : "Imeshindikana kupakia picha");
+      setPhotoFile(null);
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setErr(null);
@@ -375,17 +412,48 @@ function FormDialog({ onClose }: { onClose: () => void }) {
         full_name: f.full_name,
         phone: f.phone,
         address: f.address || undefined,
+        gender: (f.gender || undefined) as "MME" | "MKE" | undefined,
+        occupation: f.occupation || undefined,
+        email: f.email || undefined,
+        next_of_kin_name: f.next_of_kin_name || undefined,
+        next_of_kin_phone: f.next_of_kin_phone || undefined,
+        photo_url: photoUrl || undefined,
         joined_at: f.joined_at,
       });
-      onClose();
+      qc.invalidateQueries({ queryKey: ["members"] });
+      setSubmitted(true);
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Imeshindikana kusajili");
     }
   };
 
+  // Success view — clear "Pending approval" state, NOT fully active yet
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={onClose}>
+        <div className="w-full max-w-md rounded-t-3xl bg-card p-6 sm:rounded-2xl text-center" onClick={(e) => e.stopPropagation()}>
+          <Clock className="mx-auto h-12 w-12 text-amber-500" />
+          <h3 className="mt-3 font-display text-lg font-bold">Mwanachama Amesajiliwa</h3>
+          <span className="chip bg-amber-100 text-amber-700 mt-2 inline-flex items-center gap-1">
+            <Clock className="h-3 w-3" /> Pending approval
+          </span>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Mwanachama hajiunganishwa kikamilifu mpaka <strong>Katibu</strong> aidhinishе.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground"
+          >
+            Sawa
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center overflow-y-auto" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl my-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">Sajili Mwanachama Mpya</h3>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
@@ -394,16 +462,47 @@ function FormDialog({ onClose }: { onClose: () => void }) {
         <div className="space-y-3">
           <Field label="Jina kamili" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} />
           <Field label="Namba ya simu" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} type="tel" />
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Jinsia</label>
+            <select
+              value={f.gender}
+              onChange={(e) => setF({ ...f, gender: e.target.value })}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">— Chagua —</option>
+              <option value="MME">Mwanamume</option>
+              <option value="MKE">Mwanamke</option>
+            </select>
+          </div>
+          <Field label="Kazi / Taaluma (hiari)" value={f.occupation} onChange={(v) => setF({ ...f, occupation: v })} />
+          <Field label="Barua pepe (hiari)" value={f.email} onChange={(v) => setF({ ...f, email: v })} type="email" />
+          <Field label="Mlezi / Ndugu wa karibu (hiari)" value={f.next_of_kin_name} onChange={(v) => setF({ ...f, next_of_kin_name: v })} />
+          <Field label="Simu ya mlezi (hiari)" value={f.next_of_kin_phone} onChange={(v) => setF({ ...f, next_of_kin_phone: v })} type="tel" />
           <Field label="Anwani (hiari)" value={f.address} onChange={(v) => setF({ ...f, address: v })} />
           <Field label="Tarehe ya kujiunga" value={f.joined_at} onChange={(v) => setF({ ...f, joined_at: v })} type="date" />
+          <div>
+            <label className="block text-xs text-muted-foreground mb-1">Picha ya mwanachama (hiari)</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhoto}
+              className="w-full text-xs text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary"
+            />
+            {photoUploading && (
+              <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Inapakia picha...
+              </p>
+            )}
+            {photoUrl && <p className="mt-1 text-xs text-success">Picha imepakiwa ✓</p>}
+          </div>
         </div>
         <button
-          disabled={!f.full_name || !f.phone || createMember.isPending}
+          disabled={!f.full_name || !f.phone || createMember.isPending || photoUploading}
           onClick={handleSubmit}
           className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 inline-flex items-center justify-center gap-2"
         >
-          {createMember.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Hifadhi Mwanachama
+          {createMember.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Tuma kwa Katibu kuidhinisha
         </button>
       </div>
     </div>

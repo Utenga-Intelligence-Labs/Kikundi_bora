@@ -35,12 +35,21 @@ func (h *MemberHandler) List(c *fiber.Ctx) error {
 		Preload("Registrar", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, email, role")
 		}).
+		Preload("Approver", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, name, role")
+		}).
 		Preload("User", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, phone, role, status")
 		})
 
 	if userID := c.Query("user_id"); userID != "" {
 		query = query.Where("user_id = ?", userID)
+	}
+
+	// Approval-status filter: status=pending is the katibu approval queue
+	statusFilter := c.Query("status")
+	if statusFilter != "" {
+		query = query.Where("approval_status = ?", statusFilter)
 	}
 
 	if q != "" {
@@ -53,6 +62,9 @@ func (h *MemberHandler) List(c *fiber.Ctx) error {
 	countQuery := database.DB.Model(&models.Member{}).Where("deleted_at IS NULL")
 	if userID := c.Query("user_id"); userID != "" {
 		countQuery = countQuery.Where("user_id = ?", userID)
+	}
+	if statusFilter != "" {
+		countQuery = countQuery.Where("approval_status = ?", statusFilter)
 	}
 	if q != "" {
 		searchPattern := likePattern(q)
@@ -119,16 +131,29 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 	}
 
 	member := models.Member{
-		MemberNo:     memberNo,
-		FullName:     req.FullName,
-		Phone:        req.Phone,
-		Address:      req.Address,
-		JoinedAt:     joinedAt,
-		IsActive:     true,
-		RegisteredBy: userID,
+		MemberNo:       memberNo,
+		FullName:       req.FullName,
+		Phone:          req.Phone,
+		Address:        req.Address,
+		Gender:         req.Gender,
+		Occupation:     req.Occupation,
+		Email:          req.Email,
+		NextOfKinName:  req.NextOfKinName,
+		NextOfKinPhone: req.NextOfKinPhone,
+		PhotoURL:       req.PhotoURL,
+		JoinedAt:       joinedAt,
+		IsActive:       false, // activated on katibu approval
+		RegisteredBy:   userID,
+		ApprovalStatus: models.MemberApprovalPending,
 	}
 
 	if err := tx.Create(&member).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusajili mwanachama"})
+	}
+
+	// GORM omits false on insert (column default true) — force is_active off
+	// until katibu approval.
+	if err := tx.Model(&member).Update("is_active", false).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusajili mwanachama"})
 	}
 
@@ -137,13 +162,103 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 	}
 
 	services.LogAudit(c, &userID, models.AuditCreate, "members", &member.ID, nil, map[string]interface{}{
-		"member_no": memberNo, "full_name": member.FullName, "phone": member.Phone,
+		"member_no": memberNo, "full_name": member.FullName, "phone": member.Phone, "approval_status": member.ApprovalStatus,
 	})
 
+	// Notify katibu — approval queue
+	services.NotifyRole(models.RoleSecretary, models.NotifSystem,
+		"Mwanachama Mpya Unasubiri",
+		"Mwanachama mpya "+member.FullName+" ("+memberNo+") amesajiliwa na unasubiri idhini yako.",
+		"",
+	)
+
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Mwanachama amesajiliwa",
+		"message": "Mwanachama amesajiliwa. Unasubiri idhini ya Katibu.",
 		"data":    member,
 	})
+}
+
+// ApproveMember marks a pending member approved (katibu only).
+// PATCH /api/v1/members/:id/approve
+func (h *MemberHandler) ApproveMember(c *fiber.Ctx) error {
+	var member models.Member
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", c.Params("id")).
+		First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
+	}
+
+	if member.ApprovalStatus != models.MemberApprovalPending {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"message": "Mwanachama huu hashughulikiwi. Hali yake: " + member.ApprovalStatus,
+		})
+	}
+
+	userID := middleware.GetUserID(c)
+	now := time.Now()
+	member.ApprovalStatus = models.MemberApprovalApproved
+	member.ApprovedBy = &userID
+	member.ApprovedAt = &now
+	member.IsActive = true
+	if err := database.DB.Save(&member).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditApprove, "members", &member.ID,
+		map[string]interface{}{"approval_status": models.MemberApprovalPending},
+		map[string]interface{}{"approval_status": models.MemberApprovalApproved},
+	)
+
+	// Notify the registrar (mwenyekiti who submitted)
+	services.NotifyUser(member.RegisteredBy, models.NotifSystem,
+		"Mwanachama Ameidhinishwa",
+		member.FullName+" ("+member.MemberNo+") ameidhinishwa na Katibu. Sasa anatumika kikamilifu.",
+	)
+
+	return c.JSON(fiber.Map{"message": "Mwanachama ameidhinishwa.", "data": member})
+}
+
+// RejectMember marks a pending member rejected — reason required (katibu only).
+// PATCH /api/v1/members/:id/reject
+func (h *MemberHandler) RejectMember(c *fiber.Ctx) error {
+	var req models.RejectMemberRequest
+	if err := c.BodyParser(&req); err != nil || req.Reason == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Sababu ya kukataa inahitajika"})
+	}
+
+	var member models.Member
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", c.Params("id")).
+		First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
+	}
+
+	if member.ApprovalStatus != models.MemberApprovalPending {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"message": "Mwanachama huu hashughulikiwi. Hali yake: " + member.ApprovalStatus,
+		})
+	}
+
+	userID := middleware.GetUserID(c)
+	now := time.Now()
+	member.ApprovalStatus = models.MemberApprovalRejected
+	member.ApprovedBy = &userID
+	member.ApprovedAt = &now
+	member.RejectionReason = &req.Reason
+	member.IsActive = false
+	if err := database.DB.Save(&member).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditReject, "members", &member.ID,
+		map[string]interface{}{"approval_status": models.MemberApprovalPending},
+		map[string]interface{}{"approval_status": models.MemberApprovalRejected, "reason": req.Reason},
+	)
+
+	services.NotifyUser(member.RegisteredBy, models.NotifSystem,
+		"Mwanachama Amekataliwa",
+		member.FullName+" ("+member.MemberNo+") amekataliwa na Katibu. Sababu: "+req.Reason,
+	)
+
+	return c.JSON(fiber.Map{"message": "Mwanachama amekataliwa.", "data": member})
 }
 
 func (h *MemberHandler) Update(c *fiber.Ctx) error {

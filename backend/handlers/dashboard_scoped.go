@@ -319,7 +319,7 @@ func (h *DashboardHandler) GroupSummary(c *fiber.Ctx) error {
 	}
 
 	database.DB.Model(&models.Member{}).
-		Where("is_active = TRUE AND deleted_at IS NULL").
+		Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").
 		Count(&sum.TotalActiveMembers)
 
 	// All confirmed contributions (both stores, AKIBA + welfare)
@@ -414,7 +414,7 @@ func (h *DashboardHandler) GroupSummaryKatibu(c *fiber.Ctx) error {
 	}
 
 	database.DB.Model(&models.Member{}).
-		Where("is_active = TRUE AND deleted_at IS NULL").
+		Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").
 		Count(&sum.TotalActiveMembers)
 	database.DB.Model(&models.Member{}).
 		Where("deleted_at IS NULL AND joined_at >= ?", monthFirst).
@@ -450,7 +450,7 @@ func (h *DashboardHandler) GroupSummaryKatibu(c *fiber.Ctx) error {
 
 	var late []models.Member
 	database.DB.
-		Where("is_active = TRUE AND deleted_at IS NULL").
+		Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").
 		Where("id NOT IN (SELECT member_id FROM contributions WHERE month = ? AND status = 'PAID')", monthFirst).
 		Where("id NOT IN (SELECT member_id FROM member_contributions WHERE period_label = ? AND status = ? AND contribution_type = ?)",
 			label, models.ContributionConfirmed, models.ContributionAkiba).
@@ -546,7 +546,7 @@ func (h *DashboardHandler) GroupSummaryMwekaHazina(c *fiber.Ctx) error {
 	// Expected this period = fixed amount × active members (null if unset)
 	var activeMembers int64
 	database.DB.Model(&models.Member{}).
-		Where("is_active = TRUE AND deleted_at IS NULL").
+		Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").
 		Count(&activeMembers)
 	if group.FixedContributionAmount != nil {
 		expected := group.FixedContributionAmount.Mul(decimal.NewFromInt(activeMembers))

@@ -47,10 +47,22 @@ type ResetPasswordRequest struct {
 }
 
 type CreateMemberRequest struct {
-	FullName string  `json:"full_name" validate:"required,min=2"`
-	Phone    string  `json:"phone" validate:"required"`
-	Address  *string `json:"address"`
-	JoinedAt string  `json:"joined_at" validate:"required"`
+	FullName       string  `json:"full_name" validate:"required,min=2"`
+	Phone          string  `json:"phone" validate:"required"`
+	Address        *string `json:"address"`
+	Gender         *string `json:"gender" validate:"omitempty,oneof=MME MKE"`
+	Occupation     *string `json:"occupation"`
+	Email          *string `json:"email" validate:"omitempty,email"`
+	NextOfKinName  *string `json:"next_of_kin_name"`
+	NextOfKinPhone *string `json:"next_of_kin_phone"`
+	PhotoURL       *string `json:"photo_url"`
+	JoinedAt       string  `json:"joined_at" validate:"required"`
+}
+
+type ApproveMemberRequest struct{}
+
+type RejectMemberRequest struct {
+	Reason string `json:"reason" validate:"required,min=3"`
 }
 
 type UpdateMemberRequest struct {

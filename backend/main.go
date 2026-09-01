@@ -191,6 +191,8 @@ func main() {
 	// Role-scoped dashboard summaries (self / leadership / admin — see handler)
 	members.Get("/:id/dashboard-summary", dashHandler.MemberSummary)
 	members.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), memberHandler.Create)
+	members.Patch("/:id/approve", middleware.RequireRoles(models.RoleSecretary), memberHandler.ApproveMember)
+	members.Patch("/:id/reject", middleware.RequireRoles(models.RoleSecretary), memberHandler.RejectMember)
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)
 	members.Delete("/:id", middleware.RequireRoles(models.RoleChair), memberHandler.Delete)
 

@@ -341,9 +341,10 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 		return c.JSON(resp)
 	}
 
-	// Find linked member
+	// Find linked member — dashboard access requires katibu approval
 	var member models.Member
-	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).
+	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL AND approval_status = ?",
+		userID, models.MemberApprovalApproved).
 		First(&member).Error; err == nil {
 		resp.MemberID = &member.ID
 		resp.MemberCode = &member.MemberNo

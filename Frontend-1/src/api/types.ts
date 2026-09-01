@@ -110,6 +110,12 @@ export interface CreateMemberRequest {
   full_name: string;
   phone: string;
   address?: string;
+  gender?: "MME" | "MKE";
+  occupation?: string;
+  email?: string;
+  next_of_kin_name?: string;
+  next_of_kin_phone?: string;
+  photo_url?: string;
   joined_at: string;
 }
 
