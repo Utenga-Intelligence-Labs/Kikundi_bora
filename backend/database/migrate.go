@@ -28,6 +28,8 @@ func AutoMigrate() {
 		&models.Group{},
 		&models.GroupSettingProposal{},
 		&models.PaymentMethod{},
+		&models.SocialFund{},
+		&models.SocialFundContribution{},
 
 		// Member & financial tables
 		&models.Member{},

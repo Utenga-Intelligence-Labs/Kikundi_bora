@@ -172,6 +172,21 @@ func main() {
 	pms.Patch("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Update)
 	pms.Delete("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Delete)
 
+	// Social funds (Mifuko ya Kijamii) — separate pools, separate ledger.
+	// Mwenyekiti creates -> Katibu approves -> members contribute ->
+	// Mweka Hazina confirms contributions (balance grows on confirm only).
+	socialFundHandler := handlers.NewSocialFundHandler()
+	sf := groups.Group("/:id/social-funds")
+	sf.Post("/", middleware.RequireRoles(models.RoleChair), socialFundHandler.Create)
+	sf.Get("/", socialFundHandler.List)
+	sf.Get("/:fundId", socialFundHandler.GetFund)
+	sf.Post("/:fundId/contribute", socialFundHandler.Contribute)
+	sf.Post("/:fundId/approve", middleware.RequireRoles(models.RoleSecretary), socialFundHandler.ApproveFund)
+	sf.Post("/:fundId/reject", middleware.RequireRoles(models.RoleSecretary), socialFundHandler.RejectFund)
+	sf.Post("/:fundId/close", middleware.RequireRoles(models.RoleChair), socialFundHandler.CloseFund)
+	sf.Post("/:fundId/contributions/:cid/confirm", middleware.RequireRoles(models.RoleTreasurer), socialFundHandler.ConfirmContribution)
+	sf.Post("/:fundId/contributions/:cid/reject", middleware.RequireRoles(models.RoleTreasurer), socialFundHandler.RejectContribution)
+
 	// User Management routes (Mwenyekiti creates, Katibu approves)
 	users := protected.Group("/users")
 	users.Post("/create", middleware.RequireRoles(models.RoleChair), userMgmtHandler.CreateUser)

@@ -21,6 +21,7 @@ import { Route as RipotiRouteImport } from './routes/ripoti'
 import { Route as NjiaZaMalipoRouteImport } from './routes/njia-za-malipo'
 import { Route as MipangilioRouteImport } from './routes/mipangilio'
 import { Route as MikopoRouteImport } from './routes/mikopo'
+import { Route as MifukoRouteImport } from './routes/mifuko'
 import { Route as MichangoYanguRouteImport } from './routes/michango-yangu'
 import { Route as MichangoInayosubiriRouteImport } from './routes/michango-inayosubiri'
 import { Route as MichangoRouteImport } from './routes/michango'
@@ -38,6 +39,7 @@ import { Route as UongoziRipotiRouteImport } from './routes/uongozi/ripoti'
 import { Route as UongoziMikopoRouteImport } from './routes/uongozi/mikopo'
 import { Route as UongoziImportDataRouteImport } from './routes/uongozi/import-data'
 import { Route as UkaguziMkopoLoanIdRouteImport } from './routes/ukaguzi-mkopo.$loanId'
+import { Route as MifukoFundIdRouteImport } from './routes/mifuko.$fundId'
 
 const WekaNenosiriRoute = WekaNenosiriRouteImport.update({
   id: '/weka-nenosiri',
@@ -97,6 +99,11 @@ const MipangilioRoute = MipangilioRouteImport.update({
 const MikopoRoute = MikopoRouteImport.update({
   id: '/mikopo',
   path: '/mikopo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MifukoRoute = MifukoRouteImport.update({
+  id: '/mifuko',
+  path: '/mifuko',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MichangoYanguRoute = MichangoYanguRouteImport.update({
@@ -184,6 +191,11 @@ const UkaguziMkopoLoanIdRoute = UkaguziMkopoLoanIdRouteImport.update({
   path: '/ukaguzi-mkopo/$loanId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MifukoFundIdRoute = MifukoFundIdRouteImport.update({
+  id: '/$fundId',
+  path: '/$fundId',
+  getParentRoute: () => MifukoRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -199,6 +211,7 @@ export interface FileRoutesByFullPath {
   '/michango': typeof MichangoRoute
   '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
+  '/mifuko': typeof MifukoRouteWithChildren
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
   '/njia-za-malipo': typeof NjiaZaMalipoRoute
@@ -211,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/wasifu': typeof WasifuRoute
   '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
+  '/mifuko/$fundId': typeof MifukoFundIdRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/import-data': typeof UongoziImportDataRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
@@ -230,6 +244,7 @@ export interface FileRoutesByTo {
   '/michango': typeof MichangoRoute
   '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
+  '/mifuko': typeof MifukoRouteWithChildren
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
   '/njia-za-malipo': typeof NjiaZaMalipoRoute
@@ -242,6 +257,7 @@ export interface FileRoutesByTo {
   '/wasifu': typeof WasifuRoute
   '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
+  '/mifuko/$fundId': typeof MifukoFundIdRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/import-data': typeof UongoziImportDataRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
@@ -262,6 +278,7 @@ export interface FileRoutesById {
   '/michango': typeof MichangoRoute
   '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
+  '/mifuko': typeof MifukoRouteWithChildren
   '/mikopo': typeof MikopoRoute
   '/mipangilio': typeof MipangilioRoute
   '/njia-za-malipo': typeof NjiaZaMalipoRoute
@@ -274,6 +291,7 @@ export interface FileRoutesById {
   '/wasifu': typeof WasifuRoute
   '/weka-mchango': typeof WekaMchangoRoute
   '/weka-nenosiri': typeof WekaNenosiriRoute
+  '/mifuko/$fundId': typeof MifukoFundIdRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/import-data': typeof UongoziImportDataRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
@@ -295,6 +313,7 @@ export interface FileRouteTypes {
     | '/michango'
     | '/michango-inayosubiri'
     | '/michango-yangu'
+    | '/mifuko'
     | '/mikopo'
     | '/mipangilio'
     | '/njia-za-malipo'
@@ -307,6 +326,7 @@ export interface FileRouteTypes {
     | '/wasifu'
     | '/weka-mchango'
     | '/weka-nenosiri'
+    | '/mifuko/$fundId'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/import-data'
     | '/uongozi/mikopo'
@@ -326,6 +346,7 @@ export interface FileRouteTypes {
     | '/michango'
     | '/michango-inayosubiri'
     | '/michango-yangu'
+    | '/mifuko'
     | '/mikopo'
     | '/mipangilio'
     | '/njia-za-malipo'
@@ -338,6 +359,7 @@ export interface FileRouteTypes {
     | '/wasifu'
     | '/weka-mchango'
     | '/weka-nenosiri'
+    | '/mifuko/$fundId'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/import-data'
     | '/uongozi/mikopo'
@@ -357,6 +379,7 @@ export interface FileRouteTypes {
     | '/michango'
     | '/michango-inayosubiri'
     | '/michango-yangu'
+    | '/mifuko'
     | '/mikopo'
     | '/mipangilio'
     | '/njia-za-malipo'
@@ -369,6 +392,7 @@ export interface FileRouteTypes {
     | '/wasifu'
     | '/weka-mchango'
     | '/weka-nenosiri'
+    | '/mifuko/$fundId'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/import-data'
     | '/uongozi/mikopo'
@@ -389,6 +413,7 @@ export interface RootRouteChildren {
   MichangoRoute: typeof MichangoRoute
   MichangoInayosubiriRoute: typeof MichangoInayosubiriRoute
   MichangoYanguRoute: typeof MichangoYanguRoute
+  MifukoRoute: typeof MifukoRouteWithChildren
   MikopoRoute: typeof MikopoRoute
   MipangilioRoute: typeof MipangilioRoute
   NjiaZaMalipoRoute: typeof NjiaZaMalipoRoute
@@ -491,6 +516,13 @@ declare module '@tanstack/react-router' {
       path: '/mikopo'
       fullPath: '/mikopo'
       preLoaderRoute: typeof MikopoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mifuko': {
+      id: '/mifuko'
+      path: '/mifuko'
+      fullPath: '/mifuko'
+      preLoaderRoute: typeof MifukoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/michango-yangu': {
@@ -612,8 +644,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UkaguziMkopoLoanIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/mifuko/$fundId': {
+      id: '/mifuko/$fundId'
+      path: '/$fundId'
+      fullPath: '/mifuko/$fundId'
+      preLoaderRoute: typeof MifukoFundIdRouteImport
+      parentRoute: typeof MifukoRoute
+    }
   }
 }
+
+interface MifukoRouteChildren {
+  MifukoFundIdRoute: typeof MifukoFundIdRoute
+}
+
+const MifukoRouteChildren: MifukoRouteChildren = {
+  MifukoFundIdRoute: MifukoFundIdRoute,
+}
+
+const MifukoRouteWithChildren =
+  MifukoRoute._addFileChildren(MifukoRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -629,6 +679,7 @@ const rootRouteChildren: RootRouteChildren = {
   MichangoRoute: MichangoRoute,
   MichangoInayosubiriRoute: MichangoInayosubiriRoute,
   MichangoYanguRoute: MichangoYanguRoute,
+  MifukoRoute: MifukoRouteWithChildren,
   MikopoRoute: MikopoRoute,
   MipangilioRoute: MipangilioRoute,
   NjiaZaMalipoRoute: NjiaZaMalipoRoute,
