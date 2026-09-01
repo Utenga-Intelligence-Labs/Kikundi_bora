@@ -157,7 +157,7 @@ interface AppModalProps {
   title: string;
   message?: string;
   variant?: Variant;
-  primaryLabel?: string;
+  primaryLabel?: React.ReactNode;
   onPrimary?: () => void;
   secondaryLabel?: string;
   onSecondary?: () => void;

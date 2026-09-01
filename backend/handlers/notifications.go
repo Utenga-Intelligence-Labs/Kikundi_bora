@@ -71,3 +71,16 @@ func (h *NotificationHandler) MarkRead(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Arifa zimewekwa zimesomwa"})
 }
+
+// MarkAllRead marks every unread notification of the user as read.
+// POST /api/v1/notifications/read-all
+func (h *NotificationHandler) MarkAllRead(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	now := time.Now()
+	res := database.DB.Model(&models.Notification{}).
+		Where("user_id = ? AND read_at IS NULL", userID).
+		Update("read_at", now)
+
+	return c.JSON(fiber.Map{"message": "Arifa zote zimewekwa zimesomwa", "updated": res.RowsAffected})
+}

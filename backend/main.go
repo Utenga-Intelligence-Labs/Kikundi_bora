@@ -208,6 +208,7 @@ func main() {
 	notifs := protected.Group("/notifications")
 	notifs.Get("/", notifHandler.List)
 	notifs.Post("/read", notifHandler.MarkRead)
+	notifs.Post("/read-all", notifHandler.MarkAllRead)
 
 	protected.Get("/audit-logs", middleware.RequireRoles(models.RoleChair, models.RoleAdmin), auditHandler.List)
 	protected.Get("/audit-logs/login-activity", middleware.RequireRoles(models.RoleChair, models.RoleAdmin), auditHandler.LoginActivity)
