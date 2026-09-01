@@ -9,6 +9,7 @@ import (
 	"kikundibora/services"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -130,8 +131,35 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza namba ya uanachama"})
 	}
 
+	// Consolidated flow: the member submission ALSO creates the linked login
+	// account (PENDING) in the same transaction — one approval by the katibu
+	// then activates both.
+	tempPassword := models.DefaultTempPassword()
+	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Hitilafu ya mfumo"})
+	}
+	newUser := models.User{
+		Name:               req.FullName,
+		Phone:              req.Phone,
+		Email:              req.Email,
+		Password:           string(hashedPwd),
+		Role:               models.RoleMember,
+		Status:             models.UserStatusPending,
+		MustChangePassword: true,
+		IsActive:           true,
+		CreatedBy:          &userID,
+	}
+	if err := tx.Create(&newUser).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunda akaunti ya kuingia"})
+	}
+	if err := upsertUserPosition(tx, newUser.ID, models.RoleMember); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuweka nafasi ya mtumiaji"})
+	}
+
 	member := models.Member{
 		MemberNo:       memberNo,
+		UserID:         &newUser.ID,
 		FullName:       req.FullName,
 		Phone:          req.Phone,
 		Address:        req.Address,
@@ -162,7 +190,8 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 	}
 
 	services.LogAudit(c, &userID, models.AuditCreate, "members", &member.ID, nil, map[string]interface{}{
-		"member_no": memberNo, "full_name": member.FullName, "phone": member.Phone, "approval_status": member.ApprovalStatus,
+		"member_no": memberNo, "full_name": member.FullName, "phone": member.Phone,
+		"approval_status": member.ApprovalStatus, "linked_user_id": newUser.ID,
 	})
 
 	// Notify katibu — approval queue
@@ -201,6 +230,18 @@ func (h *MemberHandler) ApproveMember(c *fiber.Ctx) error {
 	member.IsActive = true
 	if err := database.DB.Save(&member).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	// One approval activates BOTH the member record and its linked login
+	// account (consolidated flow).
+	if member.UserID != nil {
+		database.DB.Model(&models.User{}).
+			Where("id = ?", *member.UserID).
+			Updates(map[string]interface{}{
+				"status":             models.UserStatusActive,
+				"is_active":          true,
+				"must_change_password": true,
+			})
 	}
 
 	services.LogAudit(c, &userID, models.AuditApprove, "members", &member.ID,
@@ -246,6 +287,14 @@ func (h *MemberHandler) RejectMember(c *fiber.Ctx) error {
 	member.IsActive = false
 	if err := database.DB.Save(&member).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
+	}
+
+	// Reject also disarms the linked login account so it can never be
+	// activated separately.
+	if member.UserID != nil {
+		database.DB.Model(&models.User{}).
+			Where("id = ?", *member.UserID).
+			Updates(map[string]interface{}{"status": models.UserStatusRejected, "is_active": false})
 	}
 
 	services.LogAudit(c, &userID, models.AuditReject, "members", &member.ID,

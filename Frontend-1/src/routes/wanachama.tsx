@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
 import { useMembers, useCreateMember, useUpdateMember } from "@/hooks/use-members";
-import { useCreateUser, useChairResetPassword } from "@/hooks/use-user-management";
+import { useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { tokenStorage } from "@/lib/auth-storage";
@@ -20,7 +20,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, Phone, X, Loader2, UserCheck, Pencil, KeyRound, Clock, Send } from "lucide-react";
+import { Search, UserPlus, Phone, X, Loader2, Pencil, KeyRound, Clock, Send } from "lucide-react";
 
 export const Route = createFileRoute("/wanachama")({
   head: () => ({
@@ -43,7 +43,6 @@ function WanachamaPage() {
   const limit = 20;
   const debouncedQ = useDebounce(q, 300);
   const [open, setOpen] = useState(false);
-  const [openCreateUser, setOpenCreateUser] = useState(false);
   const [editMember, setEditMember] = useState<typeof members[number] | null>(null);
   const [resetMember, setResetMember] = useState<typeof members[number] | null>(null);
   const [lifecycleMember, setLifecycleMember] = useState<{ id: string; full_name: string; is_active: boolean } | null>(null);
@@ -99,19 +98,11 @@ function WanachamaPage() {
       subtitle={`${total} wameandikishwa`}
       action={
         <div className="flex gap-2">
-          {hasRole(user, "chair") && (
-            <button
-              onClick={() => setOpenCreateUser(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
-            >
-              <UserCheck className="h-4 w-4" /> Unda Mtumiaji
-            </button>
-          )}
           <button
             onClick={() => setOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3.5 py-2 text-sm font-semibold text-accent-foreground"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
           >
-            <UserPlus className="h-4 w-4" /> Sajili
+            <UserPlus className="h-4 w-4" /> Ongeza Mwanachama
           </button>
         </div>
       }
@@ -258,7 +249,6 @@ function WanachamaPage() {
       )}
 
       {open && <FormDialog onClose={() => setOpen(false)} />}
-      {openCreateUser && <CreateUserDialog onClose={() => setOpenCreateUser(false)} />}
       {editMember && (
         <EditMemberDialog
           member={editMember}
@@ -509,68 +499,6 @@ function FormDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function CreateUserDialog({ onClose }: { onClose: () => void }) {
-  const createUser = useCreateUser();
-  const [f, setF] = useState({
-    full_name: "",
-    phone: "",
-  });
-  const [err, setErr] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [tempPassword, setTempPassword] = useState<string | null>(null);
-
-  const handleSubmit = async () => {
-    setErr(null);
-    setSuccess(null);
-    setTempPassword(null);
-    try {
-      const res = await createUser.mutateAsync({
-        full_name: f.full_name,
-        phone: f.phone,
-      });
-      setSuccess(res.message || "Mtumiaji ameundwa. Anasubiri kuidhinishwa na Katibu.");
-      if (res.temp_password) setTempPassword(res.temp_password);
-      setF({ full_name: "", phone: "" });
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Imeshindikana kuunda mtumiaji");
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-display text-lg font-semibold">Unda Mtumiaji Mpya</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
-        </div>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Nenosiri la muda litatolewa mara moja baada ya kuunda — liandike na umpe mtumiaji. Atalazimika kulibadilisha baada ya kuidhinishwa.
-        </p>
-        {err && <p className="mb-3 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</p>}
-        {success && <p className="mb-3 rounded-lg bg-success/10 px-3 py-2 text-sm text-success">{success}</p>}
-        {tempPassword && (
-          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-            <p className="font-semibold text-amber-900">Nenosiri la muda (onyesha mara moja):</p>
-            <p className="mt-1 font-mono text-base tracking-wide text-amber-950 select-all">{tempPassword}</p>
-            <p className="mt-1 text-xs text-amber-800">Nakili sasa — haitaonekana tena baada ya kufunga.</p>
-          </div>
-        )}
-        <div className="space-y-3">
-          <Field label="Jina kamili" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} />
-          <Field label="Namba ya simu" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} type="tel" />
-        </div>
-        <button
-          disabled={!f.full_name || !f.phone || createUser.isPending}
-          onClick={handleSubmit}
-          className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 inline-flex items-center justify-center gap-2"
-        >
-          {createUser.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          Unda Mtumiaji
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function EditMemberDialog({ member, onClose }: { member: { id: string; full_name: string; phone: string; address?: string; is_active: boolean; member_no: string; user_id?: string }; onClose: () => void }) {
   const updateMember = useUpdateMember();
