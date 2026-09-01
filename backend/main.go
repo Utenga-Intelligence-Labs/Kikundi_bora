@@ -164,6 +164,14 @@ func main() {
 	settings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Approve)
 	settings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Reject)
 
+	// Payment methods (LipaNamba / bank accounts) — members read, chair/treasurer manage
+	paymentMethodHandler := handlers.NewPaymentMethodHandler()
+	pms := groups.Group("/:id/payment-methods")
+	pms.Get("/", paymentMethodHandler.List)
+	pms.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Create)
+	pms.Patch("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Update)
+	pms.Delete("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Delete)
+
 	// User Management routes (Mwenyekiti creates, Katibu approves)
 	users := protected.Group("/users")
 	users.Post("/create", middleware.RequireRoles(models.RoleChair), userMgmtHandler.CreateUser)

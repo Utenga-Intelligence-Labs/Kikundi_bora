@@ -24,6 +24,16 @@ func newRoleTestApp(role models.Role) *fiber.App {
 	app.Post("/approve", RequireRoles(models.RoleSecretary), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
 	})
+	// Payment methods: mwenyekiti + mweka hazina manage, members read-only
+	app.Post("/payment-methods", RequireRoles(models.RoleChair, models.RoleTreasurer), func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true})
+	})
+	app.Patch("/payment-methods/:pmId", RequireRoles(models.RoleChair, models.RoleTreasurer), func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true})
+	})
+	app.Delete("/payment-methods/:pmId", RequireRoles(models.RoleChair, models.RoleTreasurer), func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true})
+	})
 	return app
 }
 
@@ -41,6 +51,10 @@ func testRequest(t *testing.T, app *fiber.App, method, path string) int {
 //   - propose: mwenyekiti (chair) only
 //   - approve/reject: katibu (secretary) only
 //   - member: neither
+//
+// Payment-methods permission matrix:
+//   - create/edit/delete: mwenyekiti (chair) + mweka hazina (treasurer) only
+//   - member: read-only (all writes 403)
 func TestRequireRolesContributionSettingsPermissions(t *testing.T) {
 	cases := []struct {
 		role        models.Role
@@ -60,6 +74,33 @@ func TestRequireRolesContributionSettingsPermissions(t *testing.T) {
 		}
 		if got := testRequest(t, app, "POST", "/approve"); got != tc.approveCode {
 			t.Errorf("role=%s approve: got %d, want %d", tc.role, got, tc.approveCode)
+		}
+	}
+}
+
+func TestRequireRolesPaymentMethodPermissions(t *testing.T) {
+	cases := []struct {
+		role   models.Role
+		create int
+		update int
+		delete int
+	}{
+		{models.RoleChair, 200, 200, 200},
+		{models.RoleTreasurer, 200, 200, 200},
+		{models.RoleMember, 403, 403, 403},
+		{models.RoleSecretary, 403, 403, 403},
+		{models.RoleAdmin, 200, 200, 200}, // admin bypasses
+	}
+	for _, tc := range cases {
+		app := newRoleTestApp(tc.role)
+		if got := testRequest(t, app, "POST", "/payment-methods"); got != tc.create {
+			t.Errorf("role=%s create payment method: got %d, want %d", tc.role, got, tc.create)
+		}
+		if got := testRequest(t, app, "PATCH", "/payment-methods/pm-1"); got != tc.update {
+			t.Errorf("role=%s update payment method: got %d, want %d", tc.role, got, tc.update)
+		}
+		if got := testRequest(t, app, "DELETE", "/payment-methods/pm-1"); got != tc.delete {
+			t.Errorf("role=%s delete payment method: got %d, want %d", tc.role, got, tc.delete)
 		}
 	}
 }

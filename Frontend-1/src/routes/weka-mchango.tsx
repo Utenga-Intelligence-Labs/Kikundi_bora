@@ -8,6 +8,7 @@ import { AppShell } from "@/components/AppShell";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon, CalendarDays } from "lucide-react";
 import { MfukoContributionForm } from "@/components/MfukoContributionForm";
+import { PaymentMethodsCard } from "@/components/PaymentMethodsCard";
 import { groupsApi, INTERVAL_LABELS } from "@/api/groups";
 import { useAppModal } from "@/components/AppModal";
 
@@ -182,6 +183,7 @@ function WekaMchangoPage() {
             </p>
           </div>
         )}
+        <PaymentMethodsCard />
         <div className="card-surface p-6">
           <h3 className="font-display text-lg font-semibold mb-4">Aina ya Mchango</h3>
           <div className="space-y-3">

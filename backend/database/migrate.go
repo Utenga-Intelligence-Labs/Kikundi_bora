@@ -27,6 +27,7 @@ func AutoMigrate() {
 		&models.PendingAction{},
 		&models.Group{},
 		&models.GroupSettingProposal{},
+		&models.PaymentMethod{},
 
 		// Member & financial tables
 		&models.Member{},
