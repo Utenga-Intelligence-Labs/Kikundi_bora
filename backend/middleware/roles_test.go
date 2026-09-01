@@ -38,6 +38,11 @@ func newRoleTestApp(role models.Role) *fiber.App {
 	app.Get("/loans/portfolio", RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
 	})
+	// Welfare contributions listing: leadership only (RBAC-H01 fix —
+	// previously unguarded; member got all rows)
+	app.Get("/welfare/contributions", RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"ok": true})
+	})
 	// "Pokea Michango" (all-contributions listing): treasurer + secretary
 	// only — mwenyekiti removed from receipting.
 	app.Get("/michango", RequireRoles(models.RoleTreasurer, models.RoleSecretary), func(c *fiber.Ctx) error {
@@ -187,6 +192,27 @@ func TestRequireRolesPokeaMichangoPermissions(t *testing.T) {
 		app := newRoleTestApp(tc.role)
 		if got := testRequest(t, app, "GET", "/michango"); got != tc.code {
 			t.Errorf("role=%s pokea michango: got %d, want %d", tc.role, got, tc.code)
+		}
+	}
+}
+
+// Welfare contributions listing (RBAC-H01 fix): leadership only —
+// member must NOT be able to enumerate everyone's welfare obligations.
+func TestRequireRolesWelfareContributionsPermissions(t *testing.T) {
+	cases := []struct {
+		role models.Role
+		code int
+	}{
+		{models.RoleMember, 403}, // the previously-exploitable case
+		{models.RoleChair, 200},
+		{models.RoleSecretary, 200},
+		{models.RoleTreasurer, 200},
+		{models.RoleAdmin, 200},
+	}
+	for _, tc := range cases {
+		app := newRoleTestApp(tc.role)
+		if got := testRequest(t, app, "GET", "/welfare/contributions"); got != tc.code {
+			t.Errorf("role=%s welfare contributions: got %d, want %d", tc.role, got, tc.code)
 		}
 	}
 }

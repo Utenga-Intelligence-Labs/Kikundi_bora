@@ -261,8 +261,10 @@ func main() {
 	welfare.Post("/events/:id/approve", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), welfareHandler.ApproveEvent)
 	welfare.Post("/events/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), welfareHandler.RejectEvent)
 
-	// Contributions — members see their own, treasurer/chair/secretary see all
-	welfare.Get("/contributions", welfareHandler.ListContributions)
+	// Contributions — leadership see all (receipting/records); members must
+	// use /my-contributions. Guard closes IDOR RBAC-H01 (any role=member
+	// previously could enumerate all welfare obligations).
+	welfare.Get("/contributions", middleware.RequireRoles(models.RoleTreasurer, models.RoleChair, models.RoleSecretary), welfareHandler.ListContributions)
 	welfare.Get("/my-contributions", welfareHandler.MyContributions)
 	welfare.Post("/events/:id/contributions/:memberId/pay", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RecordPayment)
 	welfare.Post("/events/:id/contributions/:memberId/waive", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.WaiveContribution)
