@@ -388,6 +388,91 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
 
         <p className="text-xs text-muted-foreground">{event.description}</p>
 
+        {/* Mtiririko wa Tukio — full flow history */}
+        <div>
+          <h4 className="text-sm font-semibold mb-2">Mtiririko wa Tukio</h4>
+          <ol className="space-y-2.5">
+            <li className="flex items-start gap-2.5">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-success text-white">
+                <Check className="h-3 w-3" />
+              </span>
+              <div className="text-xs">
+                <p className="font-semibold">Tundwa na Mweka Hazina</p>
+                <p className="text-muted-foreground">
+                  {event.creator?.name ?? "—"} · {event.created_at ? new Date(event.created_at).toLocaleDateString("sw-TZ") : "—"}
+                </p>
+              </div>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span
+                className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                  event.status === "PENDING"
+                    ? "bg-muted text-muted-foreground"
+                    : event.status === "REJECTED"
+                      ? "bg-destructive text-white"
+                      : "bg-success text-white"
+                }`}
+              >
+                {event.status === "PENDING" ? "2" : <Check className="h-3 w-3" />}
+              </span>
+              <div className="text-xs">
+                <p className="font-semibold">
+                  {event.status === "REJECTED"
+                    ? "Imekataliwa na Mwenyekiti"
+                    : "Idhini ya Mwenyekiti"}
+                </p>
+                <p className="text-muted-foreground">
+                  {event.approved_at
+                    ? `${event.approver?.name ?? "Mwenyekiti"} · ${new Date(event.approved_at).toLocaleDateString("sw-TZ")}`
+                    : "Inasubiri idhini"}
+                  {event.rejection_reason && ` · Sababu: ${event.rejection_reason}`}
+                </p>
+              </div>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span
+                className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                  stats.paid_count > 0 ? "bg-success text-white" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                3
+              </span>
+              <div className="text-xs">
+                <p className="font-semibold">
+                  Michango ya Wanachama — {stats.paid_count} wamelipa
+                </p>
+                <p className="text-muted-foreground">
+                  {tzs(stats.total_paid)} zimekusanywa
+                  {stats.pending_count > 0 && ` · ${stats.pending_count} bado`}
+                </p>
+              </div>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span
+                className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                  event.status === "COMPLETED" ? "bg-success text-white" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                4
+              </span>
+              <div className="text-xs">
+                <p className="font-semibold">
+                  {event.status === "COMPLETED"
+                    ? `Fedha zimetolewa kwa ${event.member?.full_name ?? "mwanachama"}`
+                    : "Utoaji wa fedha kwa mwanachama"}
+                </p>
+                <p className="text-muted-foreground">
+                  {event.completed_at
+                    ? new Date(event.completed_at).toLocaleDateString("sw-TZ")
+                    : event.status === "APPROVED"
+                      ? "Michango ikikamilika, Mweka Hazina atatoa fedha"
+                      : "Inasubiri hatua zilizopita"}
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+
         {/* Contributions */}
         {contributions.length > 0 && (
           <div>

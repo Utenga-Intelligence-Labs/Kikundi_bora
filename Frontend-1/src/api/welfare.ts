@@ -40,6 +40,7 @@ export interface WelfareEvent {
   status: WelfareEventStatus;
   created_by: string;
   approved_by?: string;
+  approved_at?: string;
   rejected_by?: string;
   rejection_reason?: string;
   completed_at?: string;

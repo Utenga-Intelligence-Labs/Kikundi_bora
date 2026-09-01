@@ -34,16 +34,6 @@ func newRoleTestApp(role models.Role) *fiber.App {
 	app.Delete("/payment-methods/:pmId", RequireRoles(models.RoleChair, models.RoleTreasurer), func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"ok": true})
 	})
-	// Social funds: mwenyekiti creates/closes, katibu approves, hazina confirms
-	app.Post("/social-funds", RequireRoles(models.RoleChair), func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"ok": true})
-	})
-	app.Post("/social-funds/:id/approve", RequireRoles(models.RoleSecretary), func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"ok": true})
-	})
-	app.Post("/social-funds/:id/confirm", RequireRoles(models.RoleTreasurer), func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"ok": true})
-	})
 	return app
 }
 
@@ -115,35 +105,6 @@ func TestRequireRolesPaymentMethodPermissions(t *testing.T) {
 	}
 }
 
-// Social-fund permission matrix:
-//   - create/close fund: mwenyekiti (chair) only
-//   - approve fund: katibu (secretary) only
-//   - confirm contribution: mweka hazina (treasurer) only
-//   - member: none of the above (contribute endpoint has no role guard —
-//     any authenticated member contributes; enforced via member row check)
 func TestRequireRolesSocialFundPermissions(t *testing.T) {
-	cases := []struct {
-		role    models.Role
-		create  int
-		approve int
-		confirm int
-	}{
-		{models.RoleChair, 200, 403, 403},
-		{models.RoleSecretary, 403, 200, 403},
-		{models.RoleTreasurer, 403, 403, 200},
-		{models.RoleMember, 403, 403, 403},
-		{models.RoleAdmin, 200, 200, 200}, // admin bypasses
-	}
-	for _, tc := range cases {
-		app := newRoleTestApp(tc.role)
-		if got := testRequest(t, app, "POST", "/social-funds"); got != tc.create {
-			t.Errorf("role=%s create social fund: got %d, want %d", tc.role, got, tc.create)
-		}
-		if got := testRequest(t, app, "POST", "/social-funds/f-1/approve"); got != tc.approve {
-			t.Errorf("role=%s approve social fund: got %d, want %d", tc.role, got, tc.approve)
-		}
-		if got := testRequest(t, app, "POST", "/social-funds/f-1/confirm"); got != tc.confirm {
-			t.Errorf("role=%s confirm contribution: got %d, want %d", tc.role, got, tc.confirm)
-		}
-	}
+	t.Skip("social funds feature removed — welfare events (/mfuko-kijamii) is the single Mfuko wa Kijamii feature")
 }

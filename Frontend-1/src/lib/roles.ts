@@ -1,5 +1,5 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Layers } from "lucide-react";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark } from "lucide-react";
 import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
@@ -13,7 +13,6 @@ export const memberNav: NavItem[] = [
   { to: "/dashibodi", label: "Dashboard Yangu", icon: Home },
   { to: "/michango-yangu", label: "Michango Yangu", icon: PiggyBank },
   { to: "/weka-mchango", label: "Weka Mchango", icon: Banknote },
-  { to: "/mifuko", label: "Mifuko", icon: Layers },
   { to: "/mikopo", label: "Mikopo Yangu", icon: Banknote },
   { to: "/historia-yangu", label: "Historia Yangu", icon: Receipt },
   { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
