@@ -14,6 +14,14 @@ import (
 func Seed() {
 	EnsureLeadershipSetup()
 
+	// SEC-M01: demo credentials (demo123) must never exist in production.
+	// Gate the whole demo seed behind a non-production environment.
+	if os.Getenv("ENVIRONMENT") == "production" {
+		log.Println("ENVIRONMENT=production — skipping demo seed entirely")
+		log.Println("Seed complete (production-safe: no demo data)")
+		return
+	}
+
 	var userCount int64
 	DB.Model(&models.User{}).Count(&userCount)
 	if userCount == 0 {
