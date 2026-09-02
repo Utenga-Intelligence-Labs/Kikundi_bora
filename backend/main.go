@@ -311,7 +311,7 @@ func main() {
 	ledgerRoutes.Get("/balance", ledgerHandler.GetBalance)
 	ledgerRoutes.Get("/statement", ledgerHandler.GetStatement)
 	ledgerRoutes.Get("/trial-balance", ledgerHandler.GetTrialBalance)
-	ledgerRoutes.Post("/replay", ledgerHandler.Replay)
+	ledgerRoutes.Post("/replay", middleware.RequireRoles(models.RoleAdmin), ledgerHandler.Replay)
 
 	// Reports routes (Chair only)
 	reports := protected.Group("/reports")
@@ -333,8 +333,8 @@ func main() {
 	michango.Get("/members-summary", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.MembersSummary)
 	michango.Get("/pending", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.PendingContributions)
 	michango.Get("/", middleware.RequireRoles(models.RoleTreasurer, models.RoleSecretary), memberContribHandler.AllContributions)
-	michango.Post("/:id/confirm", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.Confirm)
-	michango.Post("/:id/reject", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberContribHandler.Reject)
+	michango.Post("/:id/confirm", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), memberContribHandler.Confirm)
+	michango.Post("/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), memberContribHandler.Reject)
 
 	// Leadership routes (dual plane — members with leadership roles)
 	uongozi := protected.Group("/uongozi")

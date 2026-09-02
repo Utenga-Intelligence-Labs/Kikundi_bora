@@ -670,7 +670,6 @@ func (h *WelfareHandler) GetEvent(c *fiber.Ctx) error {
 
 func (h *WelfareHandler) MyContributions(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-	role := middleware.GetUserRole(c)
 
 	var pq models.PaginationQuery
 	if err := c.QueryParser(&pq); err != nil {
@@ -682,12 +681,9 @@ func (h *WelfareHandler) MyContributions(c *fiber.Ctx) error {
 	// Find the member record for this user
 	var member models.Member
 	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&member).Error; err != nil {
-		// If user is not a member, return empty
-		if role == models.RoleMember {
-			return c.JSON(fiber.Map{"data": []interface{}{}, "total": 0, "page": 1, "limit": 20})
-		}
-		// For non-member roles, show all contributions
-		return h.listAllContributions(c, pq, status)
+		// L-2: non-members get an EMPTY list — the previous fallback leaked
+		// all contributions to any non-member role hitting /my-contributions.
+		return c.JSON(fiber.Map{"data": []models.WelfareContribution{}, "total": 0, "page": pq.Page, "limit": pq.Limit})
 	}
 
 	query := database.DB.
