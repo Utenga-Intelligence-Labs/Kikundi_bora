@@ -133,3 +133,30 @@ No `NIDA` field exists (`grep NIDA = 0`). `Password json:"-"` `models/user.go:44
 ---
 
 *Generated from static review of `backend/config`, `backend/middleware`, `backend/handlers`, `backend/models`, `backend/services`, `Frontend-1/src`, `Frontend-1/nginx.conf`, `docker-compose.yml`. All findings reference verified `file:line`.*
+
+---
+
+## ✅ REMEDIATION STATUS (updated 2026-09-02)
+
+All actionable findings have been fixed and pushed. Reference commits (in order):
+
+| Finding(s) | Commit | Fix |
+|---|---|---|
+| AUTH-01, SEC-C01/H01 | *(on-disk .env — untracked)* | Secrets rotated (DB/JWT/admin), `DISABLE_LOGIN_RATE_LIMIT` removed |
+| RBAC-H01 | `cca0479` | `GET /welfare/contributions` guarded to leadership |
+| DATA-H02, AUTH-02 | `4f12815` | Logger redacts secrets; `?token=` scoped to `/uploads/*`; no-store |
+| DATA-H01 | `4c1a265` | Backups encrypted AES-256-GCM; plaintext zip removed; download decrypts in memory |
+| RBAC-M01 | `1a1e843` | `IsCurrentGroup` tenant check on all group-scoped handlers (404 foreign IDs) |
+| AUTH-04, AUTH-05 | `d2f02f6` | Login responses unified; password min length 6→8 consistent |
+| VAL-M01 | `868fd76` | validate tags on michango submit, ledger DTOs, profile/member updates |
+| VAL-M02, FILE-M01 | `7d1e783` | Loans CSV 10MB cap; upload magic-byte/WEBP/MkdirAll hardening |
+| SEC-M01 | `ab1dc93` | Demo seed gated by ENVIRONMENT=production; POSTGRES_PASSWORD required |
+| TLS-02, SEC-M01, CORS-M01 | `01a324b` | CSP directives, HSTS preload, CORS `*` rejected, nginx CSP/DENY/Permissions-Policy |
+| RBAC-M02/M-3 | `2e4ca56` | `RequireSelfOrLeadership` middleware on roles + member-summary routes |
+| L-1, L-2, M-4, L-6 | `3130cf1` | michango route alignment; welfare fallback leak; ledger replay admin-only; announcements to active members |
+
+**Remaining (documented, intentionally not fixed in code):**
+- TLS-01: HTTPS requires a real certificate + domain — infrastructure task at deploy time (nginx `listen 443 ssl`; HSTS line is pre-written and commented in nginx.conf).
+- DATA-M01 masking: payment-method numbers must remain visible to members (they need them to pay); member lists are leadership-only, so per-role DTO masking was judged unnecessary for v1.
+- L-7 backup disk quota: rate limited to 5/hour/admin; monitor in production.
+- `social_funds`/`social_fund_contributions` tables remain in the DB but are unused (feature consolidated into welfare events) — safe to DROP manually.
