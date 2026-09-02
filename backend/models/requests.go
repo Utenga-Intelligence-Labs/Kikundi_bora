@@ -35,10 +35,10 @@ type MeResponse struct {
 }
 
 type UpdateProfileRequest struct {
-	Name      *string `json:"name"`
-	Phone     *string `json:"phone"`
-	AvatarURL *string `json:"avatar_url"`
-	Bio       *string `json:"bio"`
+	Name      *string `json:"name" validate:"omitempty,min=2,max=100"`
+	Phone     *string `json:"phone" validate:"omitempty,min=9,max=15"`
+	AvatarURL *string `json:"avatar_url" validate:"omitempty,url,max=500"`
+	Bio       *string `json:"bio" validate:"omitempty,max=500"`
 }
 
 type ResetPasswordRequest struct {
@@ -66,9 +66,9 @@ type RejectMemberRequest struct {
 }
 
 type UpdateMemberRequest struct {
-	FullName *string `json:"full_name"`
-	Phone    *string `json:"phone"`
-	Address  *string `json:"address"`
+	FullName *string `json:"full_name" validate:"omitempty,min=2,max=150"`
+	Phone    *string `json:"phone" validate:"omitempty,min=9,max=15"`
+	Address  *string `json:"address" validate:"omitempty,max=500"`
 	IsActive *bool   `json:"is_active"`
 }
 

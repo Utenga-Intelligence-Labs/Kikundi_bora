@@ -36,16 +36,19 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 
 	// Parse request
 	var req struct {
-		ContributionType string  `json:"contribution_type"`
-		PeriodLabel      string  `json:"period_label"`
-		Amount           decimal.Decimal `json:"amount"`
-		ProofImageURL    string  `json:"proof_image_url"`
-		ProofMessage     string  `json:"proof_message"`
-		WelfareEventID   string  `json:"welfare_event_id"`
+		ContributionType string          `json:"contribution_type" validate:"required,oneof=AKIBA MFUKO_WA_KIJAMII"`
+		PeriodLabel      string          `json:"period_label" validate:"required,max=30"`
+		Amount           decimal.Decimal `json:"amount" validate:"required,gt=0"`
+		ProofImageURL    string          `json:"proof_image_url" validate:"omitempty,url,max=500"`
+		ProofMessage     string          `json:"proof_message" validate:"omitempty,max=1000"`
+		WelfareEventID   string          `json:"welfare_event_id" validate:"omitempty,uuid"`
 	}
 
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+	if err := validate.Struct(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 
 	// Validate

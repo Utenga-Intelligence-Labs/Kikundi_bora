@@ -62,15 +62,18 @@ func ledgerError(c *fiber.Ctx, err error) error {
 
 // OpenAccount godoc: POST /admin/ledger/accounts
 type openAccountRequest struct {
-	Name           string `json:"name"`
-	Type           string `json:"type"`
-	OwnerMemberRef string `json:"owner_member_ref,omitempty"`
+	Name           string `json:"name" validate:"required,min=2,max=100"`
+	Type           string `json:"type" validate:"required,oneof=asset liability income expense equity"`
+	OwnerMemberRef string `json:"owner_member_ref,omitempty" validate:"omitempty,max=100"`
 }
 
 func (h *LedgerHandler) OpenAccount(c *fiber.Ctx) error {
 	var req openAccountRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+	if err := validate.Struct(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 	typ := ledger.AccountType(req.Type)
 	id, err := h.lg.OpenAccount(c.Context(), h.groupID, actorUUID(c), time.Now().UTC(),
@@ -83,20 +86,23 @@ func (h *LedgerHandler) OpenAccount(c *fiber.Ctx) error {
 
 // RecordTransaction godoc: POST /admin/ledger/transactions
 type entryRequest struct {
-	AccountName string `json:"account_name"`
-	Direction   string `json:"direction"`
-	AmountMinor int64  `json:"amount_minor"` // whole TZS shillings as integer
+	AccountName string `json:"account_name" validate:"required,max=100"`
+	Direction   string `json:"direction" validate:"required,oneof=debit credit"`
+	AmountMinor int64  `json:"amount_minor" validate:"required,gt=0"` // whole TZS shillings as integer
 }
 type recordTxRequest struct {
-	Memo       string         `json:"memo"`
+	Memo       string         `json:"memo" validate:"required,max=500"`
 	OccurredAt *time.Time     `json:"occurred_at,omitempty"` // backdated corrections allowed
-	Entries    []entryRequest `json:"entries"`
+	Entries    []entryRequest `json:"entries" validate:"required,min=1,max=50,dive"`
 }
 
 func (h *LedgerHandler) RecordTransaction(c *fiber.Ctx) error {
 	var req recordTxRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+	if err := validate.Struct(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 	entries := make([]ledger.Entry, len(req.Entries))
 	for i, e := range req.Entries {
