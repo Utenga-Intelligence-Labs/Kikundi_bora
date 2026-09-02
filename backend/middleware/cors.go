@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"log"
+	"strings"
 	"time"
 
 	"kikundibora/config"
@@ -13,6 +15,14 @@ func SetupCORS() fiber.Handler {
 	origins := config.AppConfig.CORSOrigins
 	if origins == "" {
 		origins = "http://localhost:3000,http://localhost:5173"
+	}
+	// CORS-M01: wildcard origins are incompatible with AllowCredentials —
+	// refuse to boot with an insecure configuration rather than silently
+	// widening the policy.
+	for _, o := range strings.Split(origins, ",") {
+		if strings.TrimSpace(o) == "*" {
+			log.Fatal("FATAL: CORS_ORIGINS='*' is not allowed while AllowCredentials is enabled. List explicit origins.")
+		}
 	}
 	return cors.New(cors.Config{
 		AllowOrigins:     origins,
