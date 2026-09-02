@@ -187,27 +187,29 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		query = query.Where("phone = ?", loginID)
 	}
 
+	// SECURITY (AUTH-04): status differentiation removed — pending,
+	// rejected, suspended, deactivated and wrong-password all return the
+	// SAME generic 401 so attackers cannot enumerate account states.
+	// Password is still verified first where applicable; ordering below
+	// reveals nothing extra since every path returns an identical body.
 	if err := query.First(&user).Error; err != nil {
 		h.recordFailedLogin(loginID, ip, c.Get("User-Agent"))
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
 	}
 
-	// Check user status
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		h.recordFailedLogin(loginID, ip, c.Get("User-Agent"))
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
+	}
+
+	// Status checks AFTER password verification, all returning the same
+	// generic body (no state disclosure):
 	switch user.Status {
-	case models.UserStatusPending:
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Akaunti yako bado haijakaguliwa na Katibu. Subiri uidhinishwe."})
-	case models.UserStatusRejected:
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Akaunti yako imekataliwa. Wasiliana na Mwenyekiti."})
-	case models.UserStatusSuspended:
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Akaunti yamesimamishwa. Wasiliana na msimamizi."})
+	case models.UserStatusPending, models.UserStatusRejected, models.UserStatusSuspended:
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
 	}
 
 	if !user.IsActive {
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Akaunti hii imezimwa"})
-	}
-
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		h.recordFailedLogin(loginID, ip, c.Get("User-Agent"))
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
 	}
 
@@ -261,8 +263,8 @@ func (h *AuthHandler) FirstLoginSetup(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri hazifanani"})
 	}
 
-	if len(req.NewPassword) < 6 {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri lazima liwe na angalau herufi 6"})
+	if len(req.NewPassword) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Nenosiri lazima liwe na angalau herufi 8"})
 	}
 
 	var user models.User
