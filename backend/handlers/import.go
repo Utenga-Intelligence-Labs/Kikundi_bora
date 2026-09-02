@@ -190,6 +190,8 @@ func (h *ImportHandler) ImportContributions(c *fiber.Ctx) error {
 // CSV format: member_code, amount, purpose, due_date, status, approved_amount
 // Example: KKK-0001, 200000, Biashara, 2024-12-31, CLOSED, 200000
 func (h *ImportHandler) ImportLoans(c *fiber.Ctx) error {
+	// VAL-M02: same 10MB cap as the contributions import
+	const maxCSVSize = 10 * 1024 * 1024
 	userID := middleware.GetUserID(c)
 
 	file, err := c.FormFile("file")
@@ -213,7 +215,11 @@ func (h *ImportHandler) ImportLoans(c *fiber.Ctx) error {
 	}
 	defer src.Close()
 
-	reader := csv.NewReader(src)
+	// VAL-M02: cap the loans CSV like the contributions import — an
+	// unbounded ReadAll on an attacker-supplied file is a DoS vector.
+	limitedReader := io.LimitReader(src, maxCSVSize+1)
+
+	reader := csv.NewReader(limitedReader)
 	records, err := reader.ReadAll()
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

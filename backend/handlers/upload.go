@@ -41,6 +41,12 @@ var imageMagicBytes = map[string]string{
 	"RIFF":              ".webp",
 }
 
+// isWebP verifies the full RIFF container signature: "RIFF" at 0 and
+// "WEBP" at offset 8 (FILE-M01: bare "RIFF" also matches WAV/AVI).
+func isWebP(data []byte) bool {
+	return len(data) >= 12 && string(data[0:4]) == "RIFF" && string(data[8:12]) == "WEBP"
+}
+
 // magic bytes for common document types
 var docMagicBytes = map[string][]byte{
 	".pdf":  {0x25, 0x50, 0x44, 0x46},
@@ -98,6 +104,12 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Aina ya faili hairuhusiwi. Tumia JPG, PNG, GIF au WebP"})
 	}
 
+	// FILE-M01: ensure the avatars directory exists (first upload on a
+	// clean volume previously failed)
+	if err := os.MkdirAll(filepath.Join("uploads", "avatars"), 0750); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuandaa hifadhi"})
+	}
+
 	// Verify magic bytes
 	src, err := file.Open()
 	if err != nil {
@@ -106,20 +118,25 @@ func (h *UploadHandler) UploadAvatar(c *fiber.Ctx) error {
 	defer src.Close()
 
 	header := make([]byte, 12)
-	if _, err := src.Read(header); err != nil {
+	n, readErr := src.Read(header)
+	if readErr != nil || n < 4 {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Faili imeharibika"})
 	}
 
-	detected := detectContentType(header)
+	detected := detectContentType(header[:n])
 	if detected != "" && detected != ext {
 		// Allow .jpeg/.jpg mismatch
 		if !(detected == ".jpg" && ext == ".jpeg") && !(detected == ".jpeg" && ext == ".jpg") {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Aina ya faili haifanani na yaliyomo"})
 		}
 	}
+	// FILE-M01: strict WEBP container check
+	if ext == ".webp" && !isWebP(header[:n]) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Faili si picha ya WebP halali"})
+	}
 
 	// Verify content type via http.DetectContentType
-	contentType := http.DetectContentType(header)
+	contentType := http.DetectContentType(header[:n])
 	if !strings.HasPrefix(contentType, "image/") {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Faili si picha halali"})
 	}
@@ -177,9 +194,26 @@ func (h *UploadHandler) UploadDoc(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusoma faili"})
 		}
 		header := make([]byte, 12)
-		n, _ := src.Read(header)
+		n, readErr := src.Read(header)
 		src.Close()
-		if n > 0 && !verifyDocMagicBytes(header[:n], ext) {
+		// FILE-M01: check ALL uploads — images sent through /upload/doc
+		// previously skipped verification entirely
+		if readErr != nil || n < 4 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Faili imeharibika"})
+		}
+		if allowedImageTypes[ext] {
+			detected := detectContentType(header[:n])
+			if detected != "" && detected != ext &&
+				!(detected == ".jpg" && ext == ".jpeg") && !(detected == ".jpeg" && ext == ".jpg") {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Aina ya faili haifanani na yaliyomo"})
+			}
+			if ext == ".webp" && !isWebP(header[:n]) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Faili si picha ya WebP halali"})
+			}
+			if !strings.HasPrefix(http.DetectContentType(header[:n]), "image/") {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Faili si picha halali"})
+			}
+		} else if !verifyDocMagicBytes(header[:n], ext) {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Aina ya faili haifanani na yaliyomo"})
 		}
 	}
