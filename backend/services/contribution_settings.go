@@ -312,3 +312,19 @@ func RunContributionDueCheck() {
 		}
 	}
 }
+
+// CleanupExpiredSessions deletes login sessions whose server-side expiry
+// has passed (AUTH-03: user_sessions previously grew unbounded).
+func CleanupExpiredSessions() {
+	res := database.DB.
+		Where("expires_at < ?", time.Now().
+			Add(-24*time.Hour)). // grace window: recently expired still visible for audit
+		Delete(&models.UserSession{})
+	if res.Error != nil {
+		log.Printf("ERROR: Failed to purge expired sessions: %v", res.Error)
+		return
+	}
+	if res.RowsAffected > 0 {
+		log.Printf("Scheduler: purged %d expired sessions", res.RowsAffected)
+	}
+}

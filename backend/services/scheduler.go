@@ -26,11 +26,13 @@ func StartScheduler() {
 		// is not missed, then keep ticking.
 		time.Sleep(10 * time.Second)
 		RunContributionDueCheck()
+		CleanupExpiredSessions()
 
 		ticker := time.NewTicker(30 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
 			RunContributionDueCheck()
+			CleanupExpiredSessions()
 		}
 	}()
 }

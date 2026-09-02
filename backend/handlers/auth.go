@@ -533,6 +533,18 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	role := middleware.GetUserRole(c)
 
+	// AUTH-03 (rotation): revoke the token the client just used, then mint
+	// a fresh one. A stolen/reused refresh call revokes itself on first use
+	// and cannot mint further tokens with the same presentation.
+	oldHeader := c.Get("Authorization")
+	if strings.HasPrefix(oldHeader, "Bearer ") {
+		oldHash := sha256Hex(strings.TrimPrefix(oldHeader, "Bearer "))
+		now := time.Now()
+		database.DB.Model(&models.UserSession{}).
+			Where("user_id = ? AND token_hash = ? AND revoked_at IS NULL", userID, oldHash).
+			Update("revoked_at", now)
+	}
+
 	token, expiresAt := h.generateToken(userID, role)
 	if token == "" {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza tokeni"})

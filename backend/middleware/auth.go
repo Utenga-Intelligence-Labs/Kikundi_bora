@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"time"
 
 	"kikundibora/config"
 	"kikundibora/database"
@@ -63,17 +64,24 @@ func AuthRequired(c *fiber.Ctx) error {
 		})
 	}
 
-	// Check if token session has been revoked (logout)
+	// AUTH-03: single session lookup replaces the two separate Count
+	// queries — enforces revocation AND server-side expiry (previously
+	// only the JWT exp was trusted), and slides LastActiveAt forward.
 	tokenHash := fmt.Sprintf("%x", sha256.Sum256([]byte(tokenStr)))
-	var revoked int64
-	database.DB.Model(&models.UserSession{}).
-		Where("user_id = ? AND token_hash = ? AND revoked_at IS NOT NULL", userID, tokenHash).
-		Count(&revoked)
-	if revoked > 0 {
+	var session models.UserSession
+	if err := database.DB.
+		Where("user_id = ? AND token_hash = ?", userID, tokenHash).
+		First(&session).Error; err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"message": "Kipindi kimeisha. Tafadhali ingia tena.",
 		})
 	}
+	if session.RevokedAt != nil || time.Now().After(session.ExpiresAt) {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Kipindi kimeisha. Tafadhali ingia tena.",
+		})
+	}
+	database.DB.Model(&session).Update("last_active_at", time.Now())
 
 	// Verify role from database to prevent stale role from JWT
 	var user models.User
