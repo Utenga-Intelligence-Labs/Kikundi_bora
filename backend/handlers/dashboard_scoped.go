@@ -56,6 +56,10 @@ var errGroupNotFound = errors.New("kikundi not found")
 // row is rejected.
 func loadGroupOr404(c *fiber.Ctx) (*models.Group, error) {
 	id := c.Params("id")
+	// RBAC-M01 tenant check: reject foreign group IDs with 404.
+	if ok, err := database.IsCurrentGroup(id); err != nil || !ok {
+		return nil, errGroupNotFound
+	}
 	var group models.Group
 	if err := database.DB.Where("id = ?", id).First(&group).Error; err != nil {
 		return nil, errGroupNotFound

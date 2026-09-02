@@ -35,3 +35,14 @@ func GetCurrentGroup() (*models.Group, error) {
 	}
 	return &g, nil
 }
+
+// IsCurrentGroup reports whether :id refers to this deployment's group.
+// RBAC-M01: group-scoped endpoints must reject foreign IDs with 404 even
+// if a second group ever appears in the table.
+func IsCurrentGroup(id string) (bool, error) {
+	g, err := GetCurrentGroup()
+	if err != nil {
+		return false, err
+	}
+	return g.ID == id, nil
+}

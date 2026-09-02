@@ -48,10 +48,16 @@ func validatePaymentMethodRequest(req *paymentMethodRequest, requireAll bool) er
 }
 
 // loadGroupForPaymentMethods resolves the :id group or sends a 404.
-// Returns nil if the response was already written.
+// Returns nil if the response was already written. RBAC-M01 tenant check
+// included.
 func loadGroupForPaymentMethods(c *fiber.Ctx) *models.Group {
+	id := c.Params("id")
+	if ok, err := database.IsCurrentGroup(id); err != nil || !ok {
+		c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+		return nil
+	}
 	var g models.Group
-	if err := database.DB.First(&g, "id = ?", c.Params("id")).Error; err != nil {
+	if err := database.DB.First(&g, "id = ?", id).Error; err != nil {
 		c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
 		return nil
 	}

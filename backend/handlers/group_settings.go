@@ -44,6 +44,9 @@ func (h *GroupSettingsHandler) GetCurrent(c *fiber.Ctx) error {
 // GET /api/v1/groups/:id/contribution-settings — any authenticated user
 // (members need read-only settings for the submission form and banners).
 func (h *GroupSettingsHandler) GetSettings(c *fiber.Ctx) error {
+	if ok, err := database.IsCurrentGroup(c.Params("id")); err != nil || !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+	}
 	var g models.Group
 	if err := database.DB.First(&g, "id = ?", c.Params("id")).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
@@ -136,6 +139,9 @@ func (h *GroupSettingsHandler) Propose(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
 	}
 
+	if ok, err := database.IsCurrentGroup(c.Params("id")); err != nil || !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+	}
 	var g models.Group
 	if err := database.DB.First(&g, "id = ?", c.Params("id")).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
@@ -185,6 +191,9 @@ func (h *GroupSettingsHandler) Propose(c *fiber.Ctx) error {
 // POST /api/v1/groups/:id/contribution-settings/approve — Katibu only.
 // Applies the pending proposal to the group settings.
 func (h *GroupSettingsHandler) Approve(c *fiber.Ctx) error {
+	if ok, err := database.IsCurrentGroup(c.Params("id")); err != nil || !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+	}
 	var g models.Group
 	if err := database.DB.First(&g, "id = ?", c.Params("id")).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
@@ -236,6 +245,9 @@ func (h *GroupSettingsHandler) Reject(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Sababu ya kukataa inahitajika"})
 	}
 
+	if ok, err := database.IsCurrentGroup(c.Params("id")); err != nil || !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+	}
 	var g models.Group
 	if err := database.DB.First(&g, "id = ?", c.Params("id")).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
