@@ -188,13 +188,17 @@ func main() {
 	// Chair may reset non-admin user passwords (temp returned once); not full admin powers
 	users.Post("/:id/reset-password", middleware.RequireRoles(models.RoleChair), userMgmtHandler.ResetUserPassword)
 	// Roles a user holds (self / leadership / admin — used for the role-switch toggle)
-	users.Get("/:id/roles", dashHandler.UserRoles)
+	users.Get("/:id/roles", middleware.RequireSelfOrLeadership(func(c *fiber.Ctx) (string, string) {
+		return "", c.Params("id")
+	}), dashHandler.UserRoles)
 
 	members := protected.Group("/members")
 	members.Get("/", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberHandler.List)
 	members.Get("/:id", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), memberHandler.Get)
 	// Role-scoped dashboard summaries (self / leadership / admin — see handler)
-	members.Get("/:id/dashboard-summary", dashHandler.MemberSummary)
+	members.Get("/:id/dashboard-summary", middleware.RequireSelfOrLeadership(func(c *fiber.Ctx) (string, string) {
+		return c.Params("id"), ""
+	}), dashHandler.MemberSummary)
 	members.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), memberHandler.Create)
 	members.Patch("/:id/approve", middleware.RequireRoles(models.RoleSecretary), memberHandler.ApproveMember)
 	members.Patch("/:id/reject", middleware.RequireRoles(models.RoleSecretary), memberHandler.RejectMember)
