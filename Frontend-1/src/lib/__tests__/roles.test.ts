@@ -2,20 +2,20 @@ import { describe, it, expect } from "vitest";
 import { getSidebarNav, mobileNav, sidebarNav, roleSubtitle } from "../roles";
 
 describe("sidebarNav", () => {
-  it("Mwenyekiti has 11 items", () => {
-    expect(sidebarNav["Mwenyekiti"]).toHaveLength(11);
+  it("Mwenyekiti has 12 items", () => {
+    expect(sidebarNav["Mwenyekiti"]).toHaveLength(12);
   });
 
-  it("Mweka Hazina has 10 items", () => {
-    expect(sidebarNav["Mweka Hazina"]).toHaveLength(10);
+  it("Mweka Hazina has 11 items", () => {
+    expect(sidebarNav["Mweka Hazina"]).toHaveLength(11);
   });
 
-  it("Katibu has 9 items", () => {
-    expect(sidebarNav["Katibu"]).toHaveLength(9);
+  it("Katibu has 10 items", () => {
+    expect(sidebarNav["Katibu"]).toHaveLength(10);
   });
 
-  it("Mwanachama has 5 items", () => {
-    expect(sidebarNav["Mwanachama"]).toHaveLength(5);
+  it("Mwanachama has 6 items", () => {
+    expect(sidebarNav["Mwanachama"]).toHaveLength(6);
   });
 
   it("Msimamizi has 3 items", () => {
@@ -37,20 +37,20 @@ describe("sidebarNav", () => {
 
 describe("getSidebarNav", () => {
   it("returns same items for Mwenyekiti regardless of committee", () => {
-    expect(getSidebarNav("Mwenyekiti", false)).toHaveLength(11);
-    expect(getSidebarNav("Mwenyekiti", true)).toHaveLength(11);
+    expect(getSidebarNav("Mwenyekiti", false)).toHaveLength(12);
+    expect(getSidebarNav("Mwenyekiti", true)).toHaveLength(12);
   });
 
   it("inserts committee item for Mwanachama who is committee member", () => {
     const items = getSidebarNav("Mwanachama", true);
-    expect(items).toHaveLength(6);
+    expect(items).toHaveLength(7);
     expect(items[1].label).toBe("Kamati ya Mikopo");
     expect(items[1].to).toBe("/kamati-mikopo");
   });
 
   it("does not insert committee item for non-committee Mwanachama", () => {
     const items = getSidebarNav("Mwanachama", false);
-    expect(items).toHaveLength(5);
+    expect(items).toHaveLength(6);
     const labels = items.map((i) => i.label);
     expect(labels).not.toContain("Kamati ya Mikopo");
   });

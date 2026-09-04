@@ -145,6 +145,11 @@ func cleanAndSeed() {
 		"DELETE FROM pending_actions",
 		"DELETE FROM welfare_contributions",
 		"DELETE FROM welfare_events",
+		"DELETE FROM meeting_attendances",
+		"DELETE FROM meetings",
+		"DELETE FROM fines",
+		"DELETE FROM contribution_cycles",
+		"DELETE FROM fine_offence_types",
 		"DELETE FROM group_setting_proposals",
 		"DELETE FROM members",
 		"DELETE FROM users",
@@ -168,13 +173,14 @@ func TestLoanLifecycleHTTP(t *testing.T) {
 	treasurer := hLogin(t, app, "fatuma@kikundi.tz", "demo123")
 	secretary := hLogin(t, app, "rashidi@kikundi.tz", "demo123")
 
-	// Get member
-	_, d := hGet(t, app, "/api/v1/members", chair)
-	var ml struct{ Data []struct{ ID string `json:"id"` } `json:"data"` }
-	json.Unmarshal(d, &ml)
-	memberID := ml.Data[0].ID
+	// Get member — the long-standing seed member (joined 2024) carries
+	// ample arrears so allocation order is exercised deterministically.
+	var seedMember models.Member
+	database.DB.Where("deleted_at IS NULL").Order("member_no ASC").First(&seedMember)
+	memberID := seedMember.ID
 
 	// Step 1: Apply
+	fundTreasury(500000) // loan approval requires treasury coverage
 	code, d := hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
 		"member_id": memberID, "amount": 200000.0, "purpose": "Kilimo", "due_date": "2026-12-31",
 	}, chair)
@@ -241,6 +247,7 @@ func TestNegativeScenarios(t *testing.T) {
 	json.Unmarshal(d, &ml)
 	memberID := ml.Data[0].ID
 
+	fundTreasury(500000) // loan approval requires treasury coverage
 	code, d := hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
 		"member_id": memberID, "amount": 50000.0, "purpose": "Test", "due_date": "2026-12-31",
 	}, chair)
@@ -311,16 +318,29 @@ func TestNegativeScenarios(t *testing.T) {
 func TestContributionFlow(t *testing.T) {
 	app := fullTestApp()
 	cleanAndSeed()
+	cleanObligationTables()
+	// Hermetic group schedule: fixed 10000/monthly due on the 5th, so the
+	// seeded members (joined 2024) carry ample arrears for allocation.
+	var grp models.Group
+	database.DB.First(&grp)
+	amt10000 := decimal.NewFromInt(10000)
+	due05 := "05"
+	grp.FixedContributionAmount = &amt10000
+	grp.ContributionDueDate = &due05
+	grp.ContributionInterval = models.IntervalMonthly
+	database.DB.Save(&grp)
 
-	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
+	_ = hLogin(t, app, "juma@kikundi.tz", "demo123")
 	treasurer := hLogin(t, app, "fatuma@kikundi.tz", "demo123")
 
-	_, d := hGet(t, app, "/api/v1/members", chair)
-	var ml struct{ Data []struct{ ID string `json:"id"` } `json:"data"` }
-	json.Unmarshal(d, &ml)
-	memberID := ml.Data[0].ID
+	// Long-standing seed member (joined 2024) carries ample arrears, so
+	// allocation order is exercised deterministically (list order is
+	// unstable and may return a recently-backfilled member with no arrears).
+	var seedMemberCF models.Member
+	database.DB.Where("deleted_at IS NULL").Order("member_no ASC").First(&seedMemberCF)
+	memberID := seedMemberCF.ID
 
-	// Record a contribution
+	// Record a contribution (allocated across obligations; receipt returned)
 	code, d := hPost(t, app, "/api/v1/contributions", map[string]interface{}{
 		"member_id":      memberID,
 		"amount":         30000.0,
@@ -331,28 +351,36 @@ func TestContributionFlow(t *testing.T) {
 	if code != 201 {
 		t.Fatalf("contribution failed: %d %s", code, d)
 	}
-	contribID := hExtract(t, d, "data")
-	t.Logf("Contribution recorded: %s", contribID)
+	var receipt struct {
+		Data services.AllocationReceipt `json:"data"`
+	}
+	json.Unmarshal(d, &receipt)
+	if receipt.Data.Applied.String() != "30000" {
+		t.Errorf("applied = %s, want 30000", receipt.Data.Applied)
+	}
+	t.Logf("Contribution allocated: %+v", receipt.Data.Lines)
 
-	// Verify in DB
-	var c models.Contribution
-	database.DB.First(&c, "id = ?", contribID)
-	if !c.Amount.Equal(decimal.NewFromInt(30000)) {
-		t.Errorf("amount mismatch: %s", c.Amount)
+	// Verify reconciled rows in DB (allocation creates/merges month rows)
+	var total string
+	database.DB.Raw("SELECT COALESCE(SUM(amount),0)::text FROM contributions WHERE member_id = ?", memberID).Scan(&total)
+	totalDec, _ := decimal.NewFromString(total)
+	if !totalDec.Equal(decimal.NewFromInt(30000)) {
+		t.Errorf("contributions total = %s, want 30000", total)
 	}
 
-	// Try duplicate (same member + month)
+	// Second payment for the same month no longer conflicts — it flows to
+	// the next outstanding obligation (allocation order).
 	code, d = hPost(t, app, "/api/v1/contributions", map[string]interface{}{
 		"member_id":      memberID,
-		"amount":         30000.0,
+		"amount":         5000.0,
 		"month":          "2026-07",
-		"paid_at":        "2026-07-11",
+		"paid_at":        "2026-07-12",
 		"payment_method": "CASH",
 	}, treasurer)
-	if code == 201 {
-		t.Error("duplicate contribution should fail")
+	if code != 201 {
+		t.Errorf("second payment should allocate, got: %d %s", code, d)
 	} else {
-		t.Logf("duplicate contribution: %d (expected non-201)", code)
+		t.Logf("second payment allocated: %d", code)
 	}
 }
 
@@ -361,6 +389,14 @@ func TestContributionFlow(t *testing.T) {
 func TestLoginRateLimiting(t *testing.T) {
 	app := fullTestApp()
 	cleanAndSeed()
+	// Rate limiting must actually engage: the local .env disables it for
+	// dev convenience, and the login handler auto-bypasses when config
+	// Environment == "test" (so suites never lock themselves out).
+	// Both bypasses are lifted for the duration of this test only.
+	defer withLoginRateLimitEnabled()()
+	prevEnv := config.AppConfig.Environment
+	config.AppConfig.Environment = "development"
+	defer func() { config.AppConfig.Environment = prevEnv }()
 
 	body := map[string]string{"email": "nonexistent@test.com", "password": "wrong"}
 	b, _ := json.Marshal(body)

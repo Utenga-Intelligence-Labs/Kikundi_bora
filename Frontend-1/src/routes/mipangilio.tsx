@@ -5,6 +5,7 @@ import { requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
 import { ContributionSettingsCard } from "@/components/ContributionSettingsCard";
 import { PaymentMethodsCard } from "@/components/PaymentMethodsCard";
+import { PendingApprovalsCard } from "@/components/PendingApprovalsCard";
 import { useMembers } from "@/hooks/use-members";
 import {
   useCommitteeMembers,
@@ -88,6 +89,9 @@ function MipangilioPage() {
   return (
     <AppShell title="Mipangilio" subtitle="Sanidi mfumo kulingana na kikundi chako">
       <ContributionSettingsCard />
+      <div className="mt-4">
+        <PendingApprovalsCard />
+      </div>
       <div className="mt-4">
         <PaymentMethodsCard />
       </div>

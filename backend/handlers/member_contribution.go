@@ -71,14 +71,18 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 		})
 	}
 
-	// Fixed contribution amount enforcement (group settings) — AKIBA is the
-	// periodic contribution governed by the interval setting. MFUKO_WA_KIJAMII
-	// amounts follow the welfare event, so they are not fixed.
+	// Amount rule (obligations model): any positive amount up to what the
+	// member owes in total — catching up on arrears legitimately exceeds one
+	// cycle's fixed amount, so the old exact-match rule is gone.
 	if req.ContributionType == "AKIBA" {
 		var group models.Group
 		if err := database.DB.First(&group).Error; err == nil {
-			if err := services.CheckFixedContributionAmount(group.FixedContributionAmount, req.Amount); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
+			if ob, oerr := services.GetMemberObligations(group.ID, member.ID, time.Now()); oerr == nil {
+				if req.Amount.GreaterThan(ob.GrandTotal) && ob.GrandTotal.GreaterThan(decimal.Zero) {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+						"message": fmt.Sprintf("Kiasi kimezidi deni lako lote (TZS %s)", ob.GrandTotal.StringFixed(0)),
+					})
+				}
 			}
 		}
 	}
@@ -259,16 +263,24 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 		"status": "CONFIRMED", "reviewed_by": reviewerMember.ID,
 	})
 
-	// Auto-post into the double-entry ledger (best-effort — a ledger
-	// failure is logged but never fails the confirmation). Only
-	// MFUKO_WA_KIJAMII is skipped: it is earmarked welfare money, not
-	// savings. Empty/legacy types post as savings like AKIBA.
-	if contribution.ContributionType != models.ContributionMfuko && contribution.Member != nil {
-		if err := services.PostContribution(contribution.Member.MemberNo, contribution.Amount, now, userID,
-			fmt.Sprintf("Mchango AKIBA %s %s", contribution.Member.MemberNo, contribution.PeriodLabel)); err != nil {
-			log.Printf("WARN: ledger auto-post michango %s: %v", contribution.ID, err)
+	// Allocate the confirmed amount across arrears → current → fines so the
+	// member's obligations update immediately (reconciled Contribution rows
+	// are created/merged by ApplyAllocation). MFUKO_WA_KIJAMII is welfare-
+	// earmarked money with its own tracking — it never touches cycles.
+	var receipt *services.AllocationReceipt
+	if contribution.ContributionType != models.ContributionMfuko {
+		if g, gerr := database.GetCurrentGroup(); gerr == nil {
+			if r, aerr := services.ApplyAllocation(g.ID, contribution.MemberID, contribution.Amount, userID,
+				"CASH", "", now, now); aerr != nil {
+				log.Printf("WARN: allocation on confirm %s: %v", contribution.ID, aerr)
+			} else {
+				receipt = r
+			}
 		}
 	}
+
+	// Ledger posting happens inside ApplyAllocation (single aggregated
+	// entry); nothing more to post here.
 
 	// Notify member
 	if contribution.Member != nil && contribution.Member.UserID != nil {
@@ -281,6 +293,7 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Mchango umethibitishwa",
 		"data":    contribution,
+		"receipt": receipt,
 	})
 }
 

@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"fmt"
-	"log"
 	"time"
 
 	"kikundibora/database"
@@ -95,52 +93,57 @@ func (h *ContributionHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tarehe ya malipo si sahihi"})
 	}
 
-	var existing int64
-	database.DB.Model(&models.Contribution{}).
-		Where("member_id = ? AND month = ?", req.MemberID, monthFirst).
-		Count(&existing)
-	if existing > 0 {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mwanachama huyu tayari amelipa mwezi huu"})
-	}
-
 	if req.Amount.LessThanOrEqual(decimal.Zero) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kiasi lazima kiwe zaidi ya sifuri"})
 	}
 
+	// NOTE: no exact-amount or already-paid-month rejection here. Payments
+	// are allocated across arrears → current → fines, so any positive
+	// amount is accepted (over/under-payments flow by rule).
+
 	userID := middleware.GetUserID(c)
 
-	contribution := models.Contribution{
-		MemberID:        req.MemberID,
-		RecordedBy:      userID,
-		Amount:          req.Amount,
-		Month:           monthFirst,
-		PaidAt:          paidAt,
-		PaymentMethod:   req.PaymentMethod,
-		ReferenceNumber: req.ReferenceNumber,
-		ReceiptURL:      req.ReceiptURL,
-		Status:          "PAID",
-		ConfirmedBy:     &userID,
-		Notes:           req.Notes,
+	g, err := database.GetCurrentGroup()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kupata kikundi"})
+	}
+	// Keep legacy groups usable until contribution-interval settings are
+	// configured. Scheduled groups always use the obligations allocator below.
+	if g.ContributionDueDate == nil || g.ContributionInterval == "" {
+		row := models.Contribution{
+			MemberID: member.ID, RecordedBy: userID, Amount: req.Amount,
+			Month: monthFirst, PaidAt: paidAt, PaymentMethod: req.PaymentMethod,
+			ReferenceNumber: req.ReferenceNumber, Status: "PAID", ConfirmedBy: &userID,
+		}
+		if err := database.DB.Create(&row).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango wa mwezi huu tayari umerekodiwa"})
+		}
+		line := services.AllocatedLine{Kind: services.AllocCurrent, Ref: req.Month, Label: "Mchango " + req.Month, Amount: req.Amount}
+		return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+			"message": "Malipo yamerekodiwa",
+			"data":    services.AllocationReceipt{Lines: []services.AllocatedLine{line}, Applied: req.Amount, Remainder: decimal.Zero},
+		})
 	}
 
-	if err := database.DB.Create(&contribution).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurekodi mchango"})
+	// Allocate across arrears → current → fines (confirmed order). The
+	// treasurer may record any positive amount — catching up on arrears
+	// legitimately exceeds one cycle's fixed amount. The old "already paid
+	// this month" conflict is gone: extra money flows to arrears/fines.
+	receipt, err := services.ApplyAllocation(g.ID, req.MemberID, req.Amount, userID,
+		req.PaymentMethod, req.ReferenceNumber, paidAt, time.Now())
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": err.Error()})
 	}
 
-	services.LogAudit(c, &userID, models.AuditCreate, "contributions", &contribution.ID, nil, map[string]interface{}{
+	services.LogAudit(c, &userID, models.AuditCreate, "contributions", nil, nil, map[string]interface{}{
 		"member_id": req.MemberID, "amount": req.Amount, "month": monthFirst.Format("2006-01-02"),
 		"payment_method": req.PaymentMethod, "reference": req.ReferenceNumber,
+		"allocated": receipt.Lines, "remainder": receipt.Remainder,
 	})
 
-	// Auto-post into the double-entry ledger (best-effort).
-	if err := services.PostContribution(member.MemberNo, req.Amount, paidAt, userID,
-		fmt.Sprintf("Mchango %s %s", member.MemberNo, monthFirst.Format("2006-01"))); err != nil {
-		log.Printf("WARN: ledger auto-post contribution %s: %v", contribution.ID, err)
-	}
-
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Mchango umerekodiwa",
-		"data":    contribution,
+		"message": "Malipo yamegawanywa na kurekodiwa",
+		"data":    receipt,
 	})
 }
 
@@ -209,7 +212,7 @@ func (h *ContributionHandler) MonthlyReport(c *fiber.Ctx) error {
 	monthDate := time.Date(monthFirst.Year(), monthFirst.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	type Row struct {
-		MemberNo   string   `json:"member_no"`
+		MemberNo   string           `json:"member_no"`
 		FullName   string           `json:"full_name"`
 		Phone      string           `json:"phone"`
 		AmountPaid *decimal.Decimal `json:"amount_paid"`

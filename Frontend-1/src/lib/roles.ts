@@ -1,5 +1,5 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase, BookOpen } from "lucide-react";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase, BookOpen, CalendarDays, HandCoins } from "lucide-react";
 import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
@@ -11,6 +11,7 @@ export interface NavItem {
 // Member navigation (all members see this)
 export const memberNav: NavItem[] = [
   { to: "/dashibodi", label: "Dashboard Yangu", icon: Home },
+  { to: "/deni-langu", label: "Deni Langu", icon: Wallet },
   { to: "/michango-yangu", label: "Michango Yangu", icon: PiggyBank },
   { to: "/weka-mchango", label: "Weka Mchango", icon: Banknote },
   { to: "/mikopo", label: "Mikopo Yangu", icon: Banknote },
@@ -28,6 +29,8 @@ export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] =
   { to: "/uongozi/portfolio", label: "Portfolio ya Mikopo", icon: Briefcase },
   { to: "/njia-za-malipo", label: "Njia za Malipo", icon: Landmark, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
+  { to: "/mikutano", label: "Mikutano na Makosa", icon: CalendarDays, requiredRoles: ["MWENYEKITI", "KATIBU"] },
+  { to: "/ukusanyaji", label: "Ukusanyaji", icon: HandCoins, requiredRoles: ["HAZINA"] },
   { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },
@@ -46,6 +49,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/michango-inayosubiri", label: "Idhinisha Mifuko", icon: ClipboardList },
     { to: "/marejesho", label: "Marejesho", icon: Receipt },
     { to: "/ripoti", label: "Ripoti", icon: FileBarChart2 },
+    { to: "/mikutano", label: "Mikutano na Makosa", icon: CalendarDays },
     { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   "Mweka Hazina": [
@@ -58,6 +62,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/mikopo", label: "Mikopo", icon: Wallet },
     { to: "/wanachama", label: "Wanachama", icon: Users },
     { to: "/ripoti", label: "Ripoti za Fedha", icon: FileBarChart2 },
+    { to: "/ukusanyaji", label: "Ukusanyaji", icon: HandCoins },
     { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   Katibu: [
@@ -69,10 +74,12 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/michango", label: "Kumbukumbu", icon: PiggyBank },
     { to: "/mikopo", label: "Mikopo", icon: Banknote },
     { to: "/ripoti", label: "Ripoti", icon: FileBarChart2 },
+    { to: "/mikutano", label: "Mikutano na Makosa", icon: CalendarDays },
     { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   Mwanachama: [
     { to: "/dashibodi", label: "Akaunti Yangu", icon: Home },
+    { to: "/deni-langu", label: "Deni Langu", icon: Wallet },
     { to: "/mfuko-kijamii", label: "Mfuko wa Kijamii", icon: Heart },
     { to: "/michango", label: "Michango Yangu", icon: PiggyBank },
     { to: "/mikopo", label: "Mikopo Yangu", icon: Banknote },

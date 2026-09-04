@@ -1,10 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
 import { api } from "@/api/client";
 import { uploadApi } from "@/api/upload";
 import { AppShell } from "@/components/AppShell";
+import { useMemberObligations } from "@/hooks/use-obligations";
+import { tzs } from "@/lib/format";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Upload, MessageSquare, Loader2, X, ImageIcon, CalendarDays } from "lucide-react";
 import { MfukoContributionForm } from "@/components/MfukoContributionForm";
@@ -36,6 +38,11 @@ function WekaMchangoPage() {
       ? Number(settingsData.data.fixed_contribution_amount)
       : null;
   const nextDue = settingsData?.next_due_date ?? null;
+
+  // Member's combined obligations — shown as the catch-up target. Any
+  // positive amount is accepted (allocation order: arrears → current → fines).
+  const { data: obligationsData } = useMemberObligations(user?.member_id ?? null);
+  const obligationTotal = obligationsData?.data.grand_total_owed ?? null;
 
   // Prefill the fixed amount for AKIBA when configured
   useEffect(() => {
@@ -171,6 +178,13 @@ function WekaMchangoPage() {
   return (
     <AppShell title="Weka Mchango" subtitle="Wasilisha mchango wako kwa uthibitisho">
       <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+        {obligationTotal != null && Number(obligationTotal) > 0 && (
+          <div className="card-surface border-l-4 border-l-amber-500 p-4">
+            <p className="text-xs text-muted-foreground">Jumla unayodaiwa (malimbikizo + sasa + faini)</p>
+            <p className="font-display text-2xl font-bold">{tzs(Number(obligationTotal))}</p>
+            <Link to="/deni-langu" className="text-xs font-medium text-primary">Angalia maelezo →</Link>
+          </div>
+        )}
         {(fixedAmount != null || nextDue) && (
           <div className="card-surface p-4 border-l-4 border-l-primary">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -236,7 +250,7 @@ function WekaMchangoPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1">
-              Kiasi (TZS){fixedAmount != null ? " — lililopangwa na kikundi" : ""}
+              Kiasi (TZS)
             </label>
             <input
               type="number"
@@ -245,15 +259,13 @@ function WekaMchangoPage() {
               value={formData.amount}
               onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
               placeholder="0.00"
-              readOnly={fixedAmount != null}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-70 read-only:bg-muted/40"
               required
             />
-            {fixedAmount != null && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Kikundi kimepanga mchango wa TZS {fixedAmount.toLocaleString()} — kiasi hiki hakiwezi kubadilishwa.
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              Weka kiasi chochote zaidi ya sifuri — kitagawanywa: malimbikizo ya zamani → mchango wa sasa → faini.
+              {fixedAmount != null && <> Mchango wa kawaida ni TZS {fixedAmount.toLocaleString()}.</>}
+            </p>
           </div>
 
           <div>

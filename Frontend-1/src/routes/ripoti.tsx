@@ -4,6 +4,9 @@ import { AppShell } from "@/components/AppShell";
 import { useDashboard } from "@/hooks/use-dashboard";
 import { useMembers } from "@/hooks/use-members";
 import { useLoans } from "@/hooks/use-loans";
+import { useGroupObligations } from "@/hooks/use-obligations";
+import { groupsApi } from "@/api/groups";
+import { useQuery } from "@tanstack/react-query";
 import { tzs } from "@/lib/format";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
@@ -100,6 +103,7 @@ function RipotiPage() {
         <Row label="Mikopo wazi" value={String(dash?.count_outstanding_loans ?? 0)} />
         <Row label="Malipo yote" value={dash?.total_repayments ? `TZS ${Number(dash.total_repayments).toLocaleString()}` : "—"} />
       </Card>
+      <ObligationsAnalyticsCard />
       </div>
 
       <p className="mt-6 text-center text-xs text-muted-foreground">
@@ -109,8 +113,7 @@ function RipotiPage() {
   );
 }
 
-function Card({ title, sub, icon: Icon, children }: { title: string; sub?: string; icon: any; children: React.ReactNode }) {
-  return (
+function Card({ title, sub, icon: Icon, children }: { title: string; sub?: string; icon: any; children: React.ReactNode }) {  return (
     <section className="card-surface overflow-hidden">
       <header className="flex items-center gap-2.5 border-b border-border px-4 py-3">
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
@@ -132,5 +135,29 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className={`text-sm ${strong ? "font-display text-base font-bold" : "font-semibold"}`}>{value}</span>
     </div>
+  );
+}
+
+function ObligationsAnalyticsCard() {
+  const { data: gs } = useQuery({
+    queryKey: ["groups", "current"],
+    queryFn: () => groupsApi.current(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const groupId = (gs?.data.id ?? null) as string | null;
+  const { data, isLoading } = useGroupObligations(groupId);
+  if (isLoading || !data?.data) return null;
+  const ob = data.data;
+  return (
+    <Card title="Madeni ya Kikundi" icon={Wallet} sub="Malimbikizo + faini kwa kikundi kizima">
+      <Row label="Malimbikizo yote" value={tzs(Number(ob.total_arrears_outstanding))} />
+      <Row label="Faini zote" value={tzs(Number(ob.total_fines_outstanding))} />
+      <Row
+        label="Jumla"
+        value={tzs(Number(ob.total_arrears_outstanding) + Number(ob.total_fines_outstanding))}
+        strong
+      />
+      <Row label="Wanaodaiwa" value={String(ob.member_count_owing)} />
+    </Card>
   );
 }

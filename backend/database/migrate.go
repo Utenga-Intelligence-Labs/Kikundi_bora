@@ -29,6 +29,10 @@ func AutoMigrate() {
 		&models.GroupSettingProposal{},
 		&models.FineSettings{},
 		&models.Fine{},
+		&models.FineOffenceType{},
+		&models.ContributionCycle{},
+		&models.Meeting{},
+		&models.MeetingAttendance{},
 		&models.PaymentMethod{},
 
 		// Member & financial tables
@@ -62,6 +66,19 @@ func AutoMigrate() {
 	// Second pass: add foreign key constraints.
 	log.Println("Migration: adding foreign key constraints (pass 2)...")
 	addFKConstraints()
+
+	// Fines idempotency, take 2: the old single unique index on
+	// (group, member, cycle) predates offence types and would wrongly block
+	// multiple offences per cycle. Replace with partial uniques.
+	DB.Exec(`DROP INDEX IF EXISTS idx_fines_group_member_cycle`)
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_fines_cycle_occurrence
+		ON fines (group_id, member_id, offence_type_id, contribution_cycle_label)
+		WHERE contribution_cycle_label <> ''`)
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_fines_event_occurrence
+		ON fines (group_id, member_id, offence_type_id, occurrence_date)
+		WHERE contribution_cycle_label = ''`)
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contribution_cycles_member_cycle
+		ON contribution_cycles (group_id, member_id, cycle_label)`)
 
 	// Backfill: payment methods created before the approval workflow
 	// carry an empty status — treat them as approved (they were live).
@@ -139,11 +156,22 @@ func addFKConstraints() {
 		{"leadership_positions", "fk_leadership_positions_member", "member_id", "members", "id", "CASCADE"},
 		// FineSettings → Group
 		{"fine_settings", "fk_fine_settings_group", "group_id", "groups", "id", "CASCADE"},
+		// FineOffenceType → Group
+		{"fine_offence_types", "fk_offence_types_group", "group_id", "groups", "id", "CASCADE"},
+		// ContributionCycle → Group, Member
+		{"contribution_cycles", "fk_cycles_group", "group_id", "groups", "id", "CASCADE"},
+		{"contribution_cycles", "fk_cycles_member", "member_id", "members", "id", "CASCADE"},
+		// Meeting → Group
+		{"meetings", "fk_meetings_group", "group_id", "groups", "id", "CASCADE"},
+		// MeetingAttendance → Meeting, Member
+		{"meeting_attendances", "fk_attendance_meeting", "meeting_id", "meetings", "id", "CASCADE"},
+		{"meeting_attendances", "fk_attendance_member", "member_id", "members", "id", "CASCADE"},
 		// Fine → Group, Member, User
 		{"fines", "fk_fines_group", "group_id", "groups", "id", "CASCADE"},
 		{"fines", "fk_fines_member", "member_id", "members", "id", "RESTRICT"},
 		{"fines", "fk_fines_collector", "collected_by", "users", "id", "SET NULL"},
 		{"fines", "fk_fines_waiver", "waived_by", "users", "id", "SET NULL"},
+		{"fines", "fk_fines_offence", "offence_type_id", "fine_offence_types", "id", "RESTRICT"},
 	}
 
 	for _, fk := range fks {
@@ -164,5 +192,3 @@ func addFKConstraints() {
 		}
 	}
 }
-
-

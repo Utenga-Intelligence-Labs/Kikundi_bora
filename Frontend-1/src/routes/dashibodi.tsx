@@ -389,6 +389,12 @@ function MemberView({
               Weka Mchango
             </Link>
           )}
+          <Link
+            to="/deni-langu"
+            className="ml-auto shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+          >
+            Deni Langu
+          </Link>
         </div>
       )}
       <HeroBalance

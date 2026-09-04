@@ -372,9 +372,10 @@ func RunContributionDueCheck() {
 				log.Printf("ERROR: Scheduler notification for group %s failed: %v", groups[i].ID, err)
 			}
 		}
-		if _, err := ApplyFinesForGroup(&groups[i], now); err != nil {
-			log.Printf("ERROR: Scheduler fines for group %s failed: %v", groups[i].ID, err)
-		}
+		// Member obligations: refresh cycle tracking, then lateness fines —
+		// via active offence types when any exist, else the legacy
+		// FineSettings policy (single path only, never both).
+		RunObligationChecks(&groups[i], now)
 	}
 }
 

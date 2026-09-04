@@ -120,10 +120,19 @@ func ApplyFinesForGroup(g *models.Group, now time.Time) (created int, err error)
 			continue
 		}
 
+		// Legacy policy rows ride on the hidden legacy offence type so the
+		// NOT NULL offence reference (and the new idempotency keys) hold.
+		legacyOT, lotErr := ensureLegacyOffenceType(g.ID)
+		if lotErr != nil {
+			log.Printf("ERROR: legacy offence type for group %s: %v", g.ID, lotErr)
+			continue
+		}
 		fine := models.Fine{
 			GroupID:                g.ID,
 			MemberID:               m.ID,
+			OffenceTypeID:          legacyOT.ID,
 			ContributionCycleLabel: label,
+			OccurrenceDate:         dateOf(due),
 			DueDate:                dateOf(due),
 			Amount:                 amount,
 			Reason:                 reason,

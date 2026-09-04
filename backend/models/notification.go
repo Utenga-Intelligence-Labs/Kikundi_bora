@@ -18,6 +18,7 @@ const (
 	NotifRepayment         NotificationType = "REPAYMENT"
 	NotifContribution      NotificationType = "CONTRIBUTION"
 	NotifContributionDue   NotificationType = "CONTRIBUTION_DUE"
+	NotifFineIssued          NotificationType = "FINE_ISSUED"
 	NotifSystem            NotificationType = "SYSTEM"
 	NotifWelfareCreated    NotificationType = "WELFARE_CREATED"
 	NotifWelfareApproved   NotificationType = "WELFARE_APPROVED"

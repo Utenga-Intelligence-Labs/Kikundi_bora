@@ -189,6 +189,45 @@ func main() {
 	settings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Approve)
 	settings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Reject)
 
+	// Member obligations (arrears + current + fines combined).
+	// Member reads own; leadership reads all (self-or-leadership).
+	memberOblig := protected.Group("/members/:id/obligations")
+	memberOblig.Get("/summary", middleware.RequireSelfOrLeadership(func(c *fiber.Ctx) (string, string) {
+		return c.Params("id"), ""
+	}), handlers.ObligationsMemberSummary)
+
+	// Group obligations aggregate + treasurer collection queue.
+	leadership3 := middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer)
+	groups.Get("/:id/obligations/summary", leadership3, handlers.ObligationsGroupSummary)
+	groups.Get("/:id/collection-queue", middleware.RequireRoles(models.RoleTreasurer), handlers.CollectionQueue)
+
+	// Fine offence types: chair proposes, secretary approves.
+	offences := groups.Group("/:id/fine-offence-types")
+	offences.Get("/", leadership3, handlers.ListOffenceTypes)
+	offences.Post("/", middleware.RequireRoles(models.RoleChair), handlers.CreateOffenceType)
+	offences.Patch("/:typeId", middleware.RequireRoles(models.RoleChair), handlers.UpdateOffenceType)
+	offences.Post("/:typeId/approve", middleware.RequireRoles(models.RoleSecretary), handlers.ApproveOffenceType)
+	offences.Post("/:typeId/deactivate", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), handlers.DeactivateOffenceType)
+
+	// Fines: list (members own-only), collect (treasurer), waivers (chair propose + secretary decide).
+	fines := protected.Group("/fines")
+	fines.Get("/", handlers.ListFines)
+	fines.Post("/:id/collect", middleware.RequireRoles(models.RoleTreasurer), handlers.CollectFine)
+	fines.Patch("/:id/collect", middleware.RequireRoles(models.RoleTreasurer), handlers.CollectFine)
+	fines.Post("/:id/waive-propose", middleware.RequireRoles(models.RoleChair), handlers.ProposeFineWaiver)
+	fines.Patch("/:id/waive", middleware.RequireRoles(models.RoleChair), handlers.ProposeFineWaiver)
+	fines.Post("/:id/waive-approve", middleware.RequireRoles(models.RoleSecretary), handlers.ApproveFineWaiver)
+	fines.Post("/:id/waive-reject", middleware.RequireRoles(models.RoleSecretary), handlers.RejectFineWaiver)
+
+	// Meetings: chair/secretary manage, secretary marks attendance + triggers fines.
+	meetings := groups.Group("/:id/meetings")
+	meetings.Get("/", leadership3, handlers.ListMeetings)
+	meetings.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), handlers.CreateMeeting)
+	mtg := protected.Group("/meetings/:id")
+	mtg.Get("/attendance", leadership3, handlers.GetAttendance)
+	mtg.Put("/attendance", middleware.RequireRoles(models.RoleSecretary), handlers.SetAttendance)
+	mtg.Post("/trigger-fines", middleware.RequireRoles(models.RoleSecretary), handlers.TriggerMeetingFines)
+
 	// Payment methods (LipaNamba / bank accounts) — members read, chair/treasurer manage
 	paymentMethodHandler := handlers.NewPaymentMethodHandler()
 	portfolioHandler := handlers.NewLoanPortfolioHandler()

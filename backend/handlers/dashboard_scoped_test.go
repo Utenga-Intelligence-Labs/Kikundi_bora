@@ -87,6 +87,12 @@ func scopedCleanAndSeed(t *testing.T) {
 		"DELETE FROM pending_actions",
 		"DELETE FROM welfare_contributions",
 		"DELETE FROM welfare_events",
+		"DELETE FROM meeting_attendances",
+		"DELETE FROM meetings",
+		"DELETE FROM fines",
+		"DELETE FROM contribution_cycles",
+		"DELETE FROM fine_offence_types",
+		"DELETE FROM fine_settings",
 		"DELETE FROM group_setting_proposals",
 		"DELETE FROM members",
 		"DELETE FROM users",
@@ -96,7 +102,7 @@ func scopedCleanAndSeed(t *testing.T) {
 			t.Fatalf("cleanup %s: %v", stmt, err)
 		}
 	}
-	database.Seed()          // re-creates users, members, positions
+	database.Seed()             // re-creates users, members, positions
 	database.EnsureGroupSetup() // single group row
 }
 

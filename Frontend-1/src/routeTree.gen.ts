@@ -15,11 +15,13 @@ import { Route as WasifuRouteImport } from './routes/wasifu'
 import { Route as WanachamaKusubiriRouteImport } from './routes/wanachama-kusubiri'
 import { Route as WanachamaRouteImport } from './routes/wanachama'
 import { Route as VitendoVinavyosubiriRouteImport } from './routes/vitendo-vinavyosubiri'
+import { Route as UkusanyajiRouteImport } from './routes/ukusanyaji'
 import { Route as SajiliRouteImport } from './routes/sajili'
 import { Route as SahauRouteImport } from './routes/sahau'
 import { Route as RipotiRouteImport } from './routes/ripoti'
 import { Route as NjiaZaMalipoRouteImport } from './routes/njia-za-malipo'
 import { Route as MipangilioRouteImport } from './routes/mipangilio'
+import { Route as MikutanoRouteImport } from './routes/mikutano'
 import { Route as MikopoRouteImport } from './routes/mikopo'
 import { Route as MichangoYanguRouteImport } from './routes/michango-yangu'
 import { Route as MichangoInayosubiriRouteImport } from './routes/michango-inayosubiri'
@@ -30,6 +32,7 @@ import { Route as KitabuRouteImport } from './routes/kitabu'
 import { Route as KamatiMikopoRouteImport } from './routes/kamati-mikopo'
 import { Route as IngiaRouteImport } from './routes/ingia'
 import { Route as HistoriaYanguRouteImport } from './routes/historia-yangu'
+import { Route as DeniLanguRouteImport } from './routes/deni-langu'
 import { Route as DashibodiRouteImport } from './routes/dashibodi'
 import { Route as ArifaRouteImport } from './routes/arifa'
 import { Route as AdminLogsRouteImport } from './routes/admin-logs'
@@ -71,6 +74,11 @@ const VitendoVinavyosubiriRoute = VitendoVinavyosubiriRouteImport.update({
   path: '/vitendo-vinavyosubiri',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UkusanyajiRoute = UkusanyajiRouteImport.update({
+  id: '/ukusanyaji',
+  path: '/ukusanyaji',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SajiliRoute = SajiliRouteImport.update({
   id: '/sajili',
   path: '/sajili',
@@ -94,6 +102,11 @@ const NjiaZaMalipoRoute = NjiaZaMalipoRouteImport.update({
 const MipangilioRoute = MipangilioRouteImport.update({
   id: '/mipangilio',
   path: '/mipangilio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MikutanoRoute = MikutanoRouteImport.update({
+  id: '/mikutano',
+  path: '/mikutano',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MikopoRoute = MikopoRouteImport.update({
@@ -144,6 +157,11 @@ const IngiaRoute = IngiaRouteImport.update({
 const HistoriaYanguRoute = HistoriaYanguRouteImport.update({
   id: '/historia-yangu',
   path: '/historia-yangu',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeniLanguRoute = DeniLanguRouteImport.update({
+  id: '/deni-langu',
+  path: '/deni-langu',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashibodiRoute = DashibodiRouteImport.update({
@@ -203,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/admin-logs': typeof AdminLogsRoute
   '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/deni-langu': typeof DeniLanguRoute
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
@@ -213,11 +232,13 @@ export interface FileRoutesByFullPath {
   '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
+  '/mikutano': typeof MikutanoRoute
   '/mipangilio': typeof MipangilioRoute
   '/njia-za-malipo': typeof NjiaZaMalipoRoute
   '/ripoti': typeof RipotiRoute
   '/sahau': typeof SahauRoute
   '/sajili': typeof SajiliRoute
+  '/ukusanyaji': typeof UkusanyajiRoute
   '/vitendo-vinavyosubiri': typeof VitendoVinavyosubiriRoute
   '/wanachama': typeof WanachamaRoute
   '/wanachama-kusubiri': typeof WanachamaKusubiriRoute
@@ -236,6 +257,7 @@ export interface FileRoutesByTo {
   '/admin-logs': typeof AdminLogsRoute
   '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/deni-langu': typeof DeniLanguRoute
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
@@ -246,11 +268,13 @@ export interface FileRoutesByTo {
   '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
+  '/mikutano': typeof MikutanoRoute
   '/mipangilio': typeof MipangilioRoute
   '/njia-za-malipo': typeof NjiaZaMalipoRoute
   '/ripoti': typeof RipotiRoute
   '/sahau': typeof SahauRoute
   '/sajili': typeof SajiliRoute
+  '/ukusanyaji': typeof UkusanyajiRoute
   '/vitendo-vinavyosubiri': typeof VitendoVinavyosubiriRoute
   '/wanachama': typeof WanachamaRoute
   '/wanachama-kusubiri': typeof WanachamaKusubiriRoute
@@ -270,6 +294,7 @@ export interface FileRoutesById {
   '/admin-logs': typeof AdminLogsRoute
   '/arifa': typeof ArifaRoute
   '/dashibodi': typeof DashibodiRoute
+  '/deni-langu': typeof DeniLanguRoute
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
@@ -280,11 +305,13 @@ export interface FileRoutesById {
   '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
+  '/mikutano': typeof MikutanoRoute
   '/mipangilio': typeof MipangilioRoute
   '/njia-za-malipo': typeof NjiaZaMalipoRoute
   '/ripoti': typeof RipotiRoute
   '/sahau': typeof SahauRoute
   '/sajili': typeof SajiliRoute
+  '/ukusanyaji': typeof UkusanyajiRoute
   '/vitendo-vinavyosubiri': typeof VitendoVinavyosubiriRoute
   '/wanachama': typeof WanachamaRoute
   '/wanachama-kusubiri': typeof WanachamaKusubiriRoute
@@ -305,6 +332,7 @@ export interface FileRouteTypes {
     | '/admin-logs'
     | '/arifa'
     | '/dashibodi'
+    | '/deni-langu'
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
@@ -315,11 +343,13 @@ export interface FileRouteTypes {
     | '/michango-inayosubiri'
     | '/michango-yangu'
     | '/mikopo'
+    | '/mikutano'
     | '/mipangilio'
     | '/njia-za-malipo'
     | '/ripoti'
     | '/sahau'
     | '/sajili'
+    | '/ukusanyaji'
     | '/vitendo-vinavyosubiri'
     | '/wanachama'
     | '/wanachama-kusubiri'
@@ -338,6 +368,7 @@ export interface FileRouteTypes {
     | '/admin-logs'
     | '/arifa'
     | '/dashibodi'
+    | '/deni-langu'
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
@@ -348,11 +379,13 @@ export interface FileRouteTypes {
     | '/michango-inayosubiri'
     | '/michango-yangu'
     | '/mikopo'
+    | '/mikutano'
     | '/mipangilio'
     | '/njia-za-malipo'
     | '/ripoti'
     | '/sahau'
     | '/sajili'
+    | '/ukusanyaji'
     | '/vitendo-vinavyosubiri'
     | '/wanachama'
     | '/wanachama-kusubiri'
@@ -371,6 +404,7 @@ export interface FileRouteTypes {
     | '/admin-logs'
     | '/arifa'
     | '/dashibodi'
+    | '/deni-langu'
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
@@ -381,11 +415,13 @@ export interface FileRouteTypes {
     | '/michango-inayosubiri'
     | '/michango-yangu'
     | '/mikopo'
+    | '/mikutano'
     | '/mipangilio'
     | '/njia-za-malipo'
     | '/ripoti'
     | '/sahau'
     | '/sajili'
+    | '/ukusanyaji'
     | '/vitendo-vinavyosubiri'
     | '/wanachama'
     | '/wanachama-kusubiri'
@@ -405,6 +441,7 @@ export interface RootRouteChildren {
   AdminLogsRoute: typeof AdminLogsRoute
   ArifaRoute: typeof ArifaRoute
   DashibodiRoute: typeof DashibodiRoute
+  DeniLanguRoute: typeof DeniLanguRoute
   HistoriaYanguRoute: typeof HistoriaYanguRoute
   IngiaRoute: typeof IngiaRoute
   KamatiMikopoRoute: typeof KamatiMikopoRoute
@@ -415,11 +452,13 @@ export interface RootRouteChildren {
   MichangoInayosubiriRoute: typeof MichangoInayosubiriRoute
   MichangoYanguRoute: typeof MichangoYanguRoute
   MikopoRoute: typeof MikopoRoute
+  MikutanoRoute: typeof MikutanoRoute
   MipangilioRoute: typeof MipangilioRoute
   NjiaZaMalipoRoute: typeof NjiaZaMalipoRoute
   RipotiRoute: typeof RipotiRoute
   SahauRoute: typeof SahauRoute
   SajiliRoute: typeof SajiliRoute
+  UkusanyajiRoute: typeof UkusanyajiRoute
   VitendoVinavyosubiriRoute: typeof VitendoVinavyosubiriRoute
   WanachamaRoute: typeof WanachamaRoute
   WanachamaKusubiriRoute: typeof WanachamaKusubiriRoute
@@ -477,6 +516,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VitendoVinavyosubiriRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ukusanyaji': {
+      id: '/ukusanyaji'
+      path: '/ukusanyaji'
+      fullPath: '/ukusanyaji'
+      preLoaderRoute: typeof UkusanyajiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sajili': {
       id: '/sajili'
       path: '/sajili'
@@ -510,6 +556,13 @@ declare module '@tanstack/react-router' {
       path: '/mipangilio'
       fullPath: '/mipangilio'
       preLoaderRoute: typeof MipangilioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mikutano': {
+      id: '/mikutano'
+      path: '/mikutano'
+      fullPath: '/mikutano'
+      preLoaderRoute: typeof MikutanoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mikopo': {
@@ -580,6 +633,13 @@ declare module '@tanstack/react-router' {
       path: '/historia-yangu'
       fullPath: '/historia-yangu'
       preLoaderRoute: typeof HistoriaYanguRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deni-langu': {
+      id: '/deni-langu'
+      path: '/deni-langu'
+      fullPath: '/deni-langu'
+      preLoaderRoute: typeof DeniLanguRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashibodi': {
@@ -661,6 +721,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLogsRoute: AdminLogsRoute,
   ArifaRoute: ArifaRoute,
   DashibodiRoute: DashibodiRoute,
+  DeniLanguRoute: DeniLanguRoute,
   HistoriaYanguRoute: HistoriaYanguRoute,
   IngiaRoute: IngiaRoute,
   KamatiMikopoRoute: KamatiMikopoRoute,
@@ -671,11 +732,13 @@ const rootRouteChildren: RootRouteChildren = {
   MichangoInayosubiriRoute: MichangoInayosubiriRoute,
   MichangoYanguRoute: MichangoYanguRoute,
   MikopoRoute: MikopoRoute,
+  MikutanoRoute: MikutanoRoute,
   MipangilioRoute: MipangilioRoute,
   NjiaZaMalipoRoute: NjiaZaMalipoRoute,
   RipotiRoute: RipotiRoute,
   SahauRoute: SahauRoute,
   SajiliRoute: SajiliRoute,
+  UkusanyajiRoute: UkusanyajiRoute,
   VitendoVinavyosubiriRoute: VitendoVinavyosubiriRoute,
   WanachamaRoute: WanachamaRoute,
   WanachamaKusubiriRoute: WanachamaKusubiriRoute,
