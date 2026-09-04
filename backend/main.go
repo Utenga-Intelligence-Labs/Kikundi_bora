@@ -310,16 +310,19 @@ func main() {
 	admin.Post("/backup/settings", backupHandler.SaveBackupSettings)
 	admin.Get("/backup/download/:id", backupHandler.DownloadBackup)
 
-	// Ledger / accounting core routes (treasurer + admin) — event-sourced,
-	// append-only; every write attributes to the session user.
+	// Ledger / accounting core routes — event-sourced, append-only; every
+	// write attributes to the session user. Reads (balance/statement/
+	// trial-balance) are view-only for chair + secretary; writes stay
+	// treasurer/admin-only so the books can't be altered by viewers.
 	ledgerRoutes := protected.Group("/admin/ledger")
-	ledgerRoutes.Use(middleware.RequireRoles(models.RoleTreasurer, models.RoleAdmin))
-	ledgerRoutes.Post("/accounts", ledgerHandler.OpenAccount)
-	ledgerRoutes.Post("/transactions", ledgerHandler.RecordTransaction)
-	ledgerRoutes.Post("/transactions/:id/reverse", ledgerHandler.ReverseTransaction)
-	ledgerRoutes.Get("/balance", ledgerHandler.GetBalance)
-	ledgerRoutes.Get("/statement", ledgerHandler.GetStatement)
-	ledgerRoutes.Get("/trial-balance", ledgerHandler.GetTrialBalance)
+	readLedger := middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer)
+	writeLedger := middleware.RequireRoles(models.RoleTreasurer)
+	ledgerRoutes.Post("/accounts", writeLedger, ledgerHandler.OpenAccount)
+	ledgerRoutes.Post("/transactions", writeLedger, ledgerHandler.RecordTransaction)
+	ledgerRoutes.Post("/transactions/:id/reverse", writeLedger, ledgerHandler.ReverseTransaction)
+	ledgerRoutes.Get("/balance", readLedger, ledgerHandler.GetBalance)
+	ledgerRoutes.Get("/statement", readLedger, ledgerHandler.GetStatement)
+	ledgerRoutes.Get("/trial-balance", readLedger, ledgerHandler.GetTrialBalance)
 	ledgerRoutes.Post("/replay", middleware.RequireRoles(models.RoleAdmin), ledgerHandler.Replay)
 
 	// Reports routes (Chair only)

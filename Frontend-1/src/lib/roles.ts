@@ -1,5 +1,5 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase } from "lucide-react";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase, BookOpen } from "lucide-react";
 import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
@@ -28,6 +28,7 @@ export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] =
   { to: "/uongozi/portfolio", label: "Portfolio ya Mikopo", icon: Briefcase },
   { to: "/njia-za-malipo", label: "Njia za Malipo", icon: Landmark, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
+  { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },
 ];
@@ -45,6 +46,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/michango-inayosubiri", label: "Idhinisha Mifuko", icon: ClipboardList },
     { to: "/marejesho", label: "Marejesho", icon: Receipt },
     { to: "/ripoti", label: "Ripoti", icon: FileBarChart2 },
+    { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   "Mweka Hazina": [
     { to: "/dashibodi", label: "Dashibodi", icon: Home },
@@ -56,6 +58,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/mikopo", label: "Mikopo", icon: Wallet },
     { to: "/wanachama", label: "Wanachama", icon: Users },
     { to: "/ripoti", label: "Ripoti za Fedha", icon: FileBarChart2 },
+    { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   Katibu: [
     { to: "/dashibodi", label: "Dashibodi", icon: Home },
@@ -66,6 +69,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/michango", label: "Kumbukumbu", icon: PiggyBank },
     { to: "/mikopo", label: "Mikopo", icon: Banknote },
     { to: "/ripoti", label: "Ripoti", icon: FileBarChart2 },
+    { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   Mwanachama: [
     { to: "/dashibodi", label: "Akaunti Yangu", icon: Home },

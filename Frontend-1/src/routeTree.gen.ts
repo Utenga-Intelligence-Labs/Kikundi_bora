@@ -26,6 +26,7 @@ import { Route as MichangoInayosubiriRouteImport } from './routes/michango-inayo
 import { Route as MichangoRouteImport } from './routes/michango'
 import { Route as MfukoKijamiiRouteImport } from './routes/mfuko-kijamii'
 import { Route as MarejeshoRouteImport } from './routes/marejesho'
+import { Route as KitabuRouteImport } from './routes/kitabu'
 import { Route as KamatiMikopoRouteImport } from './routes/kamati-mikopo'
 import { Route as IngiaRouteImport } from './routes/ingia'
 import { Route as HistoriaYanguRouteImport } from './routes/historia-yangu'
@@ -125,6 +126,11 @@ const MarejeshoRoute = MarejeshoRouteImport.update({
   path: '/marejesho',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KitabuRoute = KitabuRouteImport.update({
+  id: '/kitabu',
+  path: '/kitabu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KamatiMikopoRoute = KamatiMikopoRouteImport.update({
   id: '/kamati-mikopo',
   path: '/kamati-mikopo',
@@ -200,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
+  '/kitabu': typeof KitabuRoute
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
@@ -232,6 +239,7 @@ export interface FileRoutesByTo {
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
+  '/kitabu': typeof KitabuRoute
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
@@ -265,6 +273,7 @@ export interface FileRoutesById {
   '/historia-yangu': typeof HistoriaYanguRoute
   '/ingia': typeof IngiaRoute
   '/kamati-mikopo': typeof KamatiMikopoRoute
+  '/kitabu': typeof KitabuRoute
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
+    | '/kitabu'
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
+    | '/kitabu'
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/historia-yangu'
     | '/ingia'
     | '/kamati-mikopo'
+    | '/kitabu'
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
@@ -396,6 +408,7 @@ export interface RootRouteChildren {
   HistoriaYanguRoute: typeof HistoriaYanguRoute
   IngiaRoute: typeof IngiaRoute
   KamatiMikopoRoute: typeof KamatiMikopoRoute
+  KitabuRoute: typeof KitabuRoute
   MarejeshoRoute: typeof MarejeshoRoute
   MfukoKijamiiRoute: typeof MfukoKijamiiRoute
   MichangoRoute: typeof MichangoRoute
@@ -541,6 +554,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MarejeshoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kitabu': {
+      id: '/kitabu'
+      path: '/kitabu'
+      fullPath: '/kitabu'
+      preLoaderRoute: typeof KitabuRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kamati-mikopo': {
       id: '/kamati-mikopo'
       path: '/kamati-mikopo'
@@ -644,6 +664,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoriaYanguRoute: HistoriaYanguRoute,
   IngiaRoute: IngiaRoute,
   KamatiMikopoRoute: KamatiMikopoRoute,
+  KitabuRoute: KitabuRoute,
   MarejeshoRoute: MarejeshoRoute,
   MfukoKijamiiRoute: MfukoKijamiiRoute,
   MichangoRoute: MichangoRoute,
