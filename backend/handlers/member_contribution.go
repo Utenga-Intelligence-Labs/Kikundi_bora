@@ -259,10 +259,11 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 		"status": "CONFIRMED", "reviewed_by": reviewerMember.ID,
 	})
 
-	// Auto-post AKIBA into the double-entry ledger (best-effort — a ledger
-	// failure is logged but never fails the confirmation). MFUKO_WA_KIJAMII
-	// stays manual: it is earmarked welfare money, not savings.
-	if contribution.ContributionType == models.ContributionAkiba && contribution.Member != nil {
+	// Auto-post into the double-entry ledger (best-effort — a ledger
+	// failure is logged but never fails the confirmation). Only
+	// MFUKO_WA_KIJAMII is skipped: it is earmarked welfare money, not
+	// savings. Empty/legacy types post as savings like AKIBA.
+	if contribution.ContributionType != models.ContributionMfuko && contribution.Member != nil {
 		if err := services.PostContribution(contribution.Member.MemberNo, contribution.Amount, now, userID,
 			fmt.Sprintf("Mchango AKIBA %s %s", contribution.Member.MemberNo, contribution.PeriodLabel)); err != nil {
 			log.Printf("WARN: ledger auto-post michango %s: %v", contribution.ID, err)

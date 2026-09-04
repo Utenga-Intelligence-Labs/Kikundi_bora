@@ -1,29 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { Field } from "@/components/Field";
-import { useAuth } from "@/lib/auth-provider";
-import { requireAuth, requireRole, hasRole } from "@/lib/role-guards";
+import { requireAuth, requireRole } from "@/lib/role-guards";
 import { tzs } from "@/lib/format";
 import {
   useTrialBalance,
   useLedgerBalance,
   useLedgerStatement,
-  useRecordTransaction,
-  useReverseTransaction,
 } from "@/hooks/use-ledger";
 import {
-  type LedgerDirection,
-  type LedgerEntryInput,
-} from "@/api/ledger";
-import {
-  BookOpen,
   Scale,
-  PlusCircle,
-  Undo2,
   Loader2,
   AlertTriangle,
-  CheckCircle2,
   ArrowDownLeft,
   ArrowUpRight,
 } from "lucide-react";
@@ -32,44 +20,34 @@ export const Route = createFileRoute("/kitabu")({
   head: () => ({
     meta: [
       { title: "Kitabu cha Fedha — Money Seeking" },
-      { name: "description", content: "Kitabu cha double-entry: trial balance, akaunti, na uingizaji wa miamala (mweka hazina)." },
+      { name: "description", content: "Kitabu cha double-entry (kusoma tu): trial balance na mwenendo wa pesa." },
     ],
   }),
   beforeLoad: () => {
     requireAuth();
-    // Chair + secretary view-only; treasurer posts. Admin bypasses (full access).
+    // Viewing only — chair, secretary, treasurer. Admin bypasses.
     requireRole("chair", "secretary", "treasurer");
   },
   component: KitabuPage,
 });
 
-type Tab = "muhtasari" | "mwenendo" | "muamala" | "batilisha";
+type Tab = "muhtasari" | "mwenendo";
 
 function KitabuPage() {
-  const { user } = useAuth();
-  const canWrite = hasRole(user, "treasurer", "admin");
   const [tab, setTab] = useState<Tab>("muhtasari");
 
-  const tabs: { id: Tab; label: string; write?: boolean }[] = [
+  const tabs: { id: Tab; label: string }[] = [
     { id: "muhtasari", label: "Muhtasari" },
     { id: "mwenendo", label: "Pesa Ilivyoingia/Kutoka" },
-    { id: "muamala", label: "Ingiza Muamala", write: true },
-    { id: "batilisha", label: "Batilisha", write: true },
   ];
 
   return (
     <AppShell
       title="Kitabu cha Fedha"
-      subtitle={
-        canWrite
-          ? "Double-entry: ingiza miamala na fuatilia vitabu"
-          : "Mtazamo wa vitabu (kusoma tu)"
-      }
+      subtitle="Mtazamo wa vitabu (kusoma tu) — miamala inaingia kiotomatiki"
     >
       <div className="mb-4 flex flex-wrap gap-2">
-        {tabs
-          .filter((t) => !t.write || canWrite)
-          .map((t) => (
+        {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
@@ -86,8 +64,6 @@ function KitabuPage() {
 
       {tab === "muhtasari" && <TrialBalanceCard />}
       {tab === "mwenendo" && <MovementCard />}
-      {tab === "muamala" && canWrite && <RecordForm />}
-      {tab === "batilisha" && canWrite && <ReverseForm />}
     </AppShell>
   );
 }
@@ -116,17 +92,6 @@ function ErrorNote({ message }: { message: string }) {
     </p>
   );
 }
-
-function SuccessNote({ message }: { message: string }) {
-  return (
-    <p className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2.5 text-sm text-emerald-700 dark:text-emerald-400">
-      <CheckCircle2 className="h-4 w-4 shrink-0" /> {message}
-    </p>
-  );
-}
-
-const submitBtn =
-  "rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50";
 
 // ---- Muhtasari (trial balance): everyone with access ----
 function TrialBalanceCard() {
@@ -186,99 +151,6 @@ function TrialBalanceCard() {
           </tfoot>
         </table>
       </div>
-    </Card>
-  );
-}
-
-// ---- Ingiza Muamala (treasurer/admin only) ----
-function RecordForm() {
-  const [memo, setMemo] = useState("");
-  const [entries, setEntries] = useState<(LedgerEntryInput & { amount: string })[]>([
-    { account_name: "hazina_taslimu", direction: "debit", amount_minor: 0, amount: "" },
-    { account_name: "akiba_ya_mwanachama:", direction: "credit", amount_minor: 0, amount: "" },
-  ]);
-  const m = useRecordTransaction();
-  const [done, setDone] = useState<string | null>(null);
-
-  const totals = useMemo(() => {
-    let d = 0, c = 0;
-    for (const e of entries) {
-      const v = Math.round(Number(e.amount) || 0);
-      if (e.direction === "debit") d += v; else c += v;
-    }
-    return { d, c, balanced: d > 0 && d === c };
-  }, [entries]);
-
-  const setEntry = (i: number, patch: Partial<LedgerEntryInput & { amount: string }>) =>
-    setEntries((prev) => prev.map((e, j) => (j === i ? { ...e, ...patch } : e)));
-
-  const submit = () => {
-    setDone(null);
-    m.reset();
-    m.mutate(
-      {
-        memo: memo.trim(),
-        entries: entries.map((e) => ({
-          account_name: e.account_name.trim(),
-          direction: e.direction as LedgerDirection,
-          amount_minor: Math.round(Number(e.amount) || 0),
-        })),
-      },
-      { onSuccess: (r) => { setDone(`Muamala umerekodiwa (${r.transaction_id.slice(0, 8)}…)`); setMemo(""); } }
-    );
-  };
-
-  const valid = memo.trim().length > 0 && entries.length >= 1 && totals.balanced &&
-    entries.every((e) => e.account_name.trim().length >= 2 && (Number(e.amount) || 0) > 0);
-
-  return (
-    <Card title="Ingiza Muamala" sub="Debit lazima iwe sawa na credit — vinginevyo seva itakataa" icon={PlusCircle}>
-      <div className="mb-3"><Field label="Maelezo (memo)" value={memo} onChange={setMemo} placeholder="Mfano: Michango Septemba — KKK-0001" /></div>
-      {entries.map((e, i) => (
-        <div key={i} className="mb-2 grid grid-cols-12 gap-2">
-          <div className="col-span-6">
-            <Field label={i === 0 ? "Akaunti" : ""} value={e.account_name} onChange={(v) => setEntry(i, { account_name: v })} placeholder="hazina_taslimu" />
-          </div>
-          <div className="col-span-3">
-            <label className="block">
-              {i === 0 && <span className="mb-1 block text-xs font-medium text-muted-foreground">Mwelekeo</span>}
-              <select
-                value={e.direction}
-                onChange={(ev) => setEntry(i, { direction: ev.target.value as LedgerDirection })}
-                className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none"
-              >
-                <option value="debit">Debit</option>
-                <option value="credit">Credit</option>
-              </select>
-            </label>
-          </div>
-          <div className="col-span-2">
-            <Field label={i === 0 ? "TZS" : ""} type="number" value={e.amount} onChange={(v) => setEntry(i, { amount: v })} placeholder="0" />
-          </div>
-          <div className="col-span-1 flex items-end">
-            <button
-              onClick={() => setEntries((prev) => prev.filter((_, j) => j !== i))}
-              disabled={entries.length <= 1}
-              className="rounded-xl border border-border px-2 py-2.5 text-sm text-destructive disabled:opacity-30"
-              title="Ondoa"
-            >×</button>
-          </div>
-        </div>
-      ))}
-      <div className="mb-3 flex gap-2">
-        <button
-          onClick={() => setEntries((p) => [...p, { account_name: "", direction: "debit", amount_minor: 0, amount: "" }])}
-          className="rounded-xl border border-border px-3 py-1.5 text-sm"
-        >+ Mstari</button>
-        <span className={`self-center text-sm ${totals.balanced ? "text-emerald-600" : "text-muted-foreground"}`}>
-          Debit {tzs(totals.d)} · Credit {tzs(totals.c)}{totals.balanced ? " · Inasawazishwa" : ""}
-        </span>
-      </div>
-      {m.isError && <div className="mb-2"><ErrorNote message={(m.error as Error)?.message ?? "Imeshindikana kurekodi"} /></div>}
-      {done && <div className="mb-2"><SuccessNote message={done} /></div>}
-      <button onClick={submit} disabled={!valid || m.isPending} className={submitBtn}>
-        {m.isPending ? "Inarekodi…" : "Rekodi Muamala"}
-      </button>
     </Card>
   );
 }
@@ -382,32 +254,6 @@ function MovementCard() {
       <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
         <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         Kila mchango ukithibitishwa, kila marejesho na kila mkopo unaotolewa huingia hapa kiotomatiki — hakuna kuingiza manually.
-      </p>
-    </Card>
-  );
-}
-
-// ---- Batilisha (treasurer/admin only) ----
-function ReverseForm() {
-  const [id, setId] = useState("");
-  const [reason, setReason] = useState("");
-  const m = useReverseTransaction();
-  const [done, setDone] = useState<string | null>(null);
-
-  return (
-    <Card title="Batilisha Muamala" sub="Historia haifutwi — ubatilishaji ni event mpya" icon={Undo2}>
-      <div className="mb-3"><Field label="Transaction ID" value={id} onChange={setId} placeholder="uuid ya muamala" /></div>
-      <div className="mb-3"><Field label="Sababu" value={reason} onChange={setReason} placeholder="Mfano: kiasi kilikosewa" /></div>
-      {m.isError && <div className="mb-2"><ErrorNote message={(m.error as Error)?.message ?? "Imeshindikana"} /></div>}
-      {done && <div className="mb-2"><SuccessNote message={done} /></div>}
-      <button
-        onClick={() => { setDone(null); m.reset(); m.mutate({ id: id.trim(), reason: reason.trim() || undefined }, { onSuccess: () => { setDone("Muamala umebatilishwa"); setId(""); setReason(""); } }); }}
-        disabled={id.trim().length < 8 || m.isPending}
-        className={submitBtn}
-      >{m.isPending ? "Inabatilisha…" : "Batilisha"}</button>
-      <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
-        <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        ID ya muamala unaipata kwenye statement ya akaunti husika (safu ya kwanza).
       </p>
     </Card>
   );
