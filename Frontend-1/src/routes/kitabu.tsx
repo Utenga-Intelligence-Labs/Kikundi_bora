@@ -9,14 +9,12 @@ import {
   useTrialBalance,
   useLedgerBalance,
   useLedgerStatement,
-  useOpenAccount,
   useRecordTransaction,
   useReverseTransaction,
 } from "@/hooks/use-ledger";
 import {
   STANDARD_ACCOUNTS,
   type LedgerDirection,
-  type LedgerAccountType,
   type LedgerEntryInput,
 } from "@/api/ledger";
 import {
@@ -24,11 +22,12 @@ import {
   Scale,
   Search,
   PlusCircle,
-  Landmark,
   Undo2,
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/kitabu")({
@@ -46,7 +45,7 @@ export const Route = createFileRoute("/kitabu")({
   component: KitabuPage,
 });
 
-type Tab = "muhtasari" | "akaunti" | "muamala" | "akaunti-mpya" | "batilisha";
+type Tab = "muhtasari" | "mwenendo" | "akaunti" | "muamala" | "batilisha";
 
 function KitabuPage() {
   const { user } = useAuth();
@@ -55,9 +54,9 @@ function KitabuPage() {
 
   const tabs: { id: Tab; label: string; write?: boolean }[] = [
     { id: "muhtasari", label: "Muhtasari" },
+    { id: "mwenendo", label: "Pesa Ilivyoingia/Kutoka" },
     { id: "akaunti", label: "Akaunti" },
     { id: "muamala", label: "Ingiza Muamala", write: true },
-    { id: "akaunti-mpya", label: "Fungua Akaunti", write: true },
     { id: "batilisha", label: "Batilisha", write: true },
   ];
 
@@ -89,9 +88,9 @@ function KitabuPage() {
       </div>
 
       {tab === "muhtasari" && <TrialBalanceCard />}
+      {tab === "mwenendo" && <MovementCard />}
       {tab === "akaunti" && <AccountCard />}
       {tab === "muamala" && canWrite && <RecordForm />}
-      {tab === "akaunti-mpya" && canWrite && <OpenAccountForm />}
       {tab === "batilisha" && canWrite && <ReverseForm />}
     </AppShell>
   );
@@ -348,44 +347,106 @@ function RecordForm() {
   );
 }
 
-// ---- Fungua Akaunti (treasurer/admin only) ----
-function OpenAccountForm() {
-  const [name, setName] = useState("");
-  const [type, setType] = useState<LedgerAccountType>("asset");
-  const [owner, setOwner] = useState("");
-  const m = useOpenAccount();
-  const [done, setDone] = useState<string | null>(null);
+// ---- Mwenendo wa pesa (cash in/out log): everyone with access ----
+// hazina_taslimu ni asset: debit = pesa iliyoingia, credit = pesa iliyotoka.
+function MovementCard() {
+  const toISO = useMemo(() => new Date().toISOString(), []);
+  const fromISO = useMemo(
+    () => new Date(Date.now() - 90 * 86400000).toISOString(),
+    []
+  );
+  const balance = useLedgerBalance("hazina_taslimu");
+  const stmt = useLedgerStatement("hazina_taslimu", fromISO, toISO);
+
+  const lines = useMemo(() => {
+    const ls = [...(stmt.data?.statement ?? [])];
+    ls.sort(
+      (a, b) => +new Date(a.OccurredAt) - +new Date(b.OccurredAt)
+    );
+    return ls;
+  }, [stmt.data]);
+
+  const signed = (direction: string, minor: number) =>
+    direction === "debit" ? minor : -minor;
+  const inSum = lines
+    .filter((l) => l.Direction === "debit")
+    .reduce((s, l) => s + l.AmountMinor, 0);
+  const outSum = lines
+    .filter((l) => l.Direction !== "debit")
+    .reduce((s, l) => s + l.AmountMinor, 0);
+  const net = inSum - outSum;
+  const current = balance.data?.amount_minor ?? null;
+  const opening = current != null ? current - net : null;
+
+  if (balance.isLoading || stmt.isLoading) {
+    return (
+      <Card title="Pesa Ilivyoingia/Kutoka" icon={ArrowDownLeft}>
+        <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+      </Card>
+    );
+  }
+  if ((balance.error && stmt.error) || lines.length === 0) {
+    return (
+      <Card title="Pesa Ilivyoingia/Kutoka" sub="hazina_taslimu · siku 90 zilizopita" icon={ArrowDownLeft}>
+        <p className="text-sm text-muted-foreground">Hakuna mwenendo wa pesa katika kipindi hiki. Miamala inaingia kiotomatiki michango inapothibitishwa.</p>
+      </Card>
+    );
+  }
+
+  let running = opening ?? 0;
+  const rows = lines.map((l) => {
+    running += signed(l.Direction, l.AmountMinor);
+    return { ...l, running };
+  });
 
   return (
-    <Card title="Fungua Akaunti" sub="Akaunti za wanachama: akiba_ya_mwanachama:KKK-0001" icon={Landmark}>
-      <div className="mb-3 grid gap-3 sm:grid-cols-2">
-        <Field label="Jina la akaunti" value={name} onChange={setName} placeholder="hazina_taslimu" />
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Aina</span>
-          <select value={type} onChange={(e) => setType(e.target.value as LedgerAccountType)} className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none">
-            <option value="asset">asset (mali)</option>
-            <option value="liability">liability (deni/akiba)</option>
-            <option value="income">income (mapato)</option>
-            <option value="expense">expense (matumizi)</option>
-            <option value="equity">equity (mtaji)</option>
-          </select>
-        </label>
+    <Card title="Pesa Ilivyoingia/Kutoka" sub="hazina_taslimu · siku 90 zilizopita" icon={ArrowDownLeft}>
+      <div className="mb-3 grid grid-cols-3 gap-2 text-center">
+        <div className="rounded-xl bg-emerald-500/10 px-2 py-2">
+          <p className="text-[11px] text-muted-foreground">Ingizo</p>
+          <p className="text-sm font-bold text-emerald-600">+{tzs(inSum)}</p>
+        </div>
+        <div className="rounded-xl bg-destructive/10 px-2 py-2">
+          <p className="text-[11px] text-muted-foreground">Matoleo</p>
+          <p className="text-sm font-bold text-destructive">−{tzs(outSum)}</p>
+        </div>
+        <div className="rounded-xl bg-primary/5 px-2 py-2">
+          <p className="text-[11px] text-muted-foreground">Salio sasa</p>
+          <p className="text-sm font-bold">{current != null ? tzs(current) : "—"}</p>
+        </div>
       </div>
-      <div className="mb-3"><Field label="Mmiliki (hiari — namba ya mwanachama)" value={owner} onChange={setOwner} placeholder="KKK-0001" /></div>
-      <div className="mb-3 flex flex-wrap gap-1.5">
-        {STANDARD_ACCOUNTS.map((a) => (
-          <button key={a.name} onClick={() => { setName(a.name); setType(a.type); }} className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-            {a.name}
-          </button>
-        ))}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="py-2 pr-2">Tarehe</th>
+              <th className="py-2 pr-2">Maelezo</th>
+              <th className="py-2 pr-2 text-right">Ingizo</th>
+              <th className="py-2 pr-2 text-right">Toleo</th>
+              <th className="py-2 text-right">Salio</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.TransactionID}-${r.OccurredAt}`} className="border-b border-border/50">
+                <td className="py-2 pr-2 text-muted-foreground">{new Date(r.OccurredAt).toLocaleDateString()}</td>
+                <td className="py-2 pr-2">{r.Memo}</td>
+                <td className="py-2 pr-2 text-right text-emerald-600">
+                  {r.Direction === "debit" ? `+${tzs(r.AmountMinor)}` : "—"}
+                </td>
+                <td className="py-2 pr-2 text-right text-destructive">
+                  {r.Direction !== "debit" ? `−${tzs(r.AmountMinor)}` : "—"}
+                </td>
+                <td className="py-2 text-right font-semibold">{tzs(r.running)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      {m.isError && <div className="mb-2"><ErrorNote message={(m.error as Error)?.message ?? "Imeshindikana"} /></div>}
-      {done && <div className="mb-2"><SuccessNote message={done} /></div>}
-      <button
-        onClick={() => { setDone(null); m.reset(); m.mutate({ name: name.trim(), type, owner_member_ref: owner.trim() || undefined }, { onSuccess: (r) => { setDone(`Akaunti "${r.account_name}" imefunguliwa`); setName(""); setOwner(""); } }); }}
-        disabled={name.trim().length < 2 || m.isPending}
-        className={submitBtn}
-      >{m.isPending ? "Inafungua…" : "Fungua Akaunti"}</button>
+      <p className="mt-3 flex items-start gap-2 text-xs text-muted-foreground">
+        <ArrowUpRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        Kila mchango ukithibitishwa, kila marejesho na kila mkopo unaotolewa huingia hapa kiotomatiki — hakuna kuingiza manually.
+      </p>
     </Card>
   );
 }

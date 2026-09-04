@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"kikundibora/database"
@@ -44,8 +45,26 @@ func autoActor(raw string) uuid.UUID {
 }
 
 // tzsMinor converts decimal TZS to integer minor units (cents).
+// Pure — covered by unit test.
 func tzsMinor(d decimal.Decimal) int64 {
 	return d.Mul(decimal.NewFromInt(100)).Round(0).IntPart()
+}
+
+// savingsAccount returns the member savings account name, refusing blank
+// refs so a data bug can never create a garbage "akiba_ya_mwanachama:" account.
+func savingsAccount(memberNo string) (string, error) {
+	if strings.TrimSpace(memberNo) == "" {
+		return "", errors.New("empty member ref")
+	}
+	return ledger.MemberSavingsName(strings.TrimSpace(memberNo)), nil
+}
+
+// receivableAccount is the blank-ref guard for loan receivable accounts.
+func receivableAccount(memberNo string) (string, error) {
+	if strings.TrimSpace(memberNo) == "" {
+		return "", errors.New("empty member ref")
+	}
+	return ledger.LoanReceivableName(strings.TrimSpace(memberNo)), nil
 }
 
 func ensureLedgerAccount(ctx context.Context, actor uuid.UUID, name string, typ ledger.AccountType, owner string) error {
@@ -79,7 +98,10 @@ func PostContribution(memberNo string, amount decimal.Decimal, occurredAt time.T
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	actor := autoActor(actorUserID)
-	savings := ledger.MemberSavingsName(memberNo)
+	savings, err := savingsAccount(memberNo)
+	if err != nil {
+		return err
+	}
 	if err := ensureLedgerAccount(ctx, actor, ledger.NameGroupCash, ledger.Asset, ""); err != nil {
 		return err
 	}
@@ -95,7 +117,10 @@ func PostRepayment(memberNo string, amount decimal.Decimal, occurredAt time.Time
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	actor := autoActor(actorUserID)
-	receivable := ledger.LoanReceivableName(memberNo)
+	receivable, err := receivableAccount(memberNo)
+	if err != nil {
+		return err
+	}
 	if err := ensureLedgerAccount(ctx, actor, ledger.NameGroupCash, ledger.Asset, ""); err != nil {
 		return err
 	}
@@ -111,7 +136,10 @@ func PostDisbursement(memberNo string, amount decimal.Decimal, occurredAt time.T
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	actor := autoActor(actorUserID)
-	receivable := ledger.LoanReceivableName(memberNo)
+	receivable, err := receivableAccount(memberNo)
+	if err != nil {
+		return err
+	}
 	if err := ensureLedgerAccount(ctx, actor, receivable, ledger.Asset, memberNo); err != nil {
 		return err
 	}
