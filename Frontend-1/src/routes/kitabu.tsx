@@ -13,14 +13,12 @@ import {
   useReverseTransaction,
 } from "@/hooks/use-ledger";
 import {
-  STANDARD_ACCOUNTS,
   type LedgerDirection,
   type LedgerEntryInput,
 } from "@/api/ledger";
 import {
   BookOpen,
   Scale,
-  Search,
   PlusCircle,
   Undo2,
   Loader2,
@@ -45,7 +43,7 @@ export const Route = createFileRoute("/kitabu")({
   component: KitabuPage,
 });
 
-type Tab = "muhtasari" | "mwenendo" | "akaunti" | "muamala" | "batilisha";
+type Tab = "muhtasari" | "mwenendo" | "muamala" | "batilisha";
 
 function KitabuPage() {
   const { user } = useAuth();
@@ -55,7 +53,6 @@ function KitabuPage() {
   const tabs: { id: Tab; label: string; write?: boolean }[] = [
     { id: "muhtasari", label: "Muhtasari" },
     { id: "mwenendo", label: "Pesa Ilivyoingia/Kutoka" },
-    { id: "akaunti", label: "Akaunti" },
     { id: "muamala", label: "Ingiza Muamala", write: true },
     { id: "batilisha", label: "Batilisha", write: true },
   ];
@@ -89,7 +86,6 @@ function KitabuPage() {
 
       {tab === "muhtasari" && <TrialBalanceCard />}
       {tab === "mwenendo" && <MovementCard />}
-      {tab === "akaunti" && <AccountCard />}
       {tab === "muamala" && canWrite && <RecordForm />}
       {tab === "batilisha" && canWrite && <ReverseForm />}
     </AppShell>
@@ -190,66 +186,6 @@ function TrialBalanceCard() {
           </tfoot>
         </table>
       </div>
-    </Card>
-  );
-}
-
-// ---- Akaunti (balance + statement): everyone with access ----
-function AccountCard() {
-  const [account, setAccount] = useState("hazina_taslimu");
-  const [query, setQuery] = useState<string | null>(null);
-  const balance = useLedgerBalance(query);
-  const statement = useLedgerStatement(query);
-
-  return (
-    <Card title="Akaunti" sub="Salio na statement kwa akaunti moja" icon={Search}>
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
-        <div className="flex-1">
-          <Field label="Jina la akaunti" value={account} onChange={setAccount} placeholder="hazina_taslimu" />
-        </div>
-        <button onClick={() => setQuery(account.trim())} className={`${submitBtn} sm:self-end`}>
-          Tafuta
-        </button>
-      </div>
-      <datalist id="kitabu-accounts">
-        {STANDARD_ACCOUNTS.map((a) => (
-          <option key={a.name} value={a.name} />
-        ))}
-      </datalist>
-
-      {balance.data && (
-        <p className="mb-3 rounded-xl bg-primary/5 px-3 py-2.5 text-sm">
-          Salio la <strong>{balance.data.account}</strong>:{" "}
-          <strong>{tzs(balance.data.amount_minor)}</strong>
-        </p>
-      )}
-      {(balance.error || statement.error) && query && (
-        <ErrorNote message="Akaunti haijapatikana. Fungua akaunti kwanza." />
-      )}
-      {(statement.data?.statement ?? []).length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="py-2 pr-2">Tarehe</th>
-                <th className="py-2 pr-2">Maelezo</th>
-                <th className="py-2 pr-2">Mwelekeo</th>
-                <th className="py-2 text-right">Kiasi</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(statement.data?.statement ?? []).map((s) => (
-                <tr key={`${s.TransactionID}-${s.OccurredAt}`} className="border-b border-border/50">
-                  <td className="py-2 pr-2 text-muted-foreground">{new Date(s.OccurredAt).toLocaleDateString()}</td>
-                  <td className="py-2 pr-2">{s.Memo}</td>
-                  <td className="py-2 pr-2">{s.Direction === "debit" ? "Debit" : "Credit"}</td>
-                  <td className="py-2 text-right">{tzs(s.AmountMinor)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </Card>
   );
 }

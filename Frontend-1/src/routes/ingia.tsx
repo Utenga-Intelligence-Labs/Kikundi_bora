@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth-provider";
 import { AuthLayout } from "@/components/AuthLayout";
 import { Field } from "@/components/Field";
-import { Mail, KeyRound, ArrowRight, Phone } from "lucide-react";
+import { Mail, KeyRound, ArrowRight, Phone, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/ingia")({
   head: () => ({
@@ -20,6 +20,7 @@ function IngiaPage() {
   const { login } = useAuth();
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -64,7 +65,31 @@ function IngiaPage() {
           placeholder="0712345678 au jina@mfano.com"
           autoComplete="username"
         />
-        <Field icon={KeyRound} label="Nenosiri" type="password" value={password} onChange={setPassword} placeholder="••••••••" autoComplete="current-password" />
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-muted-foreground">
+            Nenosiri
+          </span>
+          <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-ring/20">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <input
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              className="w-full bg-transparent text-sm outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ficha nenosiri" : "Onesha nenosiri"}
+              title={showPassword ? "Ficha nenosiri" : "Onesha nenosiri"}
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+        </label>
         <div className="flex items-center justify-between text-xs">
           <span />
           <Link to="/sahau" className="font-medium text-primary">Umesahau nenosiri?</Link>
