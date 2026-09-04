@@ -189,6 +189,17 @@ function MovementCard() {
   const current = balance.data?.amount_minor ?? null;
   const opening = current != null ? current - net : null;
 
+  const [selected, setSelected] = useState<string | null>(null);
+  const topOut = useMemo(
+    () =>
+      lines
+        .filter((l) => l.Direction !== "debit")
+        .slice()
+        .sort((a, b) => b.AmountMinor - a.AmountMinor)
+        .slice(0, 5),
+    [lines]
+  );
+
   if (balance.isLoading || stmt.isLoading) {
     return (
       <Card title="Pesa Ilivyoingia/Kutoka" icon={ArrowDownLeft}>
@@ -209,17 +220,6 @@ function MovementCard() {
     running += signed(l.Direction, l.AmountMinor);
     return { ...l, running };
   });
-
-  const [selected, setSelected] = useState<string | null>(null);
-  const topOut = useMemo(
-    () =>
-      lines
-        .filter((l) => l.Direction !== "debit")
-        .slice()
-        .sort((a, b) => b.AmountMinor - a.AmountMinor)
-        .slice(0, 5),
-    [lines]
-  );
 
   return (
     <Card title="Pesa Ilivyoingia/Kutoka" sub="hazina_taslimu · siku 90 zilizopita · bofya mstari kuona maelezo" icon={ArrowDownLeft}>
