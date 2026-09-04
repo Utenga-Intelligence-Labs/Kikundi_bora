@@ -63,6 +63,12 @@ func AutoMigrate() {
 	log.Println("Migration: adding foreign key constraints (pass 2)...")
 	addFKConstraints()
 
+	// Backfill: payment methods created before the approval workflow
+	// carry an empty status — treat them as approved (they were live).
+	DB.Model(&models.PaymentMethod{}).
+		Where("status = '' OR status IS NULL").
+		Update("status", models.PaymentMethodApproved)
+
 	log.Println("Migration complete.")
 }
 

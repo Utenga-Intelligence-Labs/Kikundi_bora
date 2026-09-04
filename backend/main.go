@@ -180,6 +180,7 @@ func main() {
 	pms := groups.Group("/:id/payment-methods")
 	pms.Get("/", paymentMethodHandler.List)
 	pms.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Create)
+	pms.Post("/:pmId/approve", middleware.RequireRoles(models.RoleChair), paymentMethodHandler.Approve)
 	pms.Patch("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Update)
 	pms.Delete("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Delete)
 

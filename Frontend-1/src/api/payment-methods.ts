@@ -12,6 +12,9 @@ export interface PaymentMethod {
   account_number: string;
   account_name: string;
   is_active: boolean;
+  status: string; // pending | approved (missing = approved, pre-workflow rows)
+  approved_by?: string | null;
+  approved_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -50,5 +53,11 @@ export const paymentMethodsApi = {
   remove: (groupId: string, pmId: string) =>
     api.delete<{ message: string }>(
       `/groups/${groupId}/payment-methods/${pmId}`
+    ),
+
+  /** Mwenyekiti only — approve a treasurer-submitted (pending) method */
+  approve: (groupId: string, pmId: string) =>
+    api.post<{ message: string; data: PaymentMethod }>(
+      `/groups/${groupId}/payment-methods/${pmId}/approve`
     ),
 };

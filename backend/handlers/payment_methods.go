@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"time"
+
 	"kikundibora/database"
 	"kikundibora/middleware"
 	"kikundibora/models"
@@ -76,7 +78,7 @@ func (h *PaymentMethodHandler) List(c *fiber.Ctx) error {
 	role := middleware.GetUserRole(c)
 	query := database.DB.Where("group_id = ?", g.ID)
 	if role != models.RoleChair && role != models.RoleTreasurer && role != models.RoleAdmin {
-		query = query.Where("is_active = TRUE")
+		query = query.Where("status = ? AND is_active = TRUE", models.PaymentMethodApproved)
 	}
 
 	var methods []models.PaymentMethod
@@ -86,6 +88,8 @@ func (h *PaymentMethodHandler) List(c *fiber.Ctx) error {
 }
 
 // Create adds a payment method. Mwenyekiti / Mweka Hazina only (route guard).
+// Chair-created methods go live immediately; treasurer submissions stay
+// pending until the Mwenyekiti approves (POST .../:pmId/approve).
 // POST /api/v1/groups/:id/payment-methods
 func (h *PaymentMethodHandler) Create(c *fiber.Ctx) error {
 	g := loadGroupForPaymentMethods(c)
@@ -102,6 +106,8 @@ func (h *PaymentMethodHandler) Create(c *fiber.Ctx) error {
 	}
 
 	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+	now := time.Now()
 	pm := models.PaymentMethod{
 		GroupID:       g.ID,
 		Type:          models.PaymentMethodType(req.Type),
@@ -109,7 +115,15 @@ func (h *PaymentMethodHandler) Create(c *fiber.Ctx) error {
 		AccountNumber: req.AccountNumber,
 		AccountName:   req.AccountName,
 		IsActive:      true,
+		Status:        models.PaymentMethodPending,
 		CreatedBy:     userID,
+	}
+	msg := "Njia ya malipo imesajiliwa — inasubiri kuidhinishwa na Mwenyekiti"
+	if role == models.RoleChair || role == models.RoleAdmin {
+		pm.Status = models.PaymentMethodApproved
+		pm.ApprovedBy = &userID
+		pm.ApprovedAt = &now
+		msg = "Njia ya malipo imeongezwa"
 	}
 	if err := database.DB.Create(&pm).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuongeza njia ya malipo"})
@@ -117,9 +131,10 @@ func (h *PaymentMethodHandler) Create(c *fiber.Ctx) error {
 
 	services.LogAudit(c, &userID, models.AuditCreate, "payment_methods", &pm.ID, nil, map[string]interface{}{
 		"group_id": g.ID, "type": pm.Type, "provider": pm.ProviderName, "account": pm.AccountNumber,
+		"status": pm.Status,
 	})
 
-	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": "Njia ya malipo imeongezwa", "data": pm})
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{"message": msg, "data": pm})
 }
 
 // Update edits a payment method (fields or is_active toggle).
@@ -161,16 +176,67 @@ func (h *PaymentMethodHandler) Update(c *fiber.Ctx) error {
 		pm.IsActive = *req.IsActive
 	}
 
+	// Treasurer edits to an approved method send it back to pending for
+	// re-approval; chair edits approve immediately.
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
+	msg := "Mabadiliko yamehifadhiwa"
+	now := time.Now()
+	if role == models.RoleChair || role == models.RoleAdmin {
+		pm.Status = models.PaymentMethodApproved
+		pm.ApprovedBy = &userID
+		pm.ApprovedAt = &now
+	} else if pm.Status == models.PaymentMethodApproved {
+		pm.Status = models.PaymentMethodPending
+		pm.ApprovedBy = nil
+		pm.ApprovedAt = nil
+		msg = "Mabadiliko yamehifadhiwa — inasubiri kuidhinishwa tena na Mwenyekiti"
+	}
+
 	if err := database.DB.Save(&pm).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi mabadiliko"})
 	}
 
-	userID := middleware.GetUserID(c)
 	services.LogAudit(c, &userID, models.AuditUpdate, "payment_methods", &pm.ID, nil, map[string]interface{}{
 		"provider": pm.ProviderName, "account": pm.AccountNumber, "is_active": pm.IsActive,
+		"status": pm.Status,
 	})
 
-	return c.JSON(fiber.Map{"message": "Mabadiliko yamehifadhiwa", "data": pm})
+	return c.JSON(fiber.Map{"message": msg, "data": pm})
+}
+
+// Approve marks a pending payment method as approved so members can see it.
+// Mwenyekiti only (route guard; admin bypasses via RequireRoles).
+// POST /api/v1/groups/:id/payment-methods/:pmId/approve
+func (h *PaymentMethodHandler) Approve(c *fiber.Ctx) error {
+	g := loadGroupForPaymentMethods(c)
+	if g == nil {
+		return nil
+	}
+
+	var pm models.PaymentMethod
+	if err := database.DB.Where("id = ? AND group_id = ?", c.Params("pmId"), g.ID).
+		First(&pm).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Njia ya malipo haijapatikana"})
+	}
+	if pm.Status == models.PaymentMethodApproved {
+		return c.JSON(fiber.Map{"message": "Njia hii tayari imeidhinishwa", "data": pm})
+	}
+
+	userID := middleware.GetUserID(c)
+	now := time.Now()
+	pm.Status = models.PaymentMethodApproved
+	pm.ApprovedBy = &userID
+	pm.ApprovedAt = &now
+	if err := database.DB.Save(&pm).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditApprove, "payment_methods", &pm.ID, nil, map[string]interface{}{
+		"provider": pm.ProviderName, "account": pm.AccountNumber,
+	})
+
+	return c.JSON(fiber.Map{"message": "Njia ya malipo imeidhinishwa — sasa inaonekana kwa wanachama", "data": pm})
 }
 
 // Delete removes a payment method. Mwenyekiti / Mweka Hazina only (route guard).

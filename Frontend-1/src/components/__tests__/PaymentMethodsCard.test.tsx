@@ -164,6 +164,39 @@ describe("PaymentMethodsCard", () => {
     expect(screen.getAllByLabelText("Badilisha").length).toBe(2);
     expect(screen.getAllByLabelText("Zima").length).toBe(2);
     expect(screen.getAllByLabelText("Futa").length).toBe(2);
+    // treasurer cannot approve — no approve button
+    expect(screen.queryByLabelText("Idhinisha")).toBeNull();
+    authState.role = "member";
+  });
+
+  it("chair sees and approves a pending treasurer submission", async () => {
+    authState.role = "chair";
+    vi.mocked(api.get).mockResolvedValue({
+      data: [
+        {
+          id: "pm-9",
+          group_id: "g-1",
+          type: "bank",
+          provider_name: "NMB",
+          account_number: "0999000000000",
+          account_name: "Money Seeking Group",
+          is_active: true,
+          status: "pending",
+        },
+      ],
+      total: 1,
+    });
+    vi.mocked(api.post).mockResolvedValue({ message: "approved", data: {} });
+    render(<PaymentMethodsCardWithRole />, { wrapper });
+
+    expect(await screen.findByText("Inasubiri kuidhinishwa")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Idhinisha"));
+
+    await waitFor(() =>
+      expect(api.post).toHaveBeenCalledWith(
+        "/groups/g-1/payment-methods/pm-9/approve"
+      )
+    );
     authState.role = "member";
   });
 });

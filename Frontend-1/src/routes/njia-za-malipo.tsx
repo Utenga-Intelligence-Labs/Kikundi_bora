@@ -29,7 +29,8 @@ function NjiaZaMalipoPage() {
       <div className="max-w-3xl">
         <PaymentMethodsCard />
         <p className="mt-4 text-xs text-muted-foreground">
-          Mabadiliko yanaonekana kwa wanachama mara moja kwenye ukurasa wa "Weka Mchango".
+          Njia mpya anazoweka Mweka Hazina zinahitaji kuidhinishwa na Mwenyekiti kabla
+          hazijaonekana kwa wanachama kwenye ukurasa wa "Weka Mchango".
           Kuzima (deactivate) kunaficha njia kwa wanachama bila kuifuta kwenye kumbukumbu.
         </p>
       </div>

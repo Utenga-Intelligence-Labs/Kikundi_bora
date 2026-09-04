@@ -22,6 +22,8 @@ export function PaymentMethodsCard() {
   const qc = useQueryClient();
   const { showModal } = useAppModal();
   const canManage = user?.role === "chair" || user?.role === "treasurer";
+  const canApprove = user?.role === "chair" || user?.role === "admin";
+  const isPending = (pm: PaymentMethod) => pm.status === "pending";
 
   const { data: gs } = useQuery({
     queryKey: ["groups", "current"],
@@ -60,10 +62,10 @@ export function PaymentMethodsCard() {
         ? paymentMethodsApi.update(groupId!, editing.id, payload)
         : paymentMethodsApi.create(groupId!, payload);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       showModal({
         title: "Imefanikiwa",
-        message: editing ? "Mabadiliko yamehifadhiwa." : "Njia ya malipo imeongezwa.",
+        message: res.message || (editing ? "Mabadiliko yamehifadhiwa." : "Njia ya malipo imeongezwa."),
         variant: "success",
         primaryLabel: "Sawa",
       });
@@ -87,6 +89,16 @@ export function PaymentMethodsCard() {
     mutationFn: (pm: PaymentMethod) => paymentMethodsApi.remove(groupId!, pm.id),
     onSuccess: () => {
       showModal({ title: "Imefanikiwa", message: "Njia ya malipo imefutwa.", variant: "success", primaryLabel: "Sawa" });
+      invalidate();
+    },
+    onError: (e: Error) =>
+      showModal({ title: "Hitilafu", message: e.message, variant: "error", primaryLabel: "Sawa" }),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (pm: PaymentMethod) => paymentMethodsApi.approve(groupId!, pm.id),
+    onSuccess: (res) => {
+      showModal({ title: "Imefanikiwa", message: res.message || "Njia ya malipo imeidhinishwa.", variant: "success", primaryLabel: "Sawa" });
       invalidate();
     },
     onError: (e: Error) =>
@@ -140,6 +152,9 @@ export function PaymentMethodsCard() {
           {pm.provider_name} · <span className="font-mono">{pm.account_number}</span>
         </p>
         <p className="text-xs text-muted-foreground truncate">{pm.account_name}</p>
+        {isPending(pm) && (
+          <span className="chip bg-amber-100 text-amber-800 text-[10px] mt-1">Inasubiri kuidhinishwa</span>
+        )}
         {!pm.is_active && (
           <span className="chip bg-muted text-muted-foreground text-[10px] mt-1">Imezimwa</span>
         )}
@@ -164,6 +179,17 @@ export function PaymentMethodsCard() {
         )}
         {canManage && (
           <>
+            {canApprove && isPending(pm) && (
+              <button
+                onClick={() => approveMutation.mutate(pm)}
+                disabled={approveMutation.isPending}
+                aria-label="Idhinisha"
+                title="Idhinisha — ionekane kwa wanachama"
+                className="grid h-7 w-7 place-items-center rounded-lg border border-emerald-500/50 text-emerald-600 hover:bg-emerald-500/10 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               onClick={() => startEdit(pm)}
               aria-label="Badilisha"
