@@ -9,6 +9,8 @@ import (
 //   - contribution due-date reminders/checks (every 30 minutes; the
 //     notification logic itself is idempotent per cycle per kind, so
 //     frequent runs never duplicate notifications).
+//   - late-contribution fines after the group's grace period (idempotent
+//     per member per cycle via unique constraint).
 //
 // Deliberately dependency-free (time.Ticker instead of robfig/cron) — the
 // only schedule needed is "check periodically, decide by date".

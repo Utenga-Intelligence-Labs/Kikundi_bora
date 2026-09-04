@@ -27,6 +27,8 @@ func AutoMigrate() {
 		&models.PendingAction{},
 		&models.Group{},
 		&models.GroupSettingProposal{},
+		&models.FineSettings{},
+		&models.Fine{},
 		&models.PaymentMethod{},
 
 		// Member & financial tables
@@ -129,6 +131,13 @@ func addFKConstraints() {
 		{"notifications", "fk_notifications_user", "user_id", "users", "id", "CASCADE"},
 		// LeadershipPosition → Member
 		{"leadership_positions", "fk_leadership_positions_member", "member_id", "members", "id", "CASCADE"},
+		// FineSettings → Group
+		{"fine_settings", "fk_fine_settings_group", "group_id", "groups", "id", "CASCADE"},
+		// Fine → Group, Member, User
+		{"fines", "fk_fines_group", "group_id", "groups", "id", "CASCADE"},
+		{"fines", "fk_fines_member", "member_id", "members", "id", "RESTRICT"},
+		{"fines", "fk_fines_collector", "collected_by", "users", "id", "SET NULL"},
+		{"fines", "fk_fines_waiver", "waived_by", "users", "id", "SET NULL"},
 	}
 
 	for _, fk := range fks {

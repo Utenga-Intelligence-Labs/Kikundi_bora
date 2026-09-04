@@ -188,6 +188,68 @@ func parseMmDd(spec string) (int, int, bool) {
 	return mm, dd, true
 }
 
+// ContributionCycleLabel is a stable identifier for a cycle that closed on
+// `due`. Used as Fine.ContributionCycleLabel (and matches period-style labels).
+func ContributionCycleLabel(interval models.ContributionInterval, due time.Time) string {
+	switch interval {
+	case models.IntervalWeekly:
+		return due.Format("2006-01-02")
+	case models.IntervalMonthly:
+		return due.Format("2006-01")
+	case models.IntervalSemiAnnual:
+		half := "H1"
+		if due.Month() > 6 {
+			half = "H2"
+		}
+		return fmt.Sprintf("%d-%s", due.Year(), half)
+	case models.IntervalYearly:
+		return due.Format("2006")
+	default:
+		return due.Format("2006-01-02")
+	}
+}
+
+// LastClosedContributionCycle returns the (start, due] window of the most
+// recently closed cycle — the cycle whose due date is strictly before today
+// (or the previous cycle when today is itself a due date).
+func LastClosedContributionCycle(g *models.Group, now time.Time) (start, due time.Time, ok bool) {
+	if g == nil || g.ContributionDueDate == nil || g.ContributionInterval == "" {
+		return time.Time{}, time.Time{}, false
+	}
+	next, valid := NextContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, now)
+	if !valid {
+		return time.Time{}, time.Time{}, false
+	}
+	due, valid = PreviousContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, next)
+	if !valid {
+		return time.Time{}, time.Time{}, false
+	}
+	start, valid = PreviousContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, due)
+	if !valid {
+		return time.Time{}, time.Time{}, false
+	}
+	return start, due, true
+}
+
+// MemberContributedInWindow reports whether the member has a matching AKIBA
+// contribution (self-submitted pending/confirmed, or treasurer-recorded PAID)
+// inside (start, end]. Pending counts as submitted so a member is not fined
+// while their proof is still waiting for verification.
+func MemberContributedInWindow(memberID string, start, end time.Time) bool {
+	var mc, legacy int64
+	database.DB.Model(&models.MemberContribution{}).
+		Where("member_id = ? AND contribution_type = ? AND status IN ? AND created_at > ? AND created_at <= ?",
+			memberID, models.ContributionAkiba,
+			[]models.ContributionStatus{models.ContributionConfirmed, models.ContributionPending},
+			start, end).
+		Count(&mc)
+	database.DB.Model(&models.Contribution{}).
+		Where("member_id = ? AND status = ? AND paid_at > ? AND paid_at <= ?",
+			memberID, "PAID", start, end).
+		Count(&legacy)
+	return mc+legacy > 0
+}
+
 // ContributionCycleWindow returns the (start, end] window of the currently
 // open contribution cycle: a contribution dated inside this window counts
 // for the cycle that closes at `end`.
@@ -309,6 +371,9 @@ func RunContributionDueCheck() {
 			if _, _, err := SendContributionDueNotifications(&groups[i], now); err != nil {
 				log.Printf("ERROR: Scheduler notification for group %s failed: %v", groups[i].ID, err)
 			}
+		}
+		if _, err := ApplyFinesForGroup(&groups[i], now); err != nil {
+			log.Printf("ERROR: Scheduler fines for group %s failed: %v", groups[i].ID, err)
 		}
 	}
 }

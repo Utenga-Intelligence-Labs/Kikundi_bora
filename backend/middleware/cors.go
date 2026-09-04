@@ -14,7 +14,7 @@ import (
 func SetupCORS() fiber.Handler {
 	origins := config.AppConfig.CORSOrigins
 	if origins == "" {
-		origins = "http://localhost:3000,http://localhost:5173"
+		origins = "http://localhost:3000,http://localhost:5173,http://localhost:8080,http://localhost:8081,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:8080,http://127.0.0.1:8081"
 	}
 	// CORS-M01: wildcard origins are incompatible with AllowCredentials —
 	// refuse to boot with an insecure configuration rather than silently

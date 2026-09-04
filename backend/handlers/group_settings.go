@@ -31,6 +31,20 @@ func loadPendingProposal(groupID string) *models.GroupSettingProposal {
 	return &p
 }
 
+func pendingProposalOfKind(groupID, kind string) *models.GroupSettingProposal {
+	p := loadPendingProposal(groupID)
+	if p == nil {
+		return nil
+	}
+	if p.ProposalKind == "" {
+		p.ProposalKind = models.ProposalKindContribution
+	}
+	if p.ProposalKind != kind {
+		return nil
+	}
+	return p
+}
+
 // GET /api/v1/groups/current — convenience for the frontend (single-group
 // deployment): resolves the group id, then returns the settings payload.
 func (h *GroupSettingsHandler) GetCurrent(c *fiber.Ctx) error {
@@ -75,10 +89,10 @@ func (h *GroupSettingsHandler) settingsResponse(c *fiber.Ctx, g *models.Group) e
 	}
 
 	return c.JSON(fiber.Map{
-		"data":              g,
-		"pending_proposal":  loadPendingProposal(g.ID),
-		"next_due_date":     nextDue,
-		"my_contribution":   myContribution,
+		"data":             g,
+		"pending_proposal": pendingProposalOfKind(g.ID, models.ProposalKindContribution),
+		"next_due_date":    nextDue,
+		"my_contribution":  myContribution,
 	})
 }
 
@@ -162,6 +176,7 @@ func (h *GroupSettingsHandler) Propose(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	proposal := models.GroupSettingProposal{
 		GroupID:                 g.ID,
+		ProposalKind:            models.ProposalKindContribution,
 		ContributionInterval:    models.ContributionInterval(req.ContributionInterval),
 		ContributionDueDate:     &req.ContributionDueDate,
 		FixedContributionAmount: req.FixedContributionAmount,
@@ -207,12 +222,18 @@ func (h *GroupSettingsHandler) Approve(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	now := time.Now()
 
-	// Apply to group — the ONLY path that mutates group contribution settings
-	g.ContributionInterval = proposal.ContributionInterval
-	g.ContributionDueDate = proposal.ContributionDueDate
-	g.FixedContributionAmount = proposal.FixedContributionAmount
-	if err := database.DB.Save(&g).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi mipangilio"})
+	if proposal.ProposalKind == models.ProposalKindFines {
+		if err := applyFineProposal(g, proposal); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi mipangilio ya faini"})
+		}
+	} else {
+		// Apply to group — the ONLY path that mutates group contribution settings
+		g.ContributionInterval = proposal.ContributionInterval
+		g.ContributionDueDate = proposal.ContributionDueDate
+		g.FixedContributionAmount = proposal.FixedContributionAmount
+		if err := database.DB.Save(&g).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi mipangilio"})
+		}
 	}
 
 	proposal.Status = models.ProposalApproved
@@ -226,6 +247,16 @@ func (h *GroupSettingsHandler) Approve(c *fiber.Ctx) error {
 		map[string]interface{}{"status": models.ProposalPending},
 		map[string]interface{}{"status": models.ProposalApproved, "interval": g.ContributionInterval, "due_date": g.ContributionDueDate, "amount": g.FixedContributionAmount},
 	)
+
+	if proposal.ProposalKind == models.ProposalKindFines {
+		services.NotifyRole(models.RoleChair, models.NotifSystem,
+			"Mipangilio ya Faini Imeidhinishwa",
+			"Katibu ameidhinisha mipangilio mpya ya faini. Sasa inatumika.",
+			"",
+		)
+		settings, _ := database.GetOrCreateFineSettings(g.ID)
+		return c.JSON(fiber.Map{"message": "Mipangilio ya faini imeidhinishwa na sasa inatumika.", "data": settings})
+	}
 
 	services.NotifyRole(models.RoleChair, models.NotifSystem,
 		"Mipangilio ya Michango Imeidhinishwa",

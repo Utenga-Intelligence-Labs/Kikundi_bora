@@ -32,6 +32,12 @@ func main() {
 	database.Connect()
 	services.InitEmail()
 
+	// Auto-migrate on every boot (idempotent — GORM never drops tables).
+	// This self-heals existing databases when new models are added
+	// (e.g. fine_settings/fines); previously migration only ran with
+	// -migrate on empty DBs, so old DBs hit "relation does not exist".
+	database.AutoMigrate()
+
 	// Ensure leadership positions and group defaults exist on every startup (idempotent)
 	database.EnsureLeadershipSetup()
 	database.EnsureGroupSetup()
@@ -40,7 +46,6 @@ func main() {
 	services.StartScheduler()
 
 	if *migrateFlag {
-		database.AutoMigrate()
 		database.Seed()
 		log.Println("Migration complete. Exiting.")
 		os.Exit(0)
