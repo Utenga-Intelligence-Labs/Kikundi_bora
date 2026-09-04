@@ -119,7 +119,7 @@ func (h *PaymentMethodHandler) Create(c *fiber.Ctx) error {
 		CreatedBy:     userID,
 	}
 	msg := "Njia ya malipo imesajiliwa — inasubiri kuidhinishwa na Mwenyekiti"
-	if role == models.RoleChair || role == models.RoleAdmin {
+	if role == models.RoleChair {
 		pm.Status = models.PaymentMethodApproved
 		pm.ApprovedBy = &userID
 		pm.ApprovedAt = &now
