@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -257,6 +258,16 @@ func (h *MemberContributionHandler) Confirm(c *fiber.Ctx) error {
 	services.LogAudit(c, &userID, models.AuditApprove, "member_contributions", &contribution.ID, nil, map[string]interface{}{
 		"status": "CONFIRMED", "reviewed_by": reviewerMember.ID,
 	})
+
+	// Auto-post AKIBA into the double-entry ledger (best-effort — a ledger
+	// failure is logged but never fails the confirmation). MFUKO_WA_KIJAMII
+	// stays manual: it is earmarked welfare money, not savings.
+	if contribution.ContributionType == models.ContributionAkiba && contribution.Member != nil {
+		if err := services.PostContribution(contribution.Member.MemberNo, contribution.Amount, now, userID,
+			fmt.Sprintf("Mchango AKIBA %s %s", contribution.Member.MemberNo, contribution.PeriodLabel)); err != nil {
+			log.Printf("WARN: ledger auto-post michango %s: %v", contribution.ID, err)
+		}
+	}
 
 	// Notify member
 	if contribution.Member != nil && contribution.Member.UserID != nil {

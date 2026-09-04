@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -129,6 +131,12 @@ func (h *ContributionHandler) Create(c *fiber.Ctx) error {
 		"member_id": req.MemberID, "amount": req.Amount, "month": monthFirst.Format("2006-01-02"),
 		"payment_method": req.PaymentMethod, "reference": req.ReferenceNumber,
 	})
+
+	// Auto-post into the double-entry ledger (best-effort).
+	if err := services.PostContribution(member.MemberNo, req.Amount, paidAt, userID,
+		fmt.Sprintf("Mchango %s %s", member.MemberNo, monthFirst.Format("2006-01"))); err != nil {
+		log.Printf("WARN: ledger auto-post contribution %s: %v", contribution.ID, err)
+	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": "Mchango umerekodiwa",

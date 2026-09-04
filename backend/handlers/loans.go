@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -385,6 +386,11 @@ func (h *LoanHandler) Disburse(c *fiber.Ctx) error {
 		if notifUserID != "" {
 			services.NotifyUser(notifUserID, models.NotifLoanDisbursed, "Mkopo Umetolewa",
 				"Mkopo wako wa TZS "+formatMoney(*loan.ApprovedAmount)+" umetolewa.")
+		}
+		// Auto-post into the double-entry ledger (best-effort).
+		if err := services.PostDisbursement(member.MemberNo, *loan.ApprovedAmount, now, userID,
+			fmt.Sprintf("Mkopo uliotolewa %s", member.MemberNo)); err != nil {
+			log.Printf("WARN: ledger auto-post disburse %s: %v", loan.ID, err)
 		}
 	}
 

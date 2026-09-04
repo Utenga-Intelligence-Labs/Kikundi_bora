@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -153,6 +154,15 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 		map[string]interface{}{"balance_before": balance},
 		map[string]interface{}{"amount_paid": req.Amount, "balance_after": newBalance, "loan_status": string(newStatus), "payment_method": req.PaymentMethod},
 	)
+
+	// Auto-post into the double-entry ledger (best-effort).
+	var payMember models.Member
+	if err := database.DB.First(&payMember, "id = ?", loan.MemberID).Error; err == nil {
+		if err := services.PostRepayment(payMember.MemberNo, req.Amount, paidAt, userID,
+			fmt.Sprintf("Marejesho %s mkopo %s", payMember.MemberNo, loan.ID)); err != nil {
+			log.Printf("WARN: ledger auto-post repayment %s: %v", repayment.ID, err)
+		}
+	}
 
 	if newStatus == models.LoanClosed {
 		services.NotifyRole(models.RoleChair, models.NotifRepayment, "Mkopo Umefungwa", "Hongera! Mkopo umelipwa kikamilifu.", "")

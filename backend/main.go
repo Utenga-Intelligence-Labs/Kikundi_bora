@@ -25,6 +25,7 @@ func main() {
 	migrateFlag := flag.Bool("migrate", false, "Run database migration and seed, then exit")
 	seedFlag := flag.Bool("seed", false, "Run seed only (no table drop), then exit")
 	replayLedgerFlag := flag.String("replay-ledger", "", "Rebuild ledger projections from the event log: '' skip, 'group' this group's scope, 'all' every group")
+	backfillLedgerFlag := flag.Bool("backfill-ledger", false, "Post one opening-balance ledger transaction per member for pre-existing PAID contributions (fresh ledger only), then continue")
 	serveFlag := flag.Bool("serve", true, "Start the HTTP server (set -serve=false with -replay-ledger for CLI-style runs)")
 	flag.Parse()
 
@@ -59,6 +60,20 @@ func main() {
 
 	// ---- Ledger core (event-sourced, append-only) -------------------------
 	lg, ledgerGroupID := ledgerInit()
+	services.SetAutoLedger(lg, *ledgerGroupID)
+
+	if *backfillLedgerFlag {
+		posted, err := services.BackfillLedgerFromHistory("system-backfill")
+		if err != nil {
+			log.Printf("Ledger backfill skipped: %v", err)
+		} else {
+			log.Printf("Ledger backfill posted %d opening-balance transactions", posted)
+		}
+		if !*serveFlag {
+			database.ClosePgx()
+			return
+		}
+	}
 
 	// Replay / rebuild-projections operation (spec §4, §6 op 7).
 	//   ./server -replay-ledger=group -serve=false
@@ -294,22 +309,25 @@ func main() {
 	pending.Post("/:id/approve", middleware.RequirePosition(models.PositionChairperson), pendingActionHandler.Approve)
 	pending.Post("/:id/reject", middleware.RequirePosition(models.PositionChairperson), pendingActionHandler.Reject)
 
-	// Admin routes (Super Admin only — protected by RequireRoles middleware)
+	// Admin routes (Super Admin only). NOTE: the guard is attached
+	// per-route (not via admin.Use) because the /admin/ledger subgroup
+	// below carries its own wider guards — a blanket prefix middleware
+	// here would 403 treasurer/chair/secretary on every ledger read.
 	admin := protected.Group("/admin")
-	admin.Use(middleware.RequireRoles(models.RoleAdmin))
-	admin.Get("/users", adminHandler.ListAllUsers)
-	admin.Get("/logs", adminHandler.GetAdminLogs)
-	admin.Post("/users/:id/override", adminHandler.OverrideUser)
-	admin.Post("/users/:id/reset-password", adminHandler.ResetUserPassword)
-	admin.Post("/auth/reset-password", authHandler.ResetPassword) // Admin-only password reset
-	admin.Get("/health", adminHandler.GetSystemHealth)
+	adminOnly := middleware.RequireRoles(models.RoleAdmin)
+	admin.Get("/users", adminOnly, adminHandler.ListAllUsers)
+	admin.Get("/logs", adminOnly, adminHandler.GetAdminLogs)
+	admin.Post("/users/:id/override", adminOnly, adminHandler.OverrideUser)
+	admin.Post("/users/:id/reset-password", adminOnly, adminHandler.ResetUserPassword)
+	admin.Post("/auth/reset-password", adminOnly, authHandler.ResetPassword) // Admin-only password reset
+	admin.Get("/health", adminOnly, adminHandler.GetSystemHealth)
 
 	// Admin Backup routes
-	admin.Post("/backup/generate", backupHandler.GenerateBackup)
-	admin.Get("/backup/history", backupHandler.GetBackupHistory)
-	admin.Get("/backup/settings", backupHandler.GetBackupSettings)
-	admin.Post("/backup/settings", backupHandler.SaveBackupSettings)
-	admin.Get("/backup/download/:id", backupHandler.DownloadBackup)
+	admin.Post("/backup/generate", adminOnly, backupHandler.GenerateBackup)
+	admin.Get("/backup/history", adminOnly, backupHandler.GetBackupHistory)
+	admin.Get("/backup/settings", adminOnly, backupHandler.GetBackupSettings)
+	admin.Post("/backup/settings", adminOnly, backupHandler.SaveBackupSettings)
+	admin.Get("/backup/download/:id", adminOnly, backupHandler.DownloadBackup)
 
 	// Ledger / accounting core routes — event-sourced, append-only; every
 	// write attributes to the session user. Reads (balance/statement/
