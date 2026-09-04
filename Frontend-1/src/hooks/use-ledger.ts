@@ -8,6 +8,8 @@ export const ledgerKeys = {
     [...ledgerKeys.all, "balance", account] as const,
   statement: (account: string, from?: string, to?: string) =>
     [...ledgerKeys.all, "statement", account, from, to] as const,
+  transaction: (id: string) =>
+    [...ledgerKeys.all, "transaction", id] as const,
 };
 
 export function useTrialBalance() {
@@ -37,6 +39,15 @@ export function useLedgerStatement(
     queryFn: () =>
       ledgerApi.getStatement(account as string, from, to),
     enabled: !!account,
+    retry: false,
+  });
+}
+
+export function useTransactionDetail(id: string | null) {
+  return useQuery({
+    queryKey: ledgerKeys.transaction(id ?? ""),
+    queryFn: () => ledgerApi.getTransaction(id as string),
+    enabled: !!id,
     retry: false,
   });
 }

@@ -342,6 +342,7 @@ func main() {
 	ledgerRoutes.Get("/balance", readLedger, ledgerHandler.GetBalance)
 	ledgerRoutes.Get("/statement", readLedger, ledgerHandler.GetStatement)
 	ledgerRoutes.Get("/trial-balance", readLedger, ledgerHandler.GetTrialBalance)
+	ledgerRoutes.Get("/transactions/:id", readLedger, ledgerHandler.GetTransactionDetail)
 	ledgerRoutes.Post("/replay", middleware.RequireRoles(models.RoleAdmin), ledgerHandler.Replay)
 
 	// Reports routes (Chair only)

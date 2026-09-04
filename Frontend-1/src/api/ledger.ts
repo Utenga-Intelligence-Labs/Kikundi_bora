@@ -38,6 +38,42 @@ export interface StatementLine {
   Currency: string;
   OccurredAt: string;
   Memo: string;
+  ActorID: string;
+  ActorName: string;
+  ReversesMemo?: string;
+  Reason?: string;
+}
+
+export interface TransactionLeg {
+  account_name: string;
+  direction: string;
+  amount_minor: number;
+  currency: string;
+}
+
+export interface TransactionLoan {
+  id: string;
+  member_name: string;
+  member_no: string;
+  amount: string;
+  status: string;
+  reviewed_by: string;
+  reviewed_at: string;
+  disbursed_by: string;
+  disbursed_at: string;
+}
+
+export interface TransactionDetail {
+  transaction_id: string;
+  event_type: string;
+  memo: string;
+  actor_name: string;
+  occurred_at: string;
+  entries: TransactionLeg[] | null;
+  reason?: string;
+  reverses_memo?: string;
+  reverses_transaction_id?: string;
+  loan?: TransactionLoan | null;
 }
 
 export interface LedgerBalance {
@@ -96,4 +132,6 @@ export const ledgerApi = {
     );
   },
   getTrialBalance: () => api.get<TrialBalance>("/admin/ledger/trial-balance"),
+  getTransaction: (id: string) =>
+    api.get<TransactionDetail>(`/admin/ledger/transactions/${id}`),
 };

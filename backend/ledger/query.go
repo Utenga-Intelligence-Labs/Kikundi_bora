@@ -19,6 +19,7 @@ type StatementLine struct {
 	Currency      string
 	OccurredAt    time.Time // business-effective ordering key
 	Memo          string
+	ActorID       string // raw actor id as recorded on the event (user UUID or deterministic fallback)
 }
 
 const sqlAccountState = `
@@ -104,7 +105,7 @@ func (l *Ledger) GetLedgerEntries(
 	from, to time.Time,
 ) ([]StatementLine, error) {
 	rows, err := poolQuerier(l.pool).Query(ctx, `
-		SELECT transaction_id, event_type, direction, amount_minor, currency, occurred_at, memo
+		SELECT transaction_id, event_type, direction, amount_minor, currency, occurred_at, memo, actor_id
 		  FROM ledger_statement_lines
 		 WHERE group_id=$1 AND account_name=$2 AND occurred_at >= $3 AND occurred_at <= $4
 		 ORDER BY occurred_at, line_id`, groupID, accountName, from.UTC(), to.UTC())
@@ -117,7 +118,7 @@ func (l *Ledger) GetLedgerEntries(
 	for rows.Next() {
 		var ln StatementLine
 		var et, dir string
-		if err := rows.Scan(&ln.TransactionID, &et, &dir, &ln.AmountMinor, &ln.Currency, &ln.OccurredAt, &ln.Memo); err != nil {
+		if err := rows.Scan(&ln.TransactionID, &et, &dir, &ln.AmountMinor, &ln.Currency, &ln.OccurredAt, &ln.Memo, &ln.ActorID); err != nil {
 			return nil, err
 		}
 		ln.EventType = EventType(et)
