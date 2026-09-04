@@ -25,6 +25,17 @@ import (
 
 var validate = validator.New()
 
+// loginRateLimitDisabled reports whether the failed-login rate limit is
+// bypassed: explicitly via DISABLE_LOGIN_RATE_LIMIT=1 (manual/dev testing),
+// or automatically under `go test` (config Environment == "test") so the
+// test suite can never lock itself out.
+func loginRateLimitDisabled() bool {
+	if os.Getenv("DISABLE_LOGIN_RATE_LIMIT") == "1" {
+		return true
+	}
+	return config.AppConfig.Environment == "test"
+}
+
 func init() {
 	// validator v10 cannot natively compare shopspring/decimal.Decimal (a
 	// struct) — without this converter, tags like `gt=0` on decimal fields
@@ -161,7 +172,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	database.DB.Model(&models.FailedLogin{}).
 		Where("ip_address = ? AND attempted_at > ?", ip, fiveMinAgo).
 		Count(&recentAttempts)
-	if os.Getenv("DISABLE_LOGIN_RATE_LIMIT") != "1" && recentAttempts >= 5 {
+	if !loginRateLimitDisabled() && recentAttempts >= 5 {
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 			"message": "Majaribio mengi mno ya kuingia. Jaribu tena baada ya dakika 5.",
 		})
@@ -172,7 +183,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	database.DB.Model(&models.FailedLogin{}).
 		Where("email_attempted = ? AND attempted_at > ?", loginID, fiveMinAgo).
 		Count(&accountAttempts)
-	if os.Getenv("DISABLE_LOGIN_RATE_LIMIT") != "1" && accountAttempts >= 5 {
+	if !loginRateLimitDisabled() && accountAttempts >= 5 {
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 			"message": "Majaribio mengi mno ya kuingia kwenye akaunti hii. Jaribu tena baada ya dakika 5.",
 		})
