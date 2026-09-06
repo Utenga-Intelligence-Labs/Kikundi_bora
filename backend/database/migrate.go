@@ -45,6 +45,7 @@ func AutoMigrate() {
 		// Loan committee tables
 		&models.LoanCommitteeMember{},
 		&models.LoanReview{},
+		&models.LoanOffsetTransaction{},
 
 		// Welfare (Mfuko wa Kijamii) tables
 		&models.WelfareEvent{},
@@ -156,6 +157,12 @@ func addFKConstraints() {
 		// LoanReview → Loan, User
 		{"loan_reviews", "fk_loan_reviews_loan", "loan_id", "loans", "id", "RESTRICT"},
 		{"loan_reviews", "fk_loan_reviews_reviewer", "reviewer_id", "users", "id", "RESTRICT"},
+		// LoanOffsetTransaction → Loan, Member, Users
+		{"loan_offset_transactions", "fk_loan_offsets_loan", "loan_id", "loans", "id", "RESTRICT"},
+		{"loan_offset_transactions", "fk_loan_offsets_member", "member_id", "members", "id", "RESTRICT"},
+		{"loan_offset_transactions", "fk_loan_offsets_proposer", "proposed_by", "users", "id", "RESTRICT"},
+		{"loan_offset_transactions", "fk_loan_offsets_approver", "approved_by", "users", "id", "SET NULL"},
+		{"loan_offset_transactions", "fk_loan_offsets_executor", "executed_by", "users", "id", "SET NULL"},
 		// WelfareEvent → Member, User
 		{"welfare_events", "fk_welfare_events_member", "member_id", "members", "id", "RESTRICT"},
 		{"welfare_events", "fk_welfare_events_creator", "created_by", "users", "id", "RESTRICT"},

@@ -4,10 +4,10 @@ import { useAuth } from "@/lib/auth-provider";
 import { requireAuth, requireRole } from "@/lib/role-guards";
 import { AppShell } from "@/components/AppShell";
 import { AppModal, useAppModal } from "@/components/AppModal";
-import { loansApi, type PortfolioLoan } from "@/api/loans";
+import { loansApi, loanOffsetApi, type PortfolioLoan, type LoanOffset } from "@/api/loans";
 import { api } from "@/api/client";
 import { tzs, tarehe } from "@/lib/format";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Briefcase, Loader2, Banknote, AlertCircle, CheckCircle2, Wallet, X,
 } from "lucide-react";
@@ -217,6 +217,11 @@ function PortfolioPage() {
               </p>
               <RepaymentHistory loanId={selected.id} />
             </div>
+            {selected.is_overdue && selected.status === "OUTSTANDING" && (
+              <div className="border-t pt-3">
+                <OffsetSection loan={selected} role={user?.role} />
+              </div>
+            )}
           </div>
         )}
       </AppModal>
@@ -250,6 +255,138 @@ function RepaymentHistory({ loanId }: { loanId: string }) {
           <CheckCircle2 className="h-4 w-4 text-success" />
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Offset with Contributions — overdue loans only. Three-role flow:
+ * chair proposes → secretary approves/rejects → treasurer executes.
+ * Preview shows outstanding, available savings and the capped amount
+ * BEFORE anything irreversible happens (confirm via AppModal).
+ */
+function OffsetSection({ loan, role }: { loan: PortfolioLoan; role?: string }) {
+  const qc = useQueryClient();
+  const { showModal } = useAppModal();
+
+  const previewQ = useQuery({
+    queryKey: ["loan-offset-preview", loan.id],
+    queryFn: () => loanOffsetApi.preview(loan.id),
+  });
+  const offsetsQ = useQuery({
+    queryKey: ["loan-offsets", loan.id],
+    queryFn: () => loanOffsetApi.list({ loan_id: loan.id }),
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["loan-offset-preview", loan.id] });
+    qc.invalidateQueries({ queryKey: ["loan-offsets", loan.id] });
+    qc.invalidateQueries({ queryKey: ["loan-portfolio"] });
+  };
+
+  const mkMut = <T,>(fn: (v: T) => Promise<{ message: string }>, okTitle: string) => ({
+    mutationFn: fn,
+    onSuccess: (r: { message: string }) => {
+      refresh();
+      showModal({ title: okTitle, message: r.message, variant: "success", primaryLabel: "Sawa" });
+    },
+    onError: (e: Error) => showModal({ title: "Hitilafu", message: e.message, variant: "error", primaryLabel: "Sawa" }),
+  });
+  const propose = useMutation(mkMut((_v: void) => loanOffsetApi.propose(loan.id), "Imetumwa"));
+  const approve = useMutation(mkMut((id: string) => loanOffsetApi.approve(id), "Imeidhinishwa"));
+  const reject = useMutation(mkMut((id: string) => loanOffsetApi.reject(id), "Imekataliwa"));
+  const execute = useMutation(mkMut((id: string) => loanOffsetApi.execute(id), "Imetekelezwa"));
+
+  const confirm = (title: string, message: string, onPrimary: () => void) =>
+    showModal({ title, message, variant: "warning", primaryLabel: "Thibitisha", onPrimary });
+
+  const preview = previewQ.data?.data;
+  const offsets: LoanOffset[] = offsetsQ.data?.data ?? [];
+  const pending = offsets.find((o) => o.status === "PROPOSED" || o.status === "APPROVED");
+
+  return (
+    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+      <p className="text-xs font-semibold text-destructive mb-2">
+        Offset na Akiba — mkopo umechelewa
+      </p>
+      {previewQ.isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : preview ? (
+        <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+          <div>
+            <p className="text-muted-foreground">Salio la mkopo</p>
+            <p className="font-semibold">{tzs(Number(preview.outstanding))}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Akiba inayopatikana</p>
+            <p className="font-semibold">{tzs(Number(preview.available_savings))}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Kiasi kitakachokatwa</p>
+            <p className="font-semibold text-destructive">{tzs(Number(preview.offset_amount))}</p>
+          </div>
+        </div>
+      ) : null}
+      {!preview?.eligible && preview?.reason && (
+        <p className="text-xs text-muted-foreground mb-2">{preview.reason}</p>
+      )}
+
+      {pending ? (
+        <div className="rounded-lg bg-card border px-3 py-2 text-xs mb-2">
+          <p className="font-semibold">
+            Pendekezo: {tzs(Number(pending.status === "EXECUTED" ? pending.amount : pending.proposed_amount))} ·{" "}
+            {pending.status === "PROPOSED" ? "Linasubiri Katibu" : "Linasubiri Hazina kutekeleza"}
+          </p>
+          <div className="mt-2 flex gap-2">
+            {pending.status === "PROPOSED" && role === "secretary" && (
+              <>
+                <button
+                  onClick={() => confirm("Idhinisha offset?", `Kiasi ${tzs(Number(pending.proposed_amount))} kitatumika kutoka akiba ya mwanachama kulipa mkopo huu uliochelewa.`, () => approve.mutate(pending.id))}
+                  disabled={approve.isPending}
+                  className="rounded-lg bg-success px-3 py-1.5 font-semibold text-white disabled:opacity-50"
+                >
+                  Idhinisha
+                </button>
+                <button
+                  onClick={() => confirm("Kataa offset?", "Pendekezo litafutwa.", () => reject.mutate(pending.id))}
+                  disabled={reject.isPending}
+                  className="rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-50"
+                >
+                  Kataa
+                </button>
+              </>
+            )}
+            {pending.status === "APPROVED" && role === "treasurer" && (
+              <button
+                onClick={() => confirm("Tekeleza offset?", `Kiasi ${tzs(Number(pending.proposed_amount))} kitakatwa kutoka akiba na kupunguza salio la mkopo. Hatua hii hairudishwi nyuma.`, () => execute.mutate(pending.id))}
+                disabled={execute.isPending}
+                className="rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                Tekeleza (Hazina)
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        preview?.eligible && role === "chair" && (
+          <button
+            onClick={() => confirm("Pendekeza offset?", `Salio la mkopo: ${tzs(Number(preview.outstanding))} · Akiba inayopatikana: ${tzs(Number(preview.available_savings))} · Kitakachokatwa: ${tzs(Number(preview.offset_amount))}. Pendekezo litatumwa kwa Katibu.`, () => propose.mutate())}
+            disabled={propose.isPending}
+            className="rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            Pendekeza Offset na Akiba
+          </button>
+        )
+      )}
+
+      {offsets.filter((o) => o.status === "EXECUTED").length > 0 && (
+        <div className="mt-2 space-y-1">
+          {offsets.filter((o) => o.status === "EXECUTED").map((o) => (
+            <p key={o.id} className="text-[11px] text-muted-foreground">
+              ✓ Offset imetekelezwa: {tzs(Number(o.amount))} · {o.executed_at ? tarehe(o.executed_at) : ""}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

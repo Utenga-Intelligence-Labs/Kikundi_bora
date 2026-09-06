@@ -294,6 +294,19 @@ func main() {
 	loans.Post("/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), loanHandler.Reject)
 	loans.Post("/:id/disburse", middleware.RequirePosition(models.PositionTreasurer), loanHandler.Disburse)
 
+	// Loan offset (overdue debt paid from member savings): three-role check —
+	// mwenyekiti proposes, katibu approves/rejects, mweka-hazina executes.
+	// A plain mwanachama hits 403 on every one of these (RequireRoles).
+	offsetHandler := handlers.NewLoanOffsetHandler()
+	leadership3off := middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer)
+	loans.Get("/:id/offset-preview", leadership3off, offsetHandler.Preview)
+	loans.Post("/:id/offset-propose", middleware.RequireRoles(models.RoleChair), offsetHandler.Propose)
+	offsets := protected.Group("/loan-offsets")
+	offsets.Get("/", leadership3off, offsetHandler.List)
+	offsets.Post("/:id/approve", middleware.RequireRoles(models.RoleSecretary), offsetHandler.Approve)
+	offsets.Post("/:id/reject", middleware.RequireRoles(models.RoleSecretary), offsetHandler.Reject)
+	offsets.Post("/:id/execute", middleware.RequireRoles(models.RoleTreasurer), offsetHandler.Execute)
+
 	repayments := protected.Group("/repayments")
 	repayments.Get("/", repayHandler.List)
 	repayments.Post("/", middleware.RequirePosition(models.PositionTreasurer), repayHandler.Record)

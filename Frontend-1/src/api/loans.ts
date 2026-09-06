@@ -81,3 +81,56 @@ export const loansApi = {
   outstandingReport: () =>
     api.get<OutstandingReportResponse>("/loans/outstanding-report"),
 };
+
+// --- Loan offset (overdue debt paid from member savings) ---
+// Three-role flow: chair proposes → secretary approves/rejects → treasurer executes.
+
+export interface OffsetPreview {
+  eligible: boolean;
+  reason?: string;
+  outstanding: string;
+  gross_savings: string;
+  offsets_applied: string;
+  available_savings: string;
+  offset_amount: string;
+  existing_proposal?: LoanOffset | null;
+}
+
+export interface LoanOffset {
+  id: string;
+  loan_id: string;
+  member_id: string;
+  proposed_amount: string;
+  amount: string;
+  outstanding_before: string;
+  savings_before: string;
+  status: "PROPOSED" | "APPROVED" | "EXECUTED" | "REJECTED";
+  proposed_by: string;
+  approved_by?: string | null;
+  executed_by?: string | null;
+  proposed_at: string;
+  approved_at?: string | null;
+  executed_at?: string | null;
+  reason?: string | null;
+  member?: { id: string; full_name: string; member_no: string };
+}
+
+export const loanOffsetApi = {
+  preview: (loanId: string) =>
+    api.get<{ data: OffsetPreview }>(`/loans/${loanId}/offset-preview`),
+  propose: (loanId: string, reason?: string) =>
+    api.post<{ message: string; data: LoanOffset }>(`/loans/${loanId}/offset-propose`, reason ? { reason } : {}),
+  list: (params?: { status?: string; loan_id?: string; member_id?: string }) => {
+    const q: Record<string, string> = {};
+    if (params?.status) q.status = params.status;
+    if (params?.loan_id) q.loan_id = params.loan_id;
+    if (params?.member_id) q.member_id = params.member_id;
+    return api.get<{ data: LoanOffset[]; total: number }>(`/loan-offsets`, q);
+  },
+  approve: (id: string) =>
+    api.post<{ message: string; data: LoanOffset }>(`/loan-offsets/${id}/approve`),
+  reject: (id: string, reason?: string) =>
+    api.post<{ message: string; data: LoanOffset }>(`/loan-offsets/${id}/reject`, reason ? { reason } : {}),
+  execute: (id: string) =>
+    api.post<{ message: string; data: LoanOffset }>(`/loan-offsets/${id}/execute`),
+};

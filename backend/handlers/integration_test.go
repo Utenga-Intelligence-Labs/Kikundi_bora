@@ -131,6 +131,7 @@ func cleanAndSeed(t *testing.T) {
 	// reseed — leaving tests running against stale data.
 	database.DB.Exec("UPDATE groups SET status='active' WHERE status='dissolved'")
 	for _, stmt := range []string{
+		"DELETE FROM loan_offset_transactions",
 		"DELETE FROM loan_reviews",
 		"DELETE FROM repayments",
 		"DELETE FROM loans",

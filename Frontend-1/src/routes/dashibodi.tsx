@@ -436,7 +436,7 @@ function MemberView({
       )}
       <HeroBalance
         label="Akiba Yangu"
-        value={tzs(Number(memberData.total_contributions ?? 0))}
+        value={tzs(Number(memberData.available_savings ?? memberData.total_contributions ?? 0))}
         stats={[
           ["Michango", String(memberData.contributions_count ?? 0)],
           ["Mikopo wazi", String(memberData.outstanding_loans_count ?? 0)],
@@ -444,6 +444,16 @@ function MemberView({
           ["Mikopo iliyofungwa", String(memberData.closed_loans_count ?? 0)],
         ]}
       />
+      {Number(memberData.total_offsets_applied ?? 0) > 0 && (
+        <div className="card-surface mt-3 border-l-4 border-l-amber-500 p-4">
+          <p className="text-sm font-semibold">
+            Akiba iliyotumika kulipa mkopo uliochelewa: {tzs(Number(memberData.total_offsets_applied))}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Jumla ya michango: {tzs(Number(memberData.total_contributions ?? 0))} · Angalia historia hapa chini kwa maelezo.
+          </p>
+        </div>
+      )}
 
       <div className="mt-5 grid gap-3 md:grid-cols-2">
         <div className="card-surface flex items-center gap-3 p-4">
@@ -469,15 +479,27 @@ function MemberView({
         </div>
       ) : (
         <div className="card-surface divide-y divide-border">
-          {(memberData.recent_contributions ?? []).slice(0, 6).map((c, i) => (
-            <div key={`${c.created_at}-${i}`} className="flex items-center justify-between px-4 py-3">
-              <div>
-                <p className="text-sm font-medium">{tzs(c.amount)}</p>
-                <p className="text-xs text-muted-foreground">{c.period_label}</p>
+          {(memberData.recent_contributions ?? []).slice(0, 6).map((c, i) =>
+            c.source === "loan_offset" ? (
+              <div key={`${c.created_at}-${i}`} className="flex items-center justify-between gap-3 bg-amber-50 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    Akiba yako imetumika kulipa mkopo uliochelewa — {tzs(c.amount)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{c.period_label} · punguzo la akiba, si malipo ya kawaida</p>
+                </div>
+                <span className="chip shrink-0 bg-amber-200 text-amber-800">OFFSET</span>
               </div>
-              <span className="chip bg-success/15 text-success">{c.status}</span>
-            </div>
-          ))}
+            ) : (
+              <div key={`${c.created_at}-${i}`} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">{tzs(c.amount)}</p>
+                  <p className="text-xs text-muted-foreground">{c.period_label}</p>
+                </div>
+                <span className="chip bg-success/15 text-success">{c.status}</span>
+              </div>
+            ),
+          )}
         </div>
       )}
     </>

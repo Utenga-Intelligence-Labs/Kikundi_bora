@@ -173,6 +173,8 @@ type MemberDashboardSummary struct {
 	FullName                  string              `json:"full_name"`
 	TotalContributions        decimal.Decimal     `json:"total_contributions"`
 	ContributionsCount        int64               `json:"contributions_count"`
+	TotalOffsetsApplied       decimal.Decimal     `json:"total_offsets_applied"`
+	AvailableSavings          decimal.Decimal     `json:"available_savings"`
 	WelfareContributionsTotal decimal.Decimal     `json:"welfare_contributions_total"`
 	WelfareContributionsCount int64               `json:"welfare_contributions_count"`
 	PendingContributionsCount int64               `json:"pending_contributions_count"`
@@ -220,6 +222,14 @@ func (h *DashboardHandler) MemberSummary(c *fiber.Ctx) error {
 	sum.TotalContributions = total
 	sum.ContributionsCount = count
 
+	// Savings forcibly applied to overdue loans: gross savings stay intact
+	// in history, but the spendable balance is net of executed offsets.
+	sum.TotalOffsetsApplied = memberOffsetsApplied(member.ID)
+	sum.AvailableSavings = total.Sub(sum.TotalOffsetsApplied)
+	if sum.AvailableSavings.LessThan(decimal.Zero) {
+		sum.AvailableSavings = decimal.Zero
+	}
+
 	// Welfare (MFUKO_WA_KIJAMII) confirmed contributions
 	database.DB.Model(&models.MemberContribution{}).
 		Where("member_id = ? AND status = ? AND contribution_type = ?",
@@ -262,6 +272,24 @@ func (h *DashboardHandler) MemberSummary(c *fiber.Ctx) error {
 			Status:           l.Status,
 			PaidAt:           l.PaidAt.Format("2006-01-02"),
 			CreatedAt:        l.CreatedAt,
+		})
+	}
+	var offs []models.LoanOffsetTransaction
+	database.DB.Where("member_id = ? AND status = ?", member.ID, models.LoanOffsetExecuted).
+		Order("executed_at DESC").Limit(10).Find(&offs)
+	for _, o := range offs {
+		at := o.CreatedAt
+		if o.ExecutedAt != nil {
+			at = *o.ExecutedAt
+		}
+		sum.RecentContributions = append(sum.RecentContributions, RecentContribution{
+			ID:               o.ID,
+			Source:           "loan_offset",
+			ContributionType: "OFFSET",
+			PeriodLabel:      at.Format("2006-01"),
+			Amount:           o.Amount,
+			Status:           "OFFSET_APPLIED",
+			CreatedAt:        at,
 		})
 	}
 	var mcs []models.MemberContribution

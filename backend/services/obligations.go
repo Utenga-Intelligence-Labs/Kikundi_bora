@@ -227,9 +227,27 @@ func BackdateMemberArrears(groupID, memberID string, from, now time.Time) ([]str
 	return labels, nil
 }
 
+// groupHasSchedule reports whether the group has an approved contribution
+// schedule (interval + due date). Without it there are no cycles to track —
+// callers must skip quietly instead of warning once per member.
+func groupHasSchedule(g *models.Group) bool {
+	return g != nil && g.ContributionDueDate != nil && g.ContributionInterval != ""
+}
+
 // RefreshGroupCycles refreshes every active approved member. Called from the
-// scheduler tick and on-demand before summaries.
+// scheduler tick and on-demand before summaries. When the group has no
+// approved contribution schedule yet, it returns after a single concise log
+// line (previously it warned once PER MEMBER on every tick).
 func RefreshGroupCycles(groupID string, now time.Time) {
+	var g models.Group
+	if err := database.DB.First(&g, "id = ?", groupID).Error; err != nil {
+		log.Printf("WARN: cycle refresh: group %s not found: %v", groupID, err)
+		return
+	}
+	if !groupHasSchedule(&g) {
+		log.Printf("Scheduler: group %s has no approved contribution schedule — skipping cycle refresh (mwenyekiti proposes settings in Mipangilio, katibu approves)", groupID)
+		return
+	}
 	var members []models.Member
 	database.DB.Where("deleted_at IS NULL AND is_active = TRUE AND approval_status = 'approved'").
 		Find(&members)
@@ -285,21 +303,22 @@ func GetMemberObligations(groupID, memberID string, now time.Time) (*MemberOblig
 	}
 	// No contribution schedule configured yet (no due date): there are no
 	// cycles to assess, but fines still apply. Return a zeros summary
-	// rather than 404 so the page explains itself.
-	if err := RefreshMemberCycles(groupID, memberID, now); err != nil {
-		log.Printf("WARN: obligations refresh %s: %v (returning fines-only summary)", memberID, err)
-		var g models.Group
-		if dbErr := database.DB.First(&g, "id = ?", groupID).Error; dbErr != nil ||
-			g.ContributionDueDate == nil || g.ContributionInterval == "" {
-			out := &MemberObligations{
-				MemberID: m.ID, MemberNo: m.MemberNo, FullName: m.FullName,
-				TotalArrears: decimal.Zero, CurrentCycleDue: decimal.Zero,
-				TotalFinesUnpaid: decimal.Zero, GrandTotal: decimal.Zero,
-				HasSchedule: false,
-				ItemizedArrears: []ArrearsItem{}, ItemizedFines: []FineItem{},
-			}
-			return out, appendFinesOnly(groupID, memberID, out)
+	// rather than 404 so the page explains itself. This is an expected
+	// pre-configuration state — stay quiet here (the scheduler and group
+	// refresh already log a single actionable line per tick).
+	var g models.Group
+	if dbErr := database.DB.First(&g, "id = ?", groupID).Error; dbErr != nil || !groupHasSchedule(&g) {
+		out := &MemberObligations{
+			MemberID: m.ID, MemberNo: m.MemberNo, FullName: m.FullName,
+			TotalArrears: decimal.Zero, CurrentCycleDue: decimal.Zero,
+			TotalFinesUnpaid: decimal.Zero, GrandTotal: decimal.Zero,
+			HasSchedule: false,
+			ItemizedArrears: []ArrearsItem{}, ItemizedFines: []FineItem{},
 		}
+		return out, appendFinesOnly(groupID, memberID, out)
+	}
+	if err := RefreshMemberCycles(groupID, memberID, now); err != nil {
+		log.Printf("WARN: obligations refresh %s: %v", memberID, err)
 	}
 	today := dateOf(now)
 	grace := cycleGraceDays(groupID)

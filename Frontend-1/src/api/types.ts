@@ -473,11 +473,11 @@ export interface UserPosition {
 
 export interface RecentContribution {
   id: string;
-  source: "contribution" | "member_contribution";
-  contribution_type: "AKIBA" | "MFUKO_WA_KIJAMII";
+  source: "contribution" | "member_contribution" | "loan_offset";
+  contribution_type: "AKIBA" | "MFUKO_WA_KIJAMII" | "OFFSET";
   period_label: string;
   amount: string;
-  status: "PAID" | "CONFIRMED" | "PENDING_VERIFICATION" | "REJECTED";
+  status: "PAID" | "CONFIRMED" | "PENDING_VERIFICATION" | "REJECTED" | "OFFSET_APPLIED";
   paid_at?: string;
   created_at: string;
 }
@@ -488,6 +488,8 @@ export interface MemberDashboardSummary {
   full_name: string;
   total_contributions: string;
   contributions_count: number;
+  total_offsets_applied: string;
+  available_savings: string;
   welfare_contributions_total: string;
   welfare_contributions_count: number;
   pending_contributions_count: number;
