@@ -337,20 +337,21 @@ func ApplyLateOffenceFines(g *models.Group, now time.Time) (int, error) {
 			}
 			_ = f
 			created++
-			notifyFineIssued(&members[i], &ot, label)
+			notifyFineIssued(g.ID, &members[i], &ot, "fine:"+f.ID, label)
 		}
 	}
 	return created, nil
 }
 
-func notifyFineIssued(m *models.Member, ot *models.FineOffenceType, label string) {
+func notifyFineIssued(groupID string, m *models.Member, ot *models.FineOffenceType, dedupKey, label string) {
 	if m.UserID == nil {
 		return
 	}
-	NotifyUser(*m.UserID, models.NotifFineIssued,
+	// In-app + SMS share one guard keyed by the fine itself.
+	NotifyUserSMS(groupID, *m.UserID, models.NotifFineIssued,
 		"Faini mpya",
 		fmt.Sprintf("%s: %s", ot.Name, label),
-	)
+		dedupKey)
 }
 
 // ensureLegacyOffenceType provides the offence row behind the pre-existing
@@ -433,14 +434,14 @@ func TriggerMeetingFines(groupID, meetingID, triggeredBy string) (int, error) {
 					groupID, rows[i].MemberID, ot.ID, dateOf(mtg.MeetingDate)).First(&existing).Error == nil {
 					continue
 				}
-				_, err := CreateEventFine(groupID, rows[i].MemberID, ot.ID, mtg.MeetingDate,
+				ef, err := CreateEventFine(groupID, rows[i].MemberID, ot.ID, mtg.MeetingDate,
 					fmt.Sprintf("%s — %s (%s)", ot.Name, mtg.Title, mtg.MeetingDate.Format("2006-01-02")), "")
 				if err != nil {
 					log.Printf("WARN: meeting fine %s: %v", m.MemberNo, err)
 					continue
 				}
 				created++
-				notifyFineIssued(&m, &ot, mtg.Title)
+				notifyFineIssued(groupID, &m, &ot, "fine:"+ef.ID, mtg.Title)
 			}
 		}
 		database.DB.Model(&rows[i]).Update("fined", true)

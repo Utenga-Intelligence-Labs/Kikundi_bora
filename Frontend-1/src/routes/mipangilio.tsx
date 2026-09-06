@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-provider";
 import { ContributionSettingsCard } from "@/components/ContributionSettingsCard";
 import { PaymentMethodsCard } from "@/components/PaymentMethodsCard";
 import { PendingApprovalsCard } from "@/components/PendingApprovalsCard";
+import { SmsSettingsCard } from "@/components/SmsSettingsCard";
 import { useMembers } from "@/hooks/use-members";
 import {
   useCommitteeMembers,
@@ -92,6 +93,11 @@ function MipangilioPage() {
       <div className="mt-4">
         <PendingApprovalsCard />
       </div>
+      {(isChair || isAdmin) && (
+        <div className="mt-4">
+          <SmsSettingsCard />
+        </div>
+      )}
       <div className="mt-4">
         <PaymentMethodsCard />
       </div>

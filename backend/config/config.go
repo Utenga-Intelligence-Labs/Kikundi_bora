@@ -19,6 +19,15 @@ type Config struct {
 	CORSOrigins   string
 	PublicBaseURL string
 	Environment   string
+	// SMS channel (Part 1): provider selection + credentials come from env
+	// only, never the database. Group on/off + per-type prefs live in the DB.
+	SMSProvider string
+	SMSAPIKey   string
+	SMSSenderID string
+	SMSBaseURL  string
+	// OTP verification (Part 2): off by default. When false the auth flow
+	// behaves exactly as before; the OTP model/endpoints stay dormant.
+	OTPVerificationEnabled bool
 }
 
 var AppConfig *Config
@@ -52,6 +61,26 @@ func Load() {
 		CORSOrigins:   getEnv("CORS_ORIGINS", ""),
 		PublicBaseURL: publicBase,
 		Environment:   getEnv("ENVIRONMENT", "development"),
+		SMSProvider:   getEnv("SMS_PROVIDER", "noop"),
+		SMSAPIKey:     getEnv("SMS_API_KEY", ""),
+		SMSSenderID:   getEnv("SMS_SENDER_ID", ""),
+		SMSBaseURL:    getEnv("SMS_BASE_URL", ""),
+		OTPVerificationEnabled: getEnvBool("OTP_VERIFICATION_ENABLED", false),
+	}
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	switch v {
+	case "1", "true", "TRUE", "True", "yes", "YES", "on", "ON":
+		return true
+	case "0", "false", "FALSE", "False", "no", "NO", "off", "OFF":
+		return false
+	default:
+		return fallback
 	}
 }
 

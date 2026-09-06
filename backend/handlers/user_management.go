@@ -36,7 +36,10 @@ func (h *UserManagementHandler) CreateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 
-	phone := strings.TrimSpace(req.Phone)
+	phone, err := services.NormalizeTanzanianPhone(req.Phone)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Namba ya simu si sahihi — tumia 07... (Tanzania)"})
+	}
 
 	// Check phone uniqueness
 	var count int64

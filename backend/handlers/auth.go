@@ -195,7 +195,14 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	if strings.Contains(loginID, "@") {
 		query = query.Where("email = ?", strings.ToLower(loginID))
 	} else {
-		query = query.Where("phone = ?", loginID)
+		// Phones are stored E.164 (+255...): normalize the typed input so
+		// 071..., 710... and +255... all match. Fall back to the raw input
+		// so legacy rows (and ids like the admin's 0000000000) still work.
+		if normalized, nerr := services.NormalizeTanzanianPhone(loginID); nerr == nil {
+			query = query.Where("phone = ? OR phone = ?", normalized, loginID)
+		} else {
+			query = query.Where("phone = ?", loginID)
+		}
 	}
 
 	// SECURITY (AUTH-04): status differentiation removed — pending,
@@ -232,9 +239,57 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		"user_agent": c.Get("User-Agent"),
 	})
 
+	// PART 2 (OTP): dormant branch. While OTPVerificationEnabled=false this
+	// block never runs and login behaves exactly as before (password +
+	// active-status checks above remain the enforced controls). Flip the
+	// flag to require an OTP step: a challenge is issued (code delivered
+	// via the SMS channel) and the client completes login at
+	// POST /auth/verify-otp instead of receiving a session here.
+	if services.OTPEnabled() {
+		ch, code, err := services.IssueOTPChallenge(user.ID, models.OTPPurposeLogin)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutuma msimbo"})
+		}
+		_ = code // delivered below via SMS; never returned in the response
+		if phone, perr := services.NormalizeTanzanianPhone(phoneOrEmpty(user.Phone)); perr == nil {
+			_ = services.SendOTPSMS(phone, code)
+		} else {
+			log.Printf("WARN: OTP for user %s skipped: %v", user.ID, perr)
+		}
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"message":      "Msimbo wa uthibitisho umetumwa",
+			"otp_required": true,
+			"challenge_id": ch.ID,
+		})
+	}
+
+	token, expiresAt, err := h.issueSession(c, &user, ip, now)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
+	}
+
+	return c.JSON(models.AuthResponse{
+		Token:              token,
+		User:               &user,
+		ExpiresAt:          expiresAt,
+		FirstLoginRequired: user.MustChangePassword,
+	})
+}
+
+// phoneOrEmpty normalizes a stored phone for SMS; empty when unusable.
+func phoneOrEmpty(phone string) string {
+	if phone == "" {
+		return ""
+	}
+	return phone
+}
+
+// issueSession mints a JWT + server-side session row for an already
+// authenticated, active user. Shared by Login and VerifyOTP.
+func (h *AuthHandler) issueSession(c *fiber.Ctx, user *models.User, ip string, now time.Time) (string, string, error) {
 	token, expiresAt := h.generateToken(user.ID, user.Role)
 	if token == "" {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kutengeneza tokeni"})
+		return "", "", fmt.Errorf("Imeshindikana kutengeneza tokeni")
 	}
 
 	session := models.UserSession{
@@ -247,9 +302,52 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 	if err := database.DB.Create(&session).Error; err != nil {
 		log.Printf("ERROR: Failed to create session: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuanzisha kikao"})
+		return "", "", fmt.Errorf("Imeshindikana kuanzisha kikao")
 	}
+	return token, expiresAt, nil
+}
 
+// VerifyOTP completes a login started under OTP mode: it consumes a
+// challenge and issues the session. Dormant while OTPVerificationEnabled
+// is false (returns 404 so the endpoint is effectively absent).
+// POST /api/v1/auth/verify-otp {challenge_id, code}
+func (h *AuthHandler) VerifyOTP(c *fiber.Ctx) error {
+	if !services.OTPEnabled() {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Haipatikani"})
+	}
+	var req struct {
+		ChallengeID string `json:"challenge_id" validate:"required,uuid"`
+		Code        string `json:"code" validate:"required,len=6"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+	if err := validate.Struct(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
+	}
+	ch, err := services.VerifyOTPChallenge(req.ChallengeID, req.Code)
+	if err != nil {
+		st := fiber.StatusUnauthorized
+		if err == services.ErrOTPNotFound {
+			st = fiber.StatusNotFound
+		}
+		return c.Status(st).JSON(fiber.Map{"message": err.Error()})
+	}
+	var user models.User
+	if err := database.DB.First(&user, "id = ?", ch.UserID).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
+	}
+	// Same post-password controls as Login: active account required.
+	if user.Status != models.UserStatusActive || !user.IsActive {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
+	}
+	now := time.Now()
+	database.DB.Model(&user).Update("last_login_at", now)
+	ip := c.IP()
+	token, expiresAt, serr := h.issueSession(c, &user, ip, now)
+	if serr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": serr.Error()})
+	}
 	return c.JSON(models.AuthResponse{
 		Token:              token,
 		User:               &user,

@@ -32,6 +32,7 @@ func main() {
 	config.Load()
 	database.Connect()
 	services.InitEmail()
+	services.InitSMS()
 
 	// Auto-migrate on every boot (idempotent — GORM never drops tables).
 	// This self-heals existing databases when new models are added
@@ -142,6 +143,7 @@ func main() {
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
+	auth.Post("/verify-otp", authHandler.VerifyOTP)
 
 	// Serve uploaded files (authenticated only)
 	uploads := app.Group("/uploads")
@@ -200,6 +202,11 @@ func main() {
 	leadership3 := middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer)
 	groups.Get("/:id/obligations/summary", leadership3, handlers.ObligationsGroupSummary)
 	groups.Get("/:id/collection-queue", middleware.RequireRoles(models.RoleTreasurer), handlers.CollectionQueue)
+
+	// Notification settings (SMS channel): chair/admin only.
+	chairAdmin := middleware.RequireRoles(models.RoleChair, models.RoleAdmin)
+	groups.Get("/:id/notification-settings", chairAdmin, handlers.GetNotificationSettings)
+	groups.Put("/:id/notification-settings", chairAdmin, handlers.UpdateNotificationSettings)
 
 	// Fine offence types: chair proposes, secretary approves.
 	offences := groups.Group("/:id/fine-offence-types")

@@ -93,7 +93,78 @@ func CollectionQueue(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"data": queue, "total": len(queue)})
 }
 
-// ── Offence types ────────────────────────────────────────────────────────────
+// ── Notification settings (SMS channel) ────────────────────────────────────
+
+type notificationSettingsResponse struct {
+	SMSEnabled       bool              `json:"sms_enabled"`
+	Provider         string            `json:"provider"`
+	ProviderReal     bool              `json:"provider_real"`
+	Types            map[string]bool   `json:"types"`
+}
+
+// GET /api/v1/groups/:id/notification-settings — mwenyekiti/admin.
+func GetNotificationSettings(c *fiber.Ctx) error {
+	g := loadObligationGroup(c)
+	if g == nil {
+		return nil
+	}
+	types := map[string]bool{}
+	for _, t := range []models.NotificationType{
+		models.NotifContributionDue, models.NotifFineIssued,
+		models.NotifLoanRequest, models.NotifLoanApproved, models.NotifLoanDisbursed,
+		models.NotifRepayment, models.NotifContribution, models.NotifWelfarePayment,
+		models.NotifUserCreated, models.NotifSystem,
+	} {
+		types[string(t)] = services.SMDPrefOrDefault(g.ID, t)
+	}
+	return c.JSON(fiber.Map{"data": notificationSettingsResponse{
+		SMSEnabled:   g.SMSNotificationsEnabled,
+		Provider:     services.SMSProviderName(),
+		ProviderReal: services.SMSProviderReal(),
+		Types:        types,
+	}})
+}
+
+type notificationSettingsRequest struct {
+	SMSEnabled *bool           `json:"sms_enabled"`
+	Types      map[string]bool `json:"types"`
+}
+
+// PUT /api/v1/groups/:id/notification-settings — mwenyekiti/admin.
+func UpdateNotificationSettings(c *fiber.Ctx) error {
+	g := loadObligationGroup(c)
+	if g == nil {
+		return nil
+	}
+	var req notificationSettingsRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+	userID := middleware.GetUserID(c)
+	if req.SMSEnabled != nil {
+		g.SMSNotificationsEnabled = *req.SMSEnabled
+		if err := database.DB.Save(g).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi"})
+		}
+	}
+	for typeName, enabled := range req.Types {
+		var pref models.NotificationSMSPref
+		err := database.DB.Where("group_id = ? AND notif_type = ?", g.ID, typeName).First(&pref).Error
+		if err == nil {
+			pref.Enabled = enabled
+			pref.UpdatedBy = &userID
+			database.DB.Save(&pref)
+		} else {
+			database.DB.Create(&models.NotificationSMSPref{
+				GroupID: g.ID, NotifType: typeName, Enabled: enabled, UpdatedBy: &userID,
+			})
+		}
+	}
+	services.LogAudit(c, &userID, models.AuditUpdate, "notification_settings", &g.ID, nil, map[string]interface{}{
+		"sms_enabled": g.SMSNotificationsEnabled,
+	})
+	return GetNotificationSettings(c)
+}
 
 type offenceTypeRequest struct {
 	Kind            string           `json:"kind"`

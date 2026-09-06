@@ -52,6 +52,10 @@ type Group struct {
 	LastReminderNotifiedFor *time.Time `json:"last_reminder_notified_for,omitempty"`
 	LastDueNotifiedFor      *time.Time `json:"last_due_notified_for,omitempty"`
 
+	// SMS channel master switch for the group (Part 1). Effective sending
+	// additionally requires a configured provider + per-type opt-in.
+	SMSNotificationsEnabled bool `gorm:"not null;default:false" json:"sms_notifications_enabled"`
+
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

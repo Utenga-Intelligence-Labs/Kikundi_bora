@@ -53,6 +53,8 @@ func AutoMigrate() {
 		// System tables
 		&models.AuditLog{},
 		&models.Notification{},
+		&models.NotificationSMSPref{},
+		&models.OTPChallenge{},
 
 		// Backup tables
 		&models.BackupHistory{},

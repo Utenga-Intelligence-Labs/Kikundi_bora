@@ -110,6 +110,14 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": formatValidationErrors(err)})
 	}
 
+	// Normalize to E.164 at entry so SMS delivery never fails on formatting.
+	// Invalid numbers are rejected here, not silently stored.
+	phoneE164, err := services.NormalizeTanzanianPhone(req.Phone)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Namba ya simu si sahihi — tumia 07... (Tanzania)"})
+	}
+	req.Phone = phoneE164
+
 	var phoneCount int64
 	database.DB.Model(&models.Member{}).Where("phone = ? AND deleted_at IS NULL", req.Phone).Count(&phoneCount)
 	if phoneCount > 0 {
@@ -332,12 +340,16 @@ func (h *MemberHandler) Update(c *fiber.Ctx) error {
 		member.FullName = *req.FullName
 	}
 	if req.Phone != nil {
+		phoneE164, err := services.NormalizeTanzanianPhone(*req.Phone)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Namba ya simu si sahihi — tumia 07... (Tanzania)"})
+		}
 		var phoneCount int64
-		database.DB.Model(&models.Member{}).Where("phone = ? AND id != ? AND deleted_at IS NULL", *req.Phone, member.ID).Count(&phoneCount)
+		database.DB.Model(&models.Member{}).Where("phone = ? AND id != ? AND deleted_at IS NULL", phoneE164, member.ID).Count(&phoneCount)
 		if phoneCount > 0 {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Namba ya simu hiyo tayari imesajiliwa"})
 		}
-		member.Phone = *req.Phone
+		member.Phone = phoneE164
 	}
 	if req.Address != nil {
 		member.Address = req.Address

@@ -140,6 +140,8 @@ func cleanAndSeed() {
 		"DELETE FROM leadership_positions",
 		"DELETE FROM user_positions",
 		"DELETE FROM notifications",
+		"DELETE FROM notification_sms_prefs",
+		"DELETE FROM otp_challenges",
 		"DELETE FROM audit_logs",
 		"DELETE FROM admin_logs",
 		"DELETE FROM pending_actions",

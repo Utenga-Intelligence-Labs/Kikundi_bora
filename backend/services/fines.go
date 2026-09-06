@@ -147,8 +147,9 @@ func ApplyFinesForGroup(g *models.Group, now time.Time) (created int, err error)
 		}
 		created++
 		if m.UserID != nil && *m.UserID != "" {
-			NotifyUser(*m.UserID, models.NotifSystem, "Faini ya mchango",
-				fmt.Sprintf("Umepata faini ya TZS %s kwa kuchelewa kuchangia kipindi %s.", amount.StringFixed(2), label))
+			NotifyUserSMS(g.ID, *m.UserID, models.NotifSystem, "Faini ya mchango",
+				fmt.Sprintf("Umepata faini ya TZS %s kwa kuchelewa kuchangia kipindi %s.", amount.StringFixed(2), label),
+				"fine:"+fine.ID)
 		}
 	}
 	if created > 0 {

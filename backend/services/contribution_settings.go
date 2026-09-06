@@ -341,7 +341,10 @@ func SendContributionDueNotifications(g *models.Group, today time.Time) (sent bo
 		title = "Siku ya Mchango"
 		msg = fmt.Sprintf("Leo %s ni siku ya mchango%s. Tafadhali wasilisha mchango wako.", when, amountPart)
 	}
-	NotifyUsers(userIDs, models.NotifContributionDue, title, msg)
+	NotifyUsersSMS(g.ID, userIDs, models.NotifContributionDue, title, msg,
+		func(uid string) string {
+			return fmt.Sprintf("due:%s:%s:%s", due.Format("2006-01-02"), k, uid)
+		})
 
 	// Record idempotency marker
 	now := dateOf(today)
