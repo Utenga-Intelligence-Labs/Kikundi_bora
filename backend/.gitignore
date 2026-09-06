@@ -10,3 +10,4 @@ uploads/reports/
 *.out
 vendor/
 tmp_*/
+uploads/avatars/
