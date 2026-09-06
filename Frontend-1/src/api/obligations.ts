@@ -28,6 +28,7 @@ export interface MemberObligations {
   current_cycle_label: string;
   total_fines_unpaid: string;
   grand_total_owed: string;
+  has_schedule?: boolean;
   itemized_arrears: ArrearsItem[];
   itemized_fines: FineItem[];
 }

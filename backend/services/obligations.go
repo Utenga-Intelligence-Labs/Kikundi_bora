@@ -227,6 +227,7 @@ type MemberObligations struct {
 	CurrentCycleLabel string          `json:"current_cycle_label"`
 	TotalFinesUnpaid  decimal.Decimal `json:"total_fines_unpaid"`
 	GrandTotal        decimal.Decimal `json:"grand_total_owed"`
+	HasSchedule       bool             `json:"has_schedule"`
 	ItemizedArrears   []ArrearsItem   `json:"itemized_arrears"`
 	ItemizedFines     []FineItem      `json:"itemized_fines"`
 }
@@ -239,8 +240,23 @@ func GetMemberObligations(groupID, memberID string, now time.Time) (*MemberOblig
 	if err := database.DB.First(&m, "id = ?", memberID).Error; err != nil {
 		return nil, err
 	}
+	// No contribution schedule configured yet (no due date): there are no
+	// cycles to assess, but fines still apply. Return a zeros summary
+	// rather than 404 so the page explains itself.
 	if err := RefreshMemberCycles(groupID, memberID, now); err != nil {
-		return nil, err
+		log.Printf("WARN: obligations refresh %s: %v (returning fines-only summary)", memberID, err)
+		var g models.Group
+		if dbErr := database.DB.First(&g, "id = ?", groupID).Error; dbErr != nil ||
+			g.ContributionDueDate == nil || g.ContributionInterval == "" {
+			out := &MemberObligations{
+				MemberID: m.ID, MemberNo: m.MemberNo, FullName: m.FullName,
+				TotalArrears: decimal.Zero, CurrentCycleDue: decimal.Zero,
+				TotalFinesUnpaid: decimal.Zero, GrandTotal: decimal.Zero,
+				HasSchedule: false,
+				ItemizedArrears: []ArrearsItem{}, ItemizedFines: []FineItem{},
+			}
+			return out, appendFinesOnly(groupID, memberID, out)
+		}
 	}
 	today := dateOf(now)
 	grace := cycleGraceDays(groupID)
@@ -253,6 +269,7 @@ func GetMemberObligations(groupID, memberID string, now time.Time) (*MemberOblig
 		MemberID: m.ID, MemberNo: m.MemberNo, FullName: m.FullName,
 		TotalArrears: decimal.Zero, CurrentCycleDue: decimal.Zero,
 		TotalFinesUnpaid: decimal.Zero, GrandTotal: decimal.Zero,
+		HasSchedule: true,
 		ItemizedArrears: []ArrearsItem{}, ItemizedFines: []FineItem{},
 	}
 	for _, c := range cycles {
@@ -278,16 +295,6 @@ func GetMemberObligations(groupID, memberID string, now time.Time) (*MemberOblig
 		}
 	}
 
-	type fineRow struct {
-		ID          string
-		OffenceName string
-		OffenceKind string
-		Amount      string
-		Occurrence  time.Time
-		CycleLabel  string
-		Status      string
-		Waiver      string
-	}
 	var frows []fineRow
 	database.DB.Raw(`
 		SELECT f.id, o.name AS offence_name, o.kind AS offence_kind,
@@ -296,6 +303,26 @@ func GetMemberObligations(groupID, memberID string, now time.Time) (*MemberOblig
 		  FROM fines f JOIN fine_offence_types o ON o.id = f.offence_type_id
 		 WHERE f.group_id = ? AND f.member_id = ? AND f.status = 'unpaid'
 		 ORDER BY f.occurrence_date ASC`, groupID, memberID).Scan(&frows)
+	appendFineItems(out, frows)
+
+	out.GrandTotal = out.TotalArrears.Add(out.CurrentCycleDue).Add(out.TotalFinesUnpaid)
+	return out, nil
+}
+
+type fineRow struct {
+	ID          string
+	OffenceName string
+	OffenceKind string
+	Amount      string
+	Occurrence  time.Time
+	CycleLabel  string
+	Status      string
+	Waiver      string
+}
+
+// appendFineItems folds raw fine rows into the summary (shared by the full
+// and the fines-only/no-schedule paths).
+func appendFineItems(out *MemberObligations, frows []fineRow) {
 	for _, fr := range frows {
 		amt, _ := decimal.NewFromString(fr.Amount)
 		out.TotalFinesUnpaid = out.TotalFinesUnpaid.Add(amt)
@@ -305,9 +332,24 @@ func GetMemberObligations(groupID, memberID string, now time.Time) (*MemberOblig
 			Status: fr.Status, WaiverStatus: fr.Waiver,
 		})
 	}
+}
 
+// appendFinesOnly loads just the unpaid fines for members whose group has no
+// contribution schedule (no cycles exist to assess).
+func appendFinesOnly(groupID, memberID string, out *MemberObligations) error {
+	var frows []fineRow
+	if err := database.DB.Raw(`
+		SELECT f.id, o.name AS offence_name, o.kind AS offence_kind,
+		       f.amount::text AS amount, f.occurrence_date AS occurrence,
+		       f.contribution_cycle_label AS cycle_label, f.status, f.waiver_status AS waiver
+		  FROM fines f JOIN fine_offence_types o ON o.id = f.offence_type_id
+		 WHERE f.group_id = ? AND f.member_id = ? AND f.status = 'unpaid'
+		 ORDER BY f.occurrence_date ASC`, groupID, memberID).Scan(&frows).Error; err != nil {
+		return err
+	}
+	appendFineItems(out, frows)
 	out.GrandTotal = out.TotalArrears.Add(out.CurrentCycleDue).Add(out.TotalFinesUnpaid)
-	return out, nil
+	return nil
 }
 
 type MemberObligationRollup struct {

@@ -45,6 +45,11 @@ function DeniLanguPage() {
   return (
     <AppShell title="Deni Langu" subtitle="Jumla unayodaiwa na kikundi">
       <div className="max-w-3xl space-y-4">
+        {ob.has_schedule === false && (
+          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Kikundi hakijaweka ratiba ya michango (tarehe ya kukatwa) — malimbikizo hayawezi kuhesabiwa hadi uongozi utakapoiweka.
+          </p>
+        )}
         <section className="card-surface overflow-hidden" data-testid="grand-total-card">
           <div className="bg-primary px-4 py-5 text-primary-foreground">
             <p className="text-xs uppercase tracking-wide opacity-80">Jumla Unayodaiwa</p>
