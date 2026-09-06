@@ -25,10 +25,10 @@ func NewLeadershipHandler() *LeadershipHandler {
 // QuickStats returns quick statistics for the "Takwimu za Haraka" dashboard section.
 // GET /api/v1/uongozi/quick-stats
 func (h *LeadershipHandler) QuickStats(c *fiber.Ctx) error {
-	// Get total members count
+	// Get total members count (approved only — pending must not inflate totals)
 	var totalMembers int64
 	database.DB.Model(&models.Member{}).
-		Where("deleted_at IS NULL").
+		Where("deleted_at IS NULL AND approval_status = 'approved'").
 		Count(&totalMembers)
 
 	// Get contributions this month from NEW MemberContribution table (Phase 4)
@@ -285,10 +285,10 @@ func (h *LeadershipHandler) Dashboard(c *fiber.Ctx) error {
 		Where("status = ?", models.LoanPending).
 		Count(&pendingLoans)
 
-	// Get total members count
+	// Get total members count (approved only — pending must not inflate totals)
 	var totalMembers int64
 	database.DB.Model(&models.Member{}).
-		Where("deleted_at IS NULL").
+		Where("deleted_at IS NULL AND approval_status = 'approved'").
 		Count(&totalMembers)
 
 	// Get outstanding loans count

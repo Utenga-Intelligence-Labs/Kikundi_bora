@@ -8,12 +8,13 @@ import type {
 } from "./types";
 
 export const membersApi = {
-  list: (params?: { page?: number; limit?: number; q?: string; user_id?: string }) => {
+  list: (params?: { page?: number; limit?: number; q?: string; user_id?: string; status?: string }) => {
     const q: Record<string, string> = {};
     if (params?.page) q.page = String(params.page);
     if (params?.limit) q.limit = String(params.limit);
     if (params?.q) q.q = params.q;
     if (params?.user_id) q.user_id = params.user_id;
+    if (params?.status) q.status = params.status;
     return api.get<PaginatedResponse<Member>>("/members", q);
   },
   get: (id: string) => api.get<Member>(`/members/${id}`),

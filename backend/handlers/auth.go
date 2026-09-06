@@ -220,6 +220,14 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
 	}
 
+	// Member-approval gate: a linked member row whose approval_status is not
+	// 'approved' must NEVER receive a session, even with correct credentials.
+	// 403 (not 401) with a clear message so the person waits for katibu
+	// approval instead of retrying passwords endlessly.
+	if msg, blocked := memberApprovalBlockReason(user.ID); blocked {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": msg})
+	}
+
 	// Status checks AFTER password verification, all returning the same
 	// generic body (no state disclosure):
 	switch user.Status {
@@ -338,6 +346,9 @@ func (h *AuthHandler) VerifyOTP(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
 	}
 	// Same post-password controls as Login: active account required.
+	if msg, blocked := memberApprovalBlockReason(user.ID); blocked {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": msg})
+	}
 	if user.Status != models.UserStatusActive || !user.IsActive {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"message": "Nambari ya simu/barua pepe au nenosiri si sahihi"})
 	}
@@ -704,6 +715,25 @@ func (h *AuthHandler) generateToken(userID string, role models.Role) (string, st
 		return "", ""
 	}
 	return tokenStr, expiresAt.Format(time.RFC3339)
+}
+
+// memberApprovalBlockReason returns (message, true) when the user has a
+// linked member row whose approval_status is not 'approved'. Users with no
+// member row (e.g. admin) are never blocked by this gate.
+func memberApprovalBlockReason(userID string) (string, bool) {
+	var member models.Member
+	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).
+		First(&member).Error; err != nil {
+		return "", false
+	}
+	switch member.ApprovalStatus {
+	case models.MemberApprovalApproved:
+		return "", false
+	case models.MemberApprovalRejected:
+		return "Akaunti yako ya mwanachama haikuidhinishwa. Wasiliana na Katibu kwa maelezo zaidi.", true
+	default:
+		return "Akaunti yako bado inasubiri idhini ya katibu. Tafadhali subiri kuidhinishwa — si tatizo la nenosiri.", true
+	}
 }
 
 func (h *AuthHandler) recordFailedLogin(email, ip, ua string) {

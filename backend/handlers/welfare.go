@@ -438,6 +438,11 @@ func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {
 
 	userID := middleware.GetUserID(c)
 
+	// Social-fund attribution only for approved members.
+	if msg, blocked := welfareMemberBlockReason(memberID); blocked {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": msg})
+	}
+
 	tx := database.DB.Begin()
 
 	var contrib models.WelfareContribution
@@ -755,6 +760,11 @@ func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
 	memberID := c.Params("memberId")
 	userID := middleware.GetUserID(c)
 
+	// Social-fund attribution only for approved members.
+	if msg, blocked := welfareMemberBlockReason(memberID); blocked {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": msg})
+	}
+
 	tx := database.DB.Begin()
 
 	var contrib models.WelfareContribution
@@ -785,6 +795,19 @@ func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
 	)
 
 	return c.JSON(fiber.Map{"message": "Mchango umesamehewa", "data": contrib})
+}
+
+// welfareMemberBlockReason rejects social-fund attribution for members whose
+// approval_status is not 'approved' (or who are missing/inactive).
+func welfareMemberBlockReason(memberID string) (string, bool) {
+	var m models.Member
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", memberID).First(&m).Error; err != nil {
+		return "Mwanachama hajapatikana", true
+	}
+	if m.ApprovalStatus != models.MemberApprovalApproved || !m.IsActive {
+		return "Mwanachama hajaidhinishwa bado — hachaguliwi kwa mchango wa kijamii", true
+	}
+	return "", false
 }
 
 // maybeCompleteWelfareEvent marks the event COMPLETED when no PENDING contributions remain.

@@ -144,6 +144,23 @@ function WekaMchangoPage() {
 
   if (!user) return null;
 
+  // /me only returns member_id for katibu-approved members. A signed-in
+  // user without one is pending approval — show guidance instead of the
+  // contribution form (the API also rejects with 403 server-side).
+  if (!user.member_id) {
+    return (
+      <AppShell title="Weka Mchango" subtitle="Wasilisha mchango wako kwa uthibitisho">
+        <div className="card-surface max-w-2xl border-l-4 border-l-amber-500 p-6 text-center">
+          <p className="font-display text-lg font-bold">Akaunti haijaidhinishwa bado</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Akaunti yako ya mwanachama bado inasubiri idhini ya katibu. Utaweza
+            kuweka michango (pamoja na mifuko ya kijamii) mara tu utakapoidhinishwa.
+          </p>
+        </div>
+      </AppShell>
+    );
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

@@ -57,6 +57,8 @@ type Group struct {
 	// additionally requires a configured provider + per-type opt-in.
 	SMSNotificationsEnabled bool `gorm:"not null;default:false" json:"sms_notifications_enabled"`
 
+	Status string `gorm:"type:varchar(20);not null;default:'active'" json:"status"` // active | dissolved
+
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
 
 	DeletedBy *string `gorm:"type:uuid" json:"deleted_by,omitempty"`

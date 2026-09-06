@@ -65,6 +65,9 @@ func (h *ContributionHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *ContributionHandler) Create(c *fiber.Ctx) error {
+	if IsGroupDissolved() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Kikundi kimevunjwa — michango imefungwa"})
+	}
 	var req models.CreateContributionRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})

@@ -130,8 +130,10 @@ function MfukoManagementPage() {
 function CreateEventCard({ onClose }: { onClose: () => void }) {
   const { showModal } = useAppModal();
   const createEvent = useCreateWelfareEvent();
-  const { data: membersData } = useMembers({ limit: 500 });
-  const members = membersData?.data ?? [];
+  // Social-fund attribution: approved members only (server also rejects
+  // with 403 — this keeps the dropdown honest too).
+  const { data: membersData } = useMembers({ limit: 500, status: "approved" });
+  const members = (membersData?.data ?? []).filter((m) => m.approval_status == null || m.approval_status === "approved");
   const [f, setF] = useState({
     memberId: "",
     eventType: "" as WelfareEventType | "",

@@ -129,6 +129,7 @@ func cleanAndSeed(t *testing.T) {
 	// Full dependency-ordered cleanup (FK-safe). A partial delete list lets
 	// FK-referenced rows survive, silently aborts later DELETEs and skips the
 	// reseed — leaving tests running against stale data.
+	database.DB.Exec("UPDATE groups SET status='active' WHERE status='dissolved'")
 	for _, stmt := range []string{
 		"DELETE FROM loan_reviews",
 		"DELETE FROM repayments",
@@ -154,6 +155,9 @@ func cleanAndSeed(t *testing.T) {
 		"DELETE FROM meetings",
 		"DELETE FROM fines",
 		"DELETE FROM contribution_cycles",
+		"DELETE FROM dissolution_payouts",
+		"DELETE FROM dissolution_votes",
+		"DELETE FROM group_dissolution_proposals",
 		"DELETE FROM fine_offence_types",
 		"DELETE FROM group_setting_proposals",
 		"DELETE FROM members",

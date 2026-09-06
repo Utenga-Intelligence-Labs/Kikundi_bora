@@ -184,6 +184,49 @@ func ensureCycleRow(g *models.Group, m *models.Member, label string, due time.Ti
 	}).Error
 }
 
+// BackdateMemberArrears generates MAIN-contribution cycle rows for a member
+// from `from` (inclusive) up to the current open cycle, using the group's
+// fixed amount snapshot per cycle via ensureCycleRow. It touches ONLY the
+// contribution_cycles table — social-fund (welfare) obligations are
+// voluntary by nature and are NEVER generated here, regardless of settings.
+// Returns the cycle labels created/found, for audit logging. Idempotent:
+// re-running creates no duplicates (ensureCycleRow is upsert-by-label).
+func BackdateMemberArrears(groupID, memberID string, from, now time.Time) ([]string, error) {
+	var g models.Group
+	if err := database.DB.First(&g, "id = ?", groupID).Error; err != nil {
+		return nil, err
+	}
+	if g.ContributionDueDate == nil || g.ContributionInterval == "" {
+		return nil, errors.New("group has no contribution schedule")
+	}
+	var m models.Member
+	if err := database.DB.First(&m, "id = ?", memberID).Error; err != nil {
+		return nil, err
+	}
+	today := dateOf(now)
+	start := dateOf(from)
+	if start.After(today) {
+		return nil, errors.New("backdate start must not be in the future")
+	}
+	due, ok := NextContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, start)
+	if !ok {
+		return nil, errors.New("invalid contribution schedule")
+	}
+	labels := []string{}
+	for i := 0; i < 240 && ok; i++ {
+		label := ContributionCycleLabel(g.ContributionInterval, due)
+		if err := ensureCycleRow(&g, &m, label, dateOf(due)); err != nil {
+			return labels, err
+		}
+		labels = append(labels, label)
+		if dateOf(due).After(today) {
+			break // current open cycle recorded; stop (never future cycles)
+		}
+		due, ok = NextContributionDueDate(g.ContributionInterval, *g.ContributionDueDate, dateOf(due).AddDate(0, 0, 1))
+	}
+	return labels, nil
+}
+
 // RefreshGroupCycles refreshes every active approved member. Called from the
 // scheduler tick and on-demand before summaries.
 func RefreshGroupCycles(groupID string, now time.Time) {

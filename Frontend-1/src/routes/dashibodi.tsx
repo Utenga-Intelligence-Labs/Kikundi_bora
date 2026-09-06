@@ -37,6 +37,8 @@ import {
   Gift,
 } from "lucide-react";
 import { useWelfareEvents } from "@/hooks/use-welfare";
+import { DissolvedBanner, DissolutionVotingCard } from "@/components/DissolutionCard";
+import { dissolutionApi } from "@/api/dissolution";
 
 export const Route = createFileRoute("/dashibodi")({
   head: () => ({
@@ -88,6 +90,8 @@ function DashboardContent({ user }: { user: User }) {
 
   return (
     <>
+      <DissolvedBanner />
+      <DissolutionBannerForDashboard groupId={groupId} />
       <div className="mb-5 flex items-center gap-2">
         <span className="chip bg-primary/10 text-primary">{displayRole}</span>
         <span className="text-xs text-muted-foreground">
@@ -578,6 +582,13 @@ function QuickAction({ to, icon: Icon, label }: { to: string; icon: any; label: 
       <span className="text-sm font-semibold leading-tight">{label}</span>
     </Link>
   );
+}
+
+function DissolutionBannerForDashboard({ groupId }: { groupId?: string }) {
+  const { data } = useQuery({ queryKey: ["dissolution","list",groupId], queryFn: ()=>dissolutionApi.listByGroup(groupId!), enabled: !!groupId });
+  const open = data?.data?.find(p=>p.status==="voting_open");
+  if (!open) return null;
+  return <div className="mb-4"><DissolutionVotingCard proposalId={open.id} /></div>;
 }
 
 function LoadingSkeleton() {

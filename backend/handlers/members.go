@@ -102,6 +102,9 @@ func (h *MemberHandler) Get(c *fiber.Ctx) error {
 }
 
 func (h *MemberHandler) Create(c *fiber.Ctx) error {
+	if IsGroupDissolved() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Kikundi kimevunjwa — hakuwezi kuongeza wanachama"})
+	}
 	var req models.CreateMemberRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
@@ -128,6 +131,29 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 	joinedAt, err := time.Parse("2006-01-02", req.JoinedAt)
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tarehe si sahihi"})
+	}
+
+	// Selective arrears backdating: mwenyekiti-only, main cycles only.
+	backdate := req.BackdateArrears != nil && *req.BackdateArrears
+	var backdateFrom time.Time
+	if backdate {
+		if middleware.GetUserRole(c) != models.RoleChair {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Ni Mwenyekiti pekee anayeweza kuongeza madeni ya nyuma"})
+		}
+		if req.BackdateFromCycle == nil || *req.BackdateFromCycle == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Chagua kipindi cha kuanzia madeni ya nyuma"})
+		}
+		backdateFrom, err = time.Parse("2006-01-02", *req.BackdateFromCycle)
+		if err != nil {
+			monthStart, merr := time.Parse("2006-01", *req.BackdateFromCycle)
+			if merr != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kipindi si sahihi — tumia YYYY-MM-DD au YYYY-MM"})
+			}
+			backdateFrom = monthStart
+		}
+		if backdateFrom.After(time.Now()) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Kipindi cha kuanzia hakiwezi kuwa baadaye"})
+		}
 	}
 
 	userID := middleware.GetUserID(c)
@@ -201,7 +227,27 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 	services.LogAudit(c, &userID, models.AuditCreate, "members", &member.ID, nil, map[string]interface{}{
 		"member_no": memberNo, "full_name": member.FullName, "phone": member.Phone,
 		"approval_status": member.ApprovalStatus, "linked_user_id": newUser.ID,
+		"backdate_arrears": backdate,
 	})
+
+	// Backdate MAIN-cycle arrears only (never social funds — see
+	// services.BackdateMemberArrears). Runs after commit; idempotent.
+	var backdatedCycles []string
+	if backdate {
+		if g, gerr := database.GetCurrentGroup(); gerr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Mwanachama amesajiliwa lakini madeni ya nyuma yameshindwa — kikundi hakijapatikana"})
+		} else if labels, berr := services.BackdateMemberArrears(g.ID, member.ID, backdateFrom, time.Now()); berr != nil {
+			log.Printf("ERROR: backdate arrears %s: %v", member.MemberNo, berr)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Mwanachama amesajiliwa lakini madeni ya nyuma yameshindwa: " + berr.Error()})
+		} else {
+			backdatedCycles = labels
+		}
+		services.LogAudit(c, &userID, models.AuditCreate, "contribution_cycles", &member.ID, nil, map[string]interface{}{
+			"member_id": member.ID, "member_no": memberNo,
+			"backdate_from": req.BackdateFromCycle, "cycles": backdatedCycles,
+			"scope": "main_contributions_only",
+		})
+	}
 
 	// Notify katibu — approval queue
 	services.NotifyRole(models.RoleSecretary, models.NotifSystem,
@@ -210,9 +256,14 @@ func (h *MemberHandler) Create(c *fiber.Ctx) error {
 		"",
 	)
 
+	msg := "Mwanachama amesajiliwa. Unasubiri idhini ya Katibu."
+	if backdate {
+		msg = "Mwanachama amesajiliwa na madeni ya nyuma yameongezwa (michango kuu tu). Unasubiri idhini ya Katibu."
+	}
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"message": "Mwanachama amesajiliwa. Unasubiri idhini ya Katibu.",
-		"data":    member,
+		"message":          msg,
+		"data":             member,
+		"backdated_cycles": backdatedCycles,
 	})
 }
 

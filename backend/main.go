@@ -140,6 +140,7 @@ func main() {
 	announcementHandler := handlers.NewAnnouncementHandler()
 	importHandler := handlers.NewImportHandler()
 	ledgerHandler := handlers.NewLedgerHandler(lg, *ledgerGroupID)
+	dissolutionHandler := handlers.NewDissolutionHandler()
 
 	auth := api.Group("/auth")
 	auth.Post("/login", authHandler.Login)
@@ -436,6 +437,17 @@ func main() {
 	uongozi.Post("/mikopo/:id/approve", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), leadershipHandler.ApproveLoan)
 	uongozi.Get("/ripoti", leadershipHandler.Reports)
 	uongozi.Get("/wanachama", memberHandler.List)
+
+	// Dissolution routes
+	dissolution := protected.Group("/dissolution-proposals")
+	dissolution.Post("/:id/vote", dissolutionHandler.Vote)
+	dissolution.Get("/:id", dissolutionHandler.Get)
+	dissolution.Get("/:id/payouts", dissolutionHandler.ListPayouts)
+	dissolution.Post("/:id/execute", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), dissolutionHandler.Execute)
+	protected.Get("/groups/:id/dissolution-proposals", dissolutionHandler.ListByGroup)
+	protected.Post("/groups/:id/dissolution-proposals", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), dissolutionHandler.Propose)
+	protected.Patch("/dissolution-payouts/:id/mark-paid", middleware.RequireRoles(models.RoleTreasurer), dissolutionHandler.MarkPaid)
+	protected.Get("/dissolution-payouts/me", dissolutionHandler.MyPayouts)
 
 	// Import routes (leadership only — for historical data from books)
 	importRoutes := protected.Group("/import")

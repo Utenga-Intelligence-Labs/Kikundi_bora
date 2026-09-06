@@ -35,6 +35,10 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-react";
+import { DissolutionProposeCard, DissolutionPayoutTable, DissolvedBanner } from "@/components/DissolutionCard";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { dissolutionApi } from "@/api/dissolution";
+import { groupsApi } from "@/api/groups";
 
 export const Route = createFileRoute("/mipangilio")({
   head: () => ({
@@ -89,6 +93,8 @@ function MipangilioPage() {
 
   return (
     <AppShell title="Mipangilio" subtitle="Sanidi mfumo kulingana na kikundi chako">
+      <DissolvedBanner />
+      <DissolutionSection />
       <ContributionSettingsCard />
       <div className="mt-4">
         <PendingApprovalsCard />
@@ -609,6 +615,30 @@ function LoanCommitteeManagement() {
         </div>
       )}
     </Card>
+  );
+}
+
+function DissolutionSection() {
+  const { data: grp } = useQuery({ queryKey: ["groups","current"], queryFn: groupsApi.current });
+  const groupId = grp?.data.id;
+  const { data: list } = useQuery({ queryKey: ["dissolution","list",groupId], queryFn: ()=>dissolutionApi.listByGroup(groupId!), enabled: !!groupId });
+  const qc = useQueryClient();
+  const proposals = list?.data ?? [];
+  const open = proposals.find(p=>p.status==="voting_open");
+  const executed = proposals.find(p=>p.status==="executed");
+  const exec = useMutation({ mutationFn: ()=>dissolutionApi.execute(open!.id), onSuccess: ()=>qc.invalidateQueries({queryKey:["dissolution"]}) });
+  return (
+    <div className="mt-4 space-y-4">
+      <DissolutionProposeCard />
+      {open && (
+        <div className="card-surface p-4">
+          <p className="text-sm font-semibold">Pendekezo linaloendelea — {open.id.slice(0,8)} · {open.status} · mwisho {new Date(open.voting_deadline).toLocaleDateString("sw-TZ")}</p>
+          <button onClick={()=>exec.mutate()} disabled={exec.isPending} className="mt-2 rounded-xl bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-50">Tekeleza (baada ya deadline + majority)</button>
+          {exec.isError && <p className="text-xs text-destructive mt-1">{(exec.error as any)?.message}</p>}
+        </div>
+      )}
+      {executed && <DissolutionPayoutTable proposalId={executed.id} />}
+    </div>
   );
 }
 

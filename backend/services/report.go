@@ -236,7 +236,7 @@ func GenerateSummaryReport() (*ReportData, error) {
 	var pendingLoans int64
 
 	database.DB.Model(&models.Member{}).Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Count(&activeMembers)
-	database.DB.Model(&models.Member{}).Where("deleted_at IS NULL").Count(&totalMembers)
+	database.DB.Model(&models.Member{}).Where("deleted_at IS NULL AND approval_status = 'approved'").Count(&totalMembers)
 	database.DB.Model(&models.Contribution{}).Where("status = ?", "PAID").Select("COALESCE(SUM(amount),0)").Scan(&totalContributions)
 	database.DB.Model(&models.Loan{}).Select("COALESCE(SUM(amount),0)").Scan(&totalLoans)
 	database.DB.Model(&models.Repayment{}).Select("COALESCE(SUM(amount),0)").Scan(&totalRepayments)

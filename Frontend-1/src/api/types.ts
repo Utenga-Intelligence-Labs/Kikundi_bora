@@ -100,6 +100,7 @@ export interface Member {
   address?: string;
   joined_at: string;
   is_active: boolean;
+  approval_status?: "pending" | "approved" | "rejected";
   registered_by: string;
   created_at: string;
   updated_at: string;
@@ -117,6 +118,10 @@ export interface CreateMemberRequest {
   next_of_kin_phone?: string;
   photo_url?: string;
   joined_at: string;
+  /** Mwenyekiti-only: retroactively charge main-cycle arrears from this cycle. Applies to michango kuu only, never social funds. */
+  backdate_arrears?: boolean;
+  /** Start cycle for backdating (YYYY-MM-DD or YYYY-MM). Sent only when backdate_arrears is true. */
+  backdate_from_cycle?: string;
 }
 
 export interface UpdateMemberRequest {

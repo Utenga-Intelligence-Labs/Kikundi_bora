@@ -56,6 +56,11 @@ func AutoMigrate() {
 		&models.NotificationSMSPref{},
 		&models.OTPChallenge{},
 
+		// Dissolution tables
+		&models.GroupDissolutionProposal{},
+		&models.DissolutionVote{},
+		&models.DissolutionPayout{},
+
 		// Backup tables
 		&models.BackupHistory{},
 		&models.BackupSettings{},
@@ -81,6 +86,8 @@ func AutoMigrate() {
 		WHERE contribution_cycle_label = ''`)
 	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_contribution_cycles_member_cycle
 		ON contribution_cycles (group_id, member_id, cycle_label)`)
+	DB.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_dissolution_votes_proposal_member
+		ON dissolution_votes (proposal_id, member_id) WHERE deleted_at IS NULL`)
 
 	// Backfill: payment methods created before the approval workflow
 	// carry an empty status — treat them as approved (they were live).

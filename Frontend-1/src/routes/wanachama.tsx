@@ -7,6 +7,7 @@ import { useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { tokenStorage } from "@/lib/auth-storage";
+import type { CreateMemberRequest } from "@/api/types";
 import { tarehe } from "@/lib/format";
 import { Field } from "@/components/Field";
 import { useDebounce } from "@/hooks/use-debounce";
@@ -369,9 +370,26 @@ function WanachamaPage() {
   );
 }
 
+/**
+ * Builds the POST /members payload. Backdate fields are included ONLY when
+ * the toggle is on AND the actor is mwenyekiti — otherwise omitted entirely
+ * (never sent as false/empty).
+ */
+export function buildCreateMemberPayload(
+  base: CreateMemberRequest,
+  opts: { backdateOn: boolean; backdateFrom: string; isChair: boolean },
+): CreateMemberRequest {
+  if (opts.backdateOn && opts.isChair) {
+    return { ...base, backdate_arrears: true, backdate_from_cycle: opts.backdateFrom };
+  }
+  return { ...base };
+}
+
 function FormDialog({ onClose }: { onClose: () => void }) {
   const createMember = useCreateMember();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isChair = hasRole(user, "chair");
   const [f, setF] = useState({
     full_name: "",
     phone: "",
@@ -383,6 +401,10 @@ function FormDialog({ onClose }: { onClose: () => void }) {
     next_of_kin_phone: "",
     joined_at: new Date().toISOString().slice(0, 10),
   });
+  const [backdateOn, setBackdateOn] = useState(false);
+  const [backdateFrom, setBackdateFrom] = useState(
+    new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10),
+  );
   const [err, setErr] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -417,18 +439,23 @@ function FormDialog({ onClose }: { onClose: () => void }) {
   const handleSubmit = async () => {
     setErr(null);
     try {
-      await createMember.mutateAsync({
-        full_name: f.full_name,
-        phone: f.phone,
-        address: f.address || undefined,
-        gender: (f.gender || undefined) as "MME" | "MKE" | undefined,
-        occupation: f.occupation || undefined,
-        email: f.email || undefined,
-        next_of_kin_name: f.next_of_kin_name || undefined,
-        next_of_kin_phone: f.next_of_kin_phone || undefined,
-        photo_url: photoUrl || undefined,
-        joined_at: f.joined_at,
-      });
+      await createMember.mutateAsync(
+        buildCreateMemberPayload(
+          {
+            full_name: f.full_name,
+            phone: f.phone,
+            address: f.address || undefined,
+            gender: (f.gender || undefined) as "MME" | "MKE" | undefined,
+            occupation: f.occupation || undefined,
+            email: f.email || undefined,
+            next_of_kin_name: f.next_of_kin_name || undefined,
+            next_of_kin_phone: f.next_of_kin_phone || undefined,
+            photo_url: photoUrl || undefined,
+            joined_at: f.joined_at,
+          },
+          { backdateOn, backdateFrom, isChair },
+        ),
+      );
       qc.invalidateQueries({ queryKey: ["members"] });
       setSubmitted(true);
     } catch (e: unknown) {
@@ -489,6 +516,34 @@ function FormDialog({ onClose }: { onClose: () => void }) {
           <Field label="Simu ya mlezi (hiari)" value={f.next_of_kin_phone} onChange={(v) => setF({ ...f, next_of_kin_phone: v })} type="tel" />
           <Field label="Anwani (hiari)" value={f.address} onChange={(v) => setF({ ...f, address: v })} />
           <Field label="Tarehe ya kujiunga" value={f.joined_at} onChange={(v) => setF({ ...f, joined_at: v })} type="date" />
+          {isChair && (
+            <div className="rounded-lg border border-border p-3">
+              <label className="flex cursor-pointer items-center justify-between gap-2">
+                <span className="text-sm font-medium">Ongeza madeni ya nyuma?</span>
+                <input
+                  type="checkbox"
+                  checked={backdateOn}
+                  onChange={(e) => setBackdateOn(e.target.checked)}
+                  className="h-5 w-9 appearance-none rounded-full bg-muted transition-colors checked:bg-primary relative cursor-pointer before:absolute before:top-0.5 before:left-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:before:translate-x-4"
+                />
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Hutumika kwa <strong>michango kuu</strong> tu — haigusi mifuko ya kijamii (hiari).
+              </p>
+              {backdateOn && (
+                <label className="mt-2 block">
+                  <span className="mb-1 block text-xs text-muted-foreground">Kuanzia lini (kipindi cha nyuma)</span>
+                  <input
+                    type="date"
+                    value={backdateFrom}
+                    onChange={(e) => setBackdateFrom(e.target.value)}
+                    max={new Date().toISOString().slice(0, 10)}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Picha ya mwanachama (hiari)</label>
             <input

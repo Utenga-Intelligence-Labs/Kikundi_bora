@@ -110,6 +110,9 @@ func (h *LoanHandler) Get(c *fiber.Ctx) error {
 }
 
 func (h *LoanHandler) Apply(c *fiber.Ctx) error {
+	if IsGroupDissolved() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Kikundi kimevunjwa — mikopo imefungwa"})
+	}
 	var req models.ApplyLoanRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})

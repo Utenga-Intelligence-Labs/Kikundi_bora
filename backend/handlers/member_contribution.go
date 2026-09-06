@@ -24,6 +24,9 @@ func NewMemberContributionHandler() *MemberContributionHandler {
 // Submit handles member contribution submission
 // POST /api/v1/michango
 func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
+	if IsGroupDissolved() {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Kikundi kimevunjwa — michango imefungwa"})
+	}
 	userID := middleware.GetUserID(c)
 
 	// Find member linked to user
@@ -35,7 +38,8 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 		})
 	}
 
-	// Parse request
+	// Parse request (approval gate applied after parsing, scoped to the
+	// social-fund type below — server-side, never frontend-only)
 	var req struct {
 		ContributionType string          `json:"contribution_type" validate:"required,oneof=AKIBA MFUKO_WA_KIJAMII"`
 		PeriodLabel      string          `json:"period_label" validate:"required,max=30"`
@@ -90,6 +94,13 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 	// MFUKO_WA_KIJAMII must reference an approved, member-funded welfare event
 	var welfareEventID *string
 	if req.ContributionType == "MFUKO_WA_KIJAMII" {
+		// Social-fund self-service requires an approved membership —
+		// enforced server-side (403), not just hidden in the UI.
+		if member.ApprovalStatus != models.MemberApprovalApproved {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"message": "Akaunti yako ya mwanachama haijaidhinishwa bado — subiri Katibu",
+			})
+		}
 		if req.WelfareEventID == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"message": "Lazima uchague mfuko wa kijamii unaochangia",
@@ -513,7 +524,7 @@ func (h *MemberContributionHandler) MembersSummary(c *fiber.Ctx) error {
 			WHERE member_id = m.id
 			ORDER BY created_at DESC LIMIT 1
 		) mc ON TRUE
-		WHERE m.deleted_at IS NULL AND m.is_active = TRUE
+		WHERE m.deleted_at IS NULL AND m.is_active = TRUE AND m.approval_status = 'approved'
 		ORDER BY
 			CASE COALESCE(mc.status, 'HAJACHANGIA')
 				WHEN 'PENDING_VERIFICATION' THEN 1

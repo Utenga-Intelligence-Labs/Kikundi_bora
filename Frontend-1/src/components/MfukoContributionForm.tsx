@@ -210,7 +210,7 @@ export function MfukoContributionForm() {
                   {obligationPaid && <span className="ml-2 text-xs text-success">✓ Tayari umelipa</span>}
                 </>
               ) : (
-                <span className="text-destructive">{obligationMsg ?? "Huna kiwango kilichowekwa kwa mfuko huu."}</span>
+                <span className={obligationMsg != null && /haijaidhinishwa|subiri/i.test(obligationMsg) ? "font-medium text-amber-700" : "text-destructive"}>{obligationMsg ?? "Huna kiwango kilichowekwa kwa mfuko huu."}</span>
               )}
             </p>
           </div>

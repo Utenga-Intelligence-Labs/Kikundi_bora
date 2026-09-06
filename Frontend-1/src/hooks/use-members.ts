@@ -14,6 +14,7 @@ export function useMembers(params?: {
   limit?: number;
   q?: string;
   user_id?: string;
+  status?: string;
 }) {
   return useQuery({
     queryKey: memberKeys.list(params as Record<string, unknown>),

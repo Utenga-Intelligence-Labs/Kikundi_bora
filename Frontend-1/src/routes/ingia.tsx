@@ -22,11 +22,13 @@ function IngiaPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPendingApproval, setIsPendingApproval] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setIsPendingApproval(false);
     setLoading(true);
     try {
       const res = await login({ email: loginId.trim(), password });
@@ -38,6 +40,10 @@ function IngiaPage() {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Imeshindikana kuingia.";
       setError(msg);
+      // Pending/rejected approval is a 403 with a clear message — show it
+      // distinctly (amber) so the person waits for katibu instead of
+      // retrying passwords endlessly.
+      setIsPendingApproval(/subiri idhini|haikuidhinishwa/i.test(msg));
     } finally {
       setLoading(false);
     }
@@ -94,7 +100,17 @@ function IngiaPage() {
           <span />
           <Link to="/sahau" className="font-medium text-primary">Umesahau nenosiri?</Link>
         </div>
-        {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+        {error && (
+          <p
+            className={
+              isPendingApproval
+                ? "rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-800"
+                : "rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            }
+          >
+            {error}
+          </p>
+        )}
         <button
           type="submit"
           disabled={loading}

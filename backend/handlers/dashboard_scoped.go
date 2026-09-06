@@ -421,7 +421,7 @@ func (h *DashboardHandler) GroupSummaryKatibu(c *fiber.Ctx) error {
 		Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").
 		Count(&sum.TotalActiveMembers)
 	database.DB.Model(&models.Member{}).
-		Where("deleted_at IS NULL AND joined_at >= ?", monthFirst).
+		Where("deleted_at IS NULL AND approval_status = 'approved' AND joined_at >= ?", monthFirst).
 		Count(&sum.MembersJoinedThisMonth)
 	// "Left" = soft-deleted this month OR deactivated (inactive, not deleted)
 	database.DB.Model(&models.Member{}).

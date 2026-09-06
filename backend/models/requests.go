@@ -57,6 +57,11 @@ type CreateMemberRequest struct {
 	NextOfKinPhone *string `json:"next_of_kin_phone"`
 	PhotoURL       *string `json:"photo_url"`
 	JoinedAt       string  `json:"joined_at" validate:"required"`
+	// Selective arrears backdating (mwenyekiti only, main michango cycles
+	// only — never social funds). When true, arrears rows are generated
+	// from BackdateFromCycle up to now using the group's fixed amount.
+	BackdateArrears   *bool   `json:"backdate_arrears"`
+	BackdateFromCycle *string `json:"backdate_from_cycle"`
 }
 
 type ApproveMemberRequest struct{}
