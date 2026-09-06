@@ -67,6 +67,7 @@ const michangoPayload = {
       period_label: "2026-09",
       amount: "10000",
       status: "PENDING_VERIFICATION",
+      proof_message: "Nimetuma TZS 10000 kupitia M-Pesa",
       created_at: "2026-09-01T10:00:00Z",
       member: { id: "m-1", member_no: "KKK-0001", full_name: "Asha Mwakalinga", phone: "0710000001" },
     },
@@ -126,21 +127,19 @@ describe("Consolidated /michango", () => {
     vi.mocked(api.post).mockResolvedValue({ message: "ok", data: {} } as never);
   });
 
-  it("treasurer sees approve/reject on PENDING AKIBA rows, chair-note on MFUKO", async () => {
+  it("treasurer reviews proof first: row opens the detail modal, approve posts from inside", async () => {
     renderPage();
     expect(await screen.findByText(/Asha Mwakalinga/)).toBeTruthy();
-    const approveBtns = await screen.findAllByText("Thibitisha");
-    expect(approveBtns.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText("Inasubiri Mwenyekiti.")).toBeTruthy();
-  });
-
-  it("approve posts to michango confirm endpoint", async () => {
-    renderPage();
-    const approveBtns = await screen.findAllByText("Thibitisha");
-    fireEvent.click(approveBtns[0]);
+    // Row button opens review modal (not instant approve)
+    fireEvent.click(await screen.findByText("Kagua na Thibitisha"));
+    // Modal shows the proof message before any action posts
+    expect(await screen.findByText("Ujumbe wa Muamala")).toBeTruthy();
+    expect(api.post).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Thibitisha"));
     await waitFor(() =>
       expect(api.post).toHaveBeenCalledWith("/michango/c-akiba/confirm")
     );
+    expect(screen.getByText("Inasubiri Mwenyekiti.")).toBeTruthy();
   });
 
   it("reject requires a reason before posting", async () => {

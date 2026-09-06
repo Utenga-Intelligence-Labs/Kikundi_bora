@@ -327,11 +327,10 @@ function MichangoPage() {
                       {isTreasurer && contrib.status === "PENDING_VERIFICATION" && contrib.contribution_type === "AKIBA" && (
                         <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
                           <button
-                            onClick={() => confirmMutation.mutate(contrib.id)}
-                            disabled={confirmMutation.isPending}
-                            className="inline-flex items-center gap-1 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                            onClick={() => setViewingContrib(contrib)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white"
                           >
-                            <Check className="h-3.5 w-3.5" /> Thibitisha
+                            <Check className="h-3.5 w-3.5" /> Kagua na Thibitisha
                           </button>
                           <button
                             onClick={() => {
@@ -378,16 +377,21 @@ function MichangoPage() {
             </div>
 
             <div className="p-5 space-y-4">
-              {/* Proof Image */}
-              {viewingContrib.proof_image_url && (
-                <div className="rounded-xl overflow-hidden border bg-muted">
-                  <img
-                    src={withUploadToken(viewingContrib.proof_image_url)}
-                    alt="Picha ya uthibitisho"
-                    className="w-full max-h-80 object-contain"
-                  />
-                </div>
-              )}
+              {/* Proof Image — review before approving */}
+              <div>
+                <p className="text-sm font-semibold mb-2">Uthibitisho (kagua kabla ya kuthibitisha)</p>
+                {viewingContrib.proof_image_url ? (
+                  <div className="rounded-xl overflow-hidden border bg-muted">
+                    <img
+                      src={withUploadToken(viewingContrib.proof_image_url)}
+                      alt="Picha ya uthibitisho"
+                      className="w-full max-h-80 object-contain"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground rounded-lg border border-dashed px-3 py-2">Hakuna picha — angalia ujumbe wa muamala hapa chini.</p>
+                )}
+              </div>
 
               {/* Info */}
               <div className="grid grid-cols-2 gap-4">
@@ -423,11 +427,13 @@ function MichangoPage() {
               </div>
 
               {/* Proof Message */}
-              {viewingContrib.proof_message && (
+              {viewingContrib.proof_message ? (
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="text-xs text-muted-foreground mb-1">Ujumbe wa Muamala</p>
                   <p className="text-sm">{viewingContrib.proof_message}</p>
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground rounded-lg border border-dashed px-3 py-2">Hakuna ujumbe wa muamala — angalia picha hapo juu.</p>
               )}
 
               {/* Rejection Reason */}
