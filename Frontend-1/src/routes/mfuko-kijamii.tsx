@@ -176,6 +176,7 @@ function DashboardStats() {
 function EventsTab() {
   const { user } = useAuth();
   const isChair = user?.role === "chair";
+  const isSecretary = user?.role === "secretary";
   const isTreasurer = user?.role === "treasurer";
 
   const [statusFilter, setStatusFilter] = useState("");
@@ -224,8 +225,8 @@ function EventsTab() {
             key={ev.id}
             event={ev}
             onView={() => setViewingEvent(ev.id)}
-            onApprove={isChair && ev.status === "PENDING" ? () => setApprovingEvent(ev.id) : undefined}
-            onReject={isChair && ev.status === "PENDING" ? () => setRejectingEvent(ev.id) : undefined}
+            onApprove={(isChair || isSecretary) && ev.status === "PENDING" ? () => setApprovingEvent(ev.id) : undefined}
+            onReject={(isChair || isSecretary) && ev.status === "PENDING" ? () => setRejectingEvent(ev.id) : undefined}
           />
         ))}
         {events.length === 0 && !isLoading && (
@@ -334,7 +335,7 @@ function EventCard({
 
 function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
   const { user } = useAuth();
-  const { data, isLoading } = useWelfareEvent(eventId);
+  const { data, isLoading, error } = useWelfareEvent(eventId);
   const recordPayment = useRecordWelfarePayment();
   const waiveContrib = useWaiveWelfareContribution();
   const disburseEvent = useDisburseWelfareEvent();
@@ -342,6 +343,15 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
   const [payAmount, setPayAmount] = useState("");
 
   if (isLoading || !data) {
+    if (!isLoading && error) {
+      return (
+        <Modal title="Taarifa za Tukio" onClose={onClose}>
+          <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            Imeshindikana kupakia tukio. Hakikisha backend ni mpya (pull + rebuild + restart) kisha jaribu tena.
+          </p>
+        </Modal>
+      );
+    }
     return (
       <Modal title="Taarifa za Tukio" onClose={onClose}>
         <div className="flex justify-center py-8">
@@ -565,7 +575,7 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
 // ---------- Approve Dialog ----------
 
 function ApproveDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
-  const { data } = useWelfareEvent(eventId);
+  const { data, isLoading, error } = useWelfareEvent(eventId);
   const approveEvent = useApproveWelfareEvent();
   const [amount, setAmount] = useState("");
 
@@ -573,6 +583,16 @@ function ApproveDialog({ eventId, onClose }: { eventId: string; onClose: () => v
 
   return (
     <Modal title="Idhinisha Tukio la Kijamii" onClose={onClose}>
+      {isLoading && (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      )}
+      {!isLoading && (error || !event) && (
+        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          Imeshindikana kupakia tukio. Hakikisha backend ni mpya (pull + rebuild + restart) kisha jaribu tena.
+        </p>
+      )}
       {event && (
         <div className="space-y-3">
           <p className="text-sm">
