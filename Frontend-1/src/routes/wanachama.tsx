@@ -461,7 +461,7 @@ function FormDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center overflow-y-auto" onClick={onClose}>
-      <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl my-6" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl my-6 max-h-[85dvh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h3 className="font-display text-lg font-semibold">Sajili Mwanachama Mpya</h3>
           <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
