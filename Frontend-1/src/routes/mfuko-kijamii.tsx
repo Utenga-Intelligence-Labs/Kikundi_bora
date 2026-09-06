@@ -16,6 +16,7 @@ import {
   useRecordWelfarePayment,
   useWaiveWelfareContribution,
   useDisburseWelfareEvent,
+  useConfirmWelfareReceipt,
 } from "@/hooks/use-welfare";
 import type {
   WelfareEventType,
@@ -41,6 +42,7 @@ import {
   FileText,
   HandCoins,
   Eye,
+  Banknote,
 } from "lucide-react";
 
 export const Route = createFileRoute("/mfuko-kijamii")({
@@ -363,7 +365,20 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
 
   const { data: event, contributions, stats } = data;
   const isTreasurer = user?.role === "treasurer";
-  const canDisburse = isTreasurer && event.status === "APPROVED" && stats.pending_count === 0;
+  const isLeadership = isTreasurer || user?.role === "chair" || user?.role === "secretary";
+  const confirmReceipt = useConfirmWelfareReceipt();
+  const canDisburse =
+    isTreasurer &&
+    (event.status === "APPROVED" || event.status === "COMPLETED") &&
+    !event.disbursed_at &&
+    stats.pending_count === 0;
+  const isBeneficiary =
+    !!user?.member_id && event.member?.id != null && user.member_id === event.member.id;
+  const canConfirmReceipt =
+    event.status === "COMPLETED" &&
+    !!event.disbursed_at &&
+    !event.received_at &&
+    (isBeneficiary || isLeadership);
 
   return (
     <Modal title="Taarifa za Tukio" onClose={onClose}>
@@ -480,8 +495,65 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
                 </p>
               </div>
             </li>
+            <li className="flex items-start gap-2.5">
+              <span
+                className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full ${
+                  event.received_at ? "bg-success text-white" : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {event.received_at ? <Check className="h-3 w-3" /> : "5"}
+              </span>
+              <div className="text-xs">
+                <p className="font-semibold">
+                  {event.received_at
+                    ? `Mapokezi yamethibitishwa na ${event.member?.full_name ?? "mlengwa"}`
+                    : "Uthibitisho wa mapokezi na mlengwa"}
+                </p>
+                <p className="text-muted-foreground">
+                  {event.received_at
+                    ? new Date(event.received_at).toLocaleDateString("sw-TZ")
+                    : event.disbursed_at
+                      ? "Fedha zimetolewa — mlengwa athibitishe kupokea"
+                      : "Inasubiri utoaji wa fedha"}
+                </p>
+              </div>
+            </li>
           </ol>
         </div>
+
+        {/* Disburse + receipt actions */}
+        {(canDisburse || canConfirmReceipt) && (
+          <div className="flex gap-2">
+            {canDisburse && (
+              <button
+                onClick={() => disburseEvent.mutate(event.id)}
+                disabled={disburseEvent.isPending}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {disburseEvent.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Banknote className="h-4 w-4" />
+                )}
+                Toa Fedha kwa Mlengwa ({tzs(event.amount_approved ?? event.amount_requested)})
+              </button>
+            )}
+            {canConfirmReceipt && (
+              <button
+                onClick={() => confirmReceipt.mutate(event.id)}
+                disabled={confirmReceipt.isPending}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {confirmReceipt.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4" />
+                )}
+                Thibitisha Kupokea
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Contributions */}
         {contributions.length > 0 && (

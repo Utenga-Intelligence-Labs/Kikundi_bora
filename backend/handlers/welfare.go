@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -277,9 +278,14 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
 	}
 
-	if event.Status != models.WelfareApproved {
+	if event.Status != models.WelfareApproved && event.Status != models.WelfareCompleted {
 		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Tukio haliwezi kutolewa. Hali yake ni: " + string(event.Status)})
+	}
+
+	if event.DisbursedAt != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Fedha za tukio hili tayari zimetolewa"})
 	}
 
 	// Check if all contributions are collected (for member-funded events)
@@ -315,6 +321,8 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 	now := time.Now()
 	event.Status = models.WelfareCompleted
 	event.CompletedAt = &now
+	event.DisbursedBy = &userID
+	event.DisbursedAt = &now
 
 	if err := tx.Save(&event).Error; err != nil {
 		tx.Rollback()
@@ -329,6 +337,17 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 		map[string]interface{}{"status": "APPROVED"},
 		map[string]interface{}{"status": "COMPLETED", "amount": *disbursementAmount},
 	)
+
+	// Mirror the payout into the main group ledger (best-effort).
+	var payee models.Member
+	payeeNo := ""
+	if err := database.DB.First(&payee, "id = ?", event.MemberID).Error; err == nil && payee.MemberNo != "" {
+		payeeNo = payee.MemberNo
+	}
+	if err := services.PostWelfareOut(payeeNo, *disbursementAmount, now, userID,
+		fmt.Sprintf("Malipo ya kijamii kwa %s", payeeNo)); err != nil {
+		log.Printf("WARN: ledger auto-post welfare-out %s: %v", event.ID, err)
+	}
 
 	// Notify affected member
 	var member models.Member
@@ -352,6 +371,55 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 		"message": fmt.Sprintf("Fedha za TZS %s zimetolewa kwa mwanachama.", formatMoney(*disbursementAmount)),
 		"data":    event,
 	})
+}
+
+// ---------- BENEFICIARY (or leadership): Confirm receipt of payout ----------
+// ConfirmReceipt records that the beneficiary member received the disbursed
+// welfare money. Allowed for the event's own member (via their login) and
+// for leadership (chair/secretary/treasurer, e.g. cash handover witnessed).
+// Only COMPLETED, not-yet-received events can be confirmed.
+// POST /api/v1/welfare/events/:id/confirm-receipt
+func (h *WelfareHandler) ConfirmReceipt(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
+	var event models.WelfareEvent
+	if err := database.DB.First(&event, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
+	}
+
+	if event.Status != models.WelfareCompleted {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Fedha bado hazijatolewa kwa tukio hili"})
+	}
+
+	if event.ReceivedAt != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mapokezi tayari yamethibitishwa"})
+	}
+
+	// Authorize: the beneficiary member themselves, or leadership.
+	allowed := role == models.RoleChair || role == models.RoleSecretary ||
+		role == models.RoleTreasurer || role == models.RoleAdmin
+	if !allowed {
+		var me models.Member
+		if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&me).Error; err != nil || me.ID != event.MemberID {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Ni mlengwa au uongozi pekee ndio wanaoweza kuthibitisha mapokezi"})
+		}
+	}
+
+	now := time.Now()
+	event.ReceivedAt = &now
+	event.ReceivedBy = &userID
+	if err := database.DB.Save(&event).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuthibitisha mapokezi"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditUpdate, "welfare_events", &event.ID,
+		map[string]interface{}{"received_at": nil},
+		map[string]interface{}{"received_at": now},
+	)
+
+	return c.JSON(fiber.Map{"message": "Mapokezi yamethibitishwa. Asante!", "data": event})
 }
 
 // ---------- TREASURER: Record welfare contribution payment ----------
@@ -436,6 +504,11 @@ func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {
 				"Malipo yako ya TZS "+formatMoney(req.Amount)+" kwa tukio la kijamii yamerekodiwa.",
 			)
 		}
+		// Mirror into the main group ledger (best-effort, never fails the request).
+		if err := services.PostWelfareIn(contribMember.MemberNo, contrib.Amount, *contrib.PaidAt, userID,
+			fmt.Sprintf("Mchango wa kijamii %s", contribMember.MemberNo)); err != nil {
+			log.Printf("WARN: ledger auto-post welfare-in %s: %v", contrib.ID, err)
+		}
 	}
 
 	// If event completed, notify everyone
@@ -516,7 +589,7 @@ func (h *WelfareHandler) ApproveContribution(c *fiber.Ctx) error {
 		map[string]interface{}{"status": "PAID", "amount": contrib.Amount},
 	)
 
-	// Notify affected member
+	// Notify affected member + mirror into the main group ledger (best-effort).
 	var contribMember models.Member
 	if err := database.DB.First(&contribMember, "id = ?", contrib.MemberID).Error; err == nil {
 		var notifUserID string
@@ -531,6 +604,10 @@ func (h *WelfareHandler) ApproveContribution(c *fiber.Ctx) error {
 				"Malipo ya Mchango wa Kijamii",
 				"Malipo yako ya TZS "+formatMoney(contrib.Amount)+" kwa tukio la kijamii yameidhinishwa.",
 			)
+		}
+		if err := services.PostWelfareIn(contribMember.MemberNo, contrib.Amount, now, userID,
+			fmt.Sprintf("Mchango wa kijamii %s", contribMember.MemberNo)); err != nil {
+			log.Printf("WARN: ledger auto-post welfare-in %s: %v", contrib.ID, err)
 		}
 	}
 

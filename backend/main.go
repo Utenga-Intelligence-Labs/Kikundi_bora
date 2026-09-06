@@ -352,6 +352,7 @@ func main() {
 
 	// Disbursement — treasurer disburses after event is approved and fully funded
 	welfare.Post("/events/:id/disburse", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.DisburseEvent)
+	welfare.Post("/events/:id/confirm-receipt", welfareHandler.ConfirmReceipt)
 
 	// Pending Actions routes (Chairperson approves)
 	pending := protected.Group("/pending-actions")

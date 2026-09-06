@@ -143,3 +143,11 @@ export function useDisburseWelfareEvent() {
     onSuccess: () => qc.invalidateQueries({ queryKey: welfareKeys.all }),
   });
 }
+
+export function useConfirmWelfareReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) => welfareApi.confirmReceipt(eventId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: welfareKeys.all }),
+  });
+}

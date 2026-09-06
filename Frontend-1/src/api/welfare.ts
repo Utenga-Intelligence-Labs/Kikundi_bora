@@ -44,6 +44,10 @@ export interface WelfareEvent {
   rejected_by?: string;
   rejection_reason?: string;
   completed_at?: string;
+  disbursed_by?: string;
+  disbursed_at?: string;
+  received_at?: string;
+  received_by?: string;
   created_at: string;
   updated_at: string;
   member?: Pick<Member, "id" | "member_no" | "full_name" | "phone">;
@@ -222,5 +226,10 @@ export const welfareApi = {
   disburseEvent: (eventId: string) =>
     api.post<MessageResponse>(
       `/welfare/events/${eventId}/disburse`
+    ),
+
+  confirmReceipt: (eventId: string) =>
+    api.post<MessageResponse>(
+      `/welfare/events/${eventId}/confirm-receipt`
     ),
 };

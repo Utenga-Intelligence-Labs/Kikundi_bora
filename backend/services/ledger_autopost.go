@@ -149,6 +149,42 @@ func PostDisbursement(memberNo string, amount decimal.Decimal, occurredAt time.T
 	return postBalanced(ctx, actor, occurredAt, memo, receivable, ledger.NameGroupCash, tzsMinor(amount))
 }
 
+// PostWelfareIn mirrors a member's welfare-fund payment received by the group:
+// debit cash on hand, credit the welfare fund holdings account.
+func PostWelfareIn(memberNo string, amount decimal.Decimal, occurredAt time.Time, actorUserID, memo string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	actor := autoActor(actorUserID)
+	if strings.TrimSpace(memberNo) == "" {
+		return errors.New("empty member ref")
+	}
+	if err := ensureLedgerAccount(ctx, actor, ledger.NameGroupCash, ledger.Asset, ""); err != nil {
+		return err
+	}
+	if err := ensureLedgerAccount(ctx, actor, ledger.NameWelfareFund, ledger.Liability, ""); err != nil {
+		return err
+	}
+	return postBalanced(ctx, actor, occurredAt, memo, ledger.NameGroupCash, ledger.NameWelfareFund, tzsMinor(amount))
+}
+
+// PostWelfareOut mirrors a welfare payout to the beneficiary member:
+// debit the welfare fund holdings, credit cash on hand.
+func PostWelfareOut(memberNo string, amount decimal.Decimal, occurredAt time.Time, actorUserID, memo string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	actor := autoActor(actorUserID)
+	if strings.TrimSpace(memberNo) == "" {
+		return errors.New("empty member ref")
+	}
+	if err := ensureLedgerAccount(ctx, actor, ledger.NameWelfareFund, ledger.Liability, ""); err != nil {
+		return err
+	}
+	if err := ensureLedgerAccount(ctx, actor, ledger.NameGroupCash, ledger.Asset, ""); err != nil {
+		return err
+	}
+	return postBalanced(ctx, actor, occurredAt, memo, ledger.NameWelfareFund, ledger.NameGroupCash, tzsMinor(amount))
+}
+
 // BackfillLedgerFromHistory posts one opening-balance transaction per member
 // for all PAID contributions that predate auto-posting. Guard: runs only on
 // a fresh ledger (no trial-balance lines yet) so it can never double-post.

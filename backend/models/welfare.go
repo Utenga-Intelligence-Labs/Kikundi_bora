@@ -54,6 +54,10 @@ type WelfareEvent struct {
 	RejectedBy      *string              `gorm:"type:uuid" json:"rejected_by,omitempty"`
 	RejectionReason *string              `gorm:"type:text" json:"rejection_reason,omitempty"`
 	CompletedAt     *time.Time           `json:"completed_at,omitempty"`
+	DisbursedBy     *string              `gorm:"type:uuid" json:"disbursed_by,omitempty"`
+	DisbursedAt     *time.Time           `json:"disbursed_at,omitempty"`
+	ReceivedAt      *time.Time           `json:"received_at,omitempty"`
+	ReceivedBy      *string              `gorm:"type:uuid" json:"received_by,omitempty"`
 	CreatedAt       time.Time            `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time            `gorm:"autoUpdateTime" json:"updated_at"`
 

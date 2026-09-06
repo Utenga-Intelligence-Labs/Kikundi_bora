@@ -39,8 +39,8 @@ func (t AccountType) DebitPositive() bool {
 //	────────────────────────────────────────────────────────────────────
 //	akiba_ya_mwanachama:{id}     member savings           liability (kikundi kinadaiwa na mwanachama? hapana — kikundi kinamdaiwa? taarifa: kikundi kina DENI kwa mwanachama)
 //	dai_la_mkopo:{member}        loan receivable          asset
-//	hazina_taslimu               group cash               asset
-//	hazina_benki:{acct}          group bank account       asset
+//	hazina_taslimu               group cash               asset//	hazina_benki:{acct}          group bank account       asset
+//	mfuko_wa_kijamii             welfare fund holdings    liability (pesa za misaada zilizokusanywa, bado hazijatolewa)
 //	mapato_ya_riba               interest income          income
 //	mapato_ya_faini              fines income             income
 //	hifadhi_ya_hasara_ya_mkopo   loan-loss provision      contra-asset (expense-ish reserve)
@@ -52,6 +52,7 @@ const (
 	PrefixMemberSavings       = "akiba_ya_mwanachama" // liability — kikundi kinadeni mwanachama
 	PrefixLoanReceivable      = "dai_la_mkopo"        // asset — mwanachama anadeni kikundi
 	NameGroupCash             = "hazina_taslimu"      // asset
+	NameWelfareFund           = "mfuko_wa_kijamii"    // liability — welfare money collected, not yet disbursed
 	PrefixGroupBank           = "hazina_benki"        // asset
 	NameInterestIncome        = "mapato_ya_riba"      // income
 	NameFinesIncome           = "mapato_ya_faini"     // income
