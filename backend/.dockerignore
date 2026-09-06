@@ -28,6 +28,7 @@ uploads/**
 backups/
 *.db
 *.sql
+!ledger/schema.sql
 _local/
 
 # Tests

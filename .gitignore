@@ -18,6 +18,7 @@ uploads/*
 backups/
 *.db
 *.sql
+!backend/ledger/schema.sql
 
 # Frontend
 node_modules/
