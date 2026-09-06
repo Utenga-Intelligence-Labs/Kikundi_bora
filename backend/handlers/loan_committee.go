@@ -283,7 +283,7 @@ func (h *LoanCommitteeHandler) GetLoan(c *fiber.Ctx) error {
 		Preload("Reviewer", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, role")
 		}).
-		First(&loan, id).Error; err != nil {
+		Where("id = ?", id).First(&loan).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
 	}
 

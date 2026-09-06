@@ -93,7 +93,7 @@ func (h *MemberHandler) Get(c *fiber.Ctx) error {
 		Preload("Registrar", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, email, role")
 		}).
-		First(&member, id).Error; err != nil {
+		Where("id = ?", id).First(&member).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
 	}
 

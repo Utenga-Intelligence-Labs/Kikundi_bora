@@ -75,7 +75,7 @@ func (h *PendingActionHandler) Get(c *fiber.Ctx) error {
 		Preload("Approver", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, role")
 		}).
-		First(&action, id).Error; err != nil {
+		Where("id = ?", id).First(&action).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kitendo hakijapatikana"})
 	}
 

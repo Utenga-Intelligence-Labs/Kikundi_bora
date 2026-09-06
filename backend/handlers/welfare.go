@@ -619,7 +619,7 @@ func (h *WelfareHandler) GetEvent(c *fiber.Ctx) error {
 		Preload("Approver", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, name, role")
 		}).
-		First(&event, id).Error; err != nil {
+		Where("id = ?", id).First(&event).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Tukio la kijamii halijapatikana"})
 	}
 
