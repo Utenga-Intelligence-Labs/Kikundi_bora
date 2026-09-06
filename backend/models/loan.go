@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -32,6 +33,8 @@ type Loan struct {
 	ReviewedAt       *time.Time       `json:"reviewed_at,omitempty"`
 	DisbursedBy      *string          `gorm:"type:uuid" json:"disbursed_by,omitempty"`
 	DisbursedAt      *time.Time       `json:"disbursed_at,omitempty"`
+	DeletedAt        gorm.DeletedAt   `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy        *string          `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	UpdatedAt        time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// Sequential approval — Hazina → Katibu → Bodi Member → Mwenyekiti (in order)
@@ -61,6 +64,8 @@ type Repayment struct {
 	ReferenceNumber string          `gorm:"type:varchar(100)" json:"reference_number,omitempty"`
 	ReceiptURL      string          `gorm:"type:varchar(500)" json:"receipt_url,omitempty"`
 	Notes           *string         `gorm:"type:text" json:"notes,omitempty"`
+	DeletedAt       gorm.DeletedAt  `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy       *string         `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt       time.Time       `gorm:"autoCreateTime" json:"created_at"`
 
 	Loan     *Loan   `gorm:"foreignKey:LoanID" json:"loan,omitempty"`

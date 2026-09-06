@@ -133,7 +133,7 @@ func (h *LoanCommitteeHandler) AppointMember(c *fiber.Ctx) error {
 	}
 
 	var targetUser models.User
-	if err := database.DB.Where("id = ? AND is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'", req.UserID).First(&targetUser).Error; err != nil {
+	if err := database.DB.Where("id = ? AND is_active = TRUE AND deleted_at IS NULL", req.UserID).First(&targetUser).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mtumiaji hajapatikana"})
 	}
 
@@ -199,7 +199,7 @@ func (h *LoanCommitteeHandler) AppointMember(c *fiber.Ctx) error {
 	})
 }
 
-// RemoveMember deactivates an appointed committee member.
+// RemoveMember deactivates an appointed committee member (soft-delete with attribution).
 func (h *LoanCommitteeHandler) RemoveMember(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -214,12 +214,15 @@ func (h *LoanCommitteeHandler) RemoveMember(c *fiber.Ctx) error {
 	now := time.Now()
 	member.IsActive = false
 	member.RemovedAt = &now
+	member.DeletedBy = &userID
 
 	if err := database.DB.Save(&member).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"message": "Imeshindikana kumuondoa mwanachama",
 		})
 	}
+	// Soft-delete row as well (recoverable, keeps audit trail)
+	database.DB.Delete(&member)
 
 	services.LogAudit(c, &userID, models.AuditCommitteeRemove, "loan_committee_members", &member.ID,
 		map[string]interface{}{"is_active": true},
@@ -232,6 +235,33 @@ func (h *LoanCommitteeHandler) RemoveMember(c *fiber.Ctx) error {
 		"message": "Mwanachama ameondolewa kutoka kamati ya mikopo",
 		"data":    member,
 	})
+}
+
+// RestoreCommitteeMember reverses a soft delete / deactivation.
+// POST /api/v1/loan-committee/members/:id/restore
+func (h *LoanCommitteeHandler) RestoreCommitteeMember(c *fiber.Ctx) error {
+	id := c.Params("id")
+	var member models.LoanCommitteeMember
+	if err := database.DB.Unscoped().Where("id = ?", id).First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama wa kamati hajapatikana"})
+	}
+	if !member.DeletedAt.Valid && member.IsActive {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mwanachama hakuwa ameondolewa"})
+	}
+	userID := middleware.GetUserID(c)
+	if err := database.DB.Unscoped().Model(&member).Updates(map[string]interface{}{
+		"deleted_at": nil,
+		"deleted_by": nil,
+		"is_active":  true,
+		"removed_at": nil,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurudisha"})
+	}
+	services.LogAudit(c, &userID, models.AuditUpdate, "loan_committee_members", &member.ID,
+		map[string]interface{}{"deleted": true},
+		map[string]interface{}{"deleted": false},
+	)
+	return c.JSON(fiber.Map{"message": "Mwanachama amerudishwa kwenye kamati", "data": member})
 }
 
 // ListLoans returns loans that are pending review or under review by the committee.
@@ -644,7 +674,7 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 	}
 
 	var leaders []models.User
-	database.DB.Where("role IN ? AND is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'",
+	database.DB.Where("role IN ? AND is_active = TRUE AND deleted_at IS NULL",
 		[]models.Role{models.RoleChair, models.RoleSecretary, models.RoleTreasurer}).
 		Find(&leaders)
 
@@ -661,7 +691,7 @@ func (h *LoanCommitteeHandler) GetReport(c *fiber.Ctx) error {
 	var appointed []models.LoanCommitteeMember
 	database.DB.Preload("User", func(db *gorm.DB) *gorm.DB {
 		return db.Select("id, name, role")
-	}).Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&appointed)
+	}).Where("is_active = TRUE").Find(&appointed)
 
 	for _, m := range appointed {
 		if m.User == nil {
@@ -798,7 +828,7 @@ func (h *LoanCommitteeHandler) countActiveCommitteeMembers(db *gorm.DB) int64 {
 
 	// Appointed committee members
 	var appointed []models.LoanCommitteeMember
-	db.Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&appointed)
+	db.Where("is_active = TRUE").Find(&appointed)
 	for _, a := range appointed {
 		eligible[a.UserID] = struct{}{}
 	}

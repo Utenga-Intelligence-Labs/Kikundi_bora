@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -25,22 +26,24 @@ const (
 
 // MemberContribution represents a member-submitted contribution with verification workflow
 type MemberContribution struct {
-	ID                    string             `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	MemberID              string             `gorm:"type:uuid;not null;index" json:"member_id"`
-	ContributionType      ContributionType   `gorm:"type:varchar(20);not null" json:"contribution_type"`
-	PeriodLabel           string             `gorm:"type:varchar(30);not null" json:"period_label"`
-	Amount                decimal.Decimal    `gorm:"type:decimal(12,2);not null" json:"amount"`
-	ProofImageURL         string             `gorm:"type:text" json:"proof_image_url,omitempty"`
-	ProofMessage          string             `gorm:"type:text" json:"proof_message,omitempty"`
-	Status                ContributionStatus `gorm:"type:varchar(20);not null;default:'PENDING_VERIFICATION'" json:"status"`
-	ReviewedByMemberID    *string            `gorm:"type:uuid" json:"reviewed_by_member_id,omitempty"`
-	ReviewReason          string             `gorm:"type:text" json:"review_reason,omitempty"`
-	IsHistoricalImport    bool               `gorm:"not null;default:false" json:"is_historical_import"`
-	WelfareEventID        *string            `gorm:"type:uuid" json:"welfare_event_id,omitempty"`
-	CreatedAt             time.Time          `gorm:"autoCreateTime" json:"created_at"`
-	ReviewedAt            time.Time          `json:"reviewed_at,omitempty"`
+	ID                 string             `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	MemberID           string             `gorm:"type:uuid;not null;index" json:"member_id"`
+	ContributionType   ContributionType   `gorm:"type:varchar(20);not null" json:"contribution_type"`
+	PeriodLabel        string             `gorm:"type:varchar(30);not null" json:"period_label"`
+	Amount             decimal.Decimal    `gorm:"type:decimal(12,2);not null" json:"amount"`
+	ProofImageURL      string             `gorm:"type:text" json:"proof_image_url,omitempty"`
+	ProofMessage       string             `gorm:"type:text" json:"proof_message,omitempty"`
+	Status             ContributionStatus `gorm:"type:varchar(20);not null;default:'PENDING_VERIFICATION'" json:"status"`
+	ReviewedByMemberID *string            `gorm:"type:uuid" json:"reviewed_by_member_id,omitempty"`
+	ReviewReason       string             `gorm:"type:text" json:"review_reason,omitempty"`
+	IsHistoricalImport bool               `gorm:"not null;default:false" json:"is_historical_import"`
+	WelfareEventID     *string            `gorm:"type:uuid" json:"welfare_event_id,omitempty"`
+	DeletedAt          gorm.DeletedAt     `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy          *string            `gorm:"type:uuid" json:"deleted_by,omitempty"`
+	CreatedAt          time.Time          `gorm:"autoCreateTime" json:"created_at"`
+	ReviewedAt         time.Time          `json:"reviewed_at,omitempty"`
 
-	Member         *Member       `gorm:"foreignKey:MemberID" json:"member,omitempty"`
-	ReviewedBy     *Member       `gorm:"foreignKey:ReviewedByMemberID" json:"reviewed_by,omitempty"`
-	WelfareEvent   *WelfareEvent `gorm:"foreignKey:WelfareEventID" json:"welfare_event,omitempty"`
+	Member       *Member       `gorm:"foreignKey:MemberID" json:"member,omitempty"`
+	ReviewedBy   *Member       `gorm:"foreignKey:ReviewedByMemberID" json:"reviewed_by,omitempty"`
+	WelfareEvent *WelfareEvent `gorm:"foreignKey:WelfareEventID" json:"welfare_event,omitempty"`
 }

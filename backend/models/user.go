@@ -2,6 +2,7 @@ package models
 
 import (
 	"crypto/rand"
+	"gorm.io/gorm"
 	"math/big"
 	"time"
 )
@@ -37,23 +38,24 @@ func DefaultTempPassword() string {
 }
 
 type User struct {
-	ID                 string     `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	Name               string     `gorm:"type:varchar(100);not null" json:"name"`
-	Email              *string    `gorm:"type:varchar(150);uniqueIndex" json:"email,omitempty"`
-	Phone              string     `gorm:"type:varchar(15);not null" json:"phone"`
-	Password           string     `gorm:"type:varchar(255)" json:"-"`
-	Role               Role       `gorm:"type:varchar(20);not null" json:"role"`
-	Status             string     `gorm:"type:varchar(20);default:'PENDING';not null" json:"status"`
-	MustChangePassword bool       `gorm:"default:false" json:"must_change_password"`
-	AvatarURL          string     `gorm:"type:text" json:"avatar_url"`
-	Bio                string     `gorm:"type:text" json:"bio"`
-	IsActive           bool       `gorm:"default:true" json:"is_active"`
-	CreatedBy          *string    `gorm:"type:uuid" json:"created_by,omitempty"`
-	ApprovedBy         *string    `gorm:"type:uuid" json:"approved_by,omitempty"`
-	LastLoginAt        *time.Time `json:"last_login_at,omitempty"`
-	DeletedAt          *time.Time `gorm:"index" json:"deleted_at,omitempty"`
-	CreatedAt          time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt          time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID                 string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	Name               string         `gorm:"type:varchar(100);not null" json:"name"`
+	Email              *string        `gorm:"type:varchar(150);uniqueIndex" json:"email,omitempty"`
+	Phone              string         `gorm:"type:varchar(15);not null" json:"phone"`
+	Password           string         `gorm:"type:varchar(255)" json:"-"`
+	Role               Role           `gorm:"type:varchar(20);not null" json:"role"`
+	Status             string         `gorm:"type:varchar(20);default:'PENDING';not null" json:"status"`
+	MustChangePassword bool           `gorm:"default:false" json:"must_change_password"`
+	AvatarURL          string         `gorm:"type:text" json:"avatar_url"`
+	Bio                string         `gorm:"type:text" json:"bio"`
+	IsActive           bool           `gorm:"default:true" json:"is_active"`
+	CreatedBy          *string        `gorm:"type:uuid" json:"created_by,omitempty"`
+	ApprovedBy         *string        `gorm:"type:uuid" json:"approved_by,omitempty"`
+	LastLoginAt        *time.Time     `json:"last_login_at,omitempty"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy          *string        `gorm:"type:uuid" json:"deleted_by,omitempty"`
+	CreatedAt          time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt          time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 type UserSession struct {

@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -13,6 +14,8 @@ type PendingAction struct {
 	Status      string          `gorm:"type:varchar(20);default:'PENDING';not null;index" json:"status"` // PENDING, APPROVED, REJECTED
 	ApprovedBy  *string         `gorm:"type:uuid" json:"approved_by,omitempty"`
 	Remarks     string          `gorm:"type:text" json:"remarks,omitempty"`
+	DeletedAt   gorm.DeletedAt  `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy   *string         `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt   time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	ResolvedAt  *time.Time      `json:"resolved_at,omitempty"`
 

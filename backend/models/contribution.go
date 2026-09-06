@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -19,6 +20,8 @@ type Contribution struct {
 	Status          string          `gorm:"type:varchar(20);default:'PAID';not null" json:"status"`
 	ConfirmedBy     *string         `gorm:"type:uuid" json:"confirmed_by,omitempty"`
 	Notes           *string         `gorm:"type:text" json:"notes,omitempty"`
+	DeletedAt       gorm.DeletedAt  `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy       *string         `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt       time.Time       `gorm:"autoCreateTime" json:"created_at"`
 
 	Member    *Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
@@ -33,6 +36,8 @@ type ContributionEdit struct {
 	OldAmount      decimal.Decimal `gorm:"type:decimal(15,2);not null" json:"old_amount"`
 	NewAmount      decimal.Decimal `gorm:"type:decimal(15,2);not null" json:"new_amount"`
 	Reason         string          `gorm:"type:text;not null" json:"reason"`
+	DeletedAt      gorm.DeletedAt  `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy      *string         `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt      time.Time       `gorm:"autoCreateTime" json:"created_at"`
 
 	Contribution *Contribution `gorm:"foreignKey:ContributionID" json:"contribution,omitempty"`

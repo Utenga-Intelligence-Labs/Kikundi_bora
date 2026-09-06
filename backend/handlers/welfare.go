@@ -643,6 +643,8 @@ func (h *WelfareHandler) RemoveContribution(c *fiber.Ctx) error {
 	var member models.Member
 	database.DB.Select("id", "member_no", "full_name").First(&member, "id = ?", contrib.MemberID)
 
+	// Soft delete with attribution (recoverable via restore)
+	tx.Model(&contrib).Updates(map[string]interface{}{"deleted_by": userID})
 	if err := tx.Delete(&contrib).Error; err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuondoa"})
@@ -663,6 +665,32 @@ func (h *WelfareHandler) RemoveContribution(c *fiber.Ctx) error {
 	)
 
 	return c.JSON(fiber.Map{"message": "Mchango wa mwanachama umeondolewa kwenye tukio"})
+}
+
+// RestoreContribution reverses a soft delete of a welfare contribution.
+// POST /api/v1/welfare/contributions/:id/restore
+func (h *WelfareHandler) RestoreContribution(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	var contrib models.WelfareContribution
+	if err := database.DB.Unscoped().Where("id = ?", id).First(&contrib).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mchango haujapatikana"})
+	}
+	if !contrib.DeletedAt.Valid {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango haukuwa umefutwa"})
+	}
+	if err := database.DB.Unscoped().Model(&contrib).Updates(map[string]interface{}{
+		"deleted_at": nil,
+		"deleted_by": nil,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurudisha"})
+	}
+	services.LogAudit(c, &userID, models.AuditUpdate, "welfare_contributions", &contrib.ID,
+		map[string]interface{}{"deleted": true},
+		map[string]interface{}{"deleted": false},
+	)
+	return c.JSON(fiber.Map{"message": "Mchango umerudishwa", "data": contrib})
 }
 // Reject requires a reason (consistent with member/fine-waiver reject flows)
 // and maps to the WAIVED terminal state, exactly like WaiveContribution.

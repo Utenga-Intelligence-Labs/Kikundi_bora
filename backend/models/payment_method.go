@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -30,15 +31,17 @@ const (
 type PaymentMethod struct {
 	ID            string            `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	GroupID       string            `gorm:"type:uuid;not null;index" json:"group_id"`
-	Type          PaymentMethodType `gorm:"type:varchar(20);not null" json:"type"` // lipa_namba | bank
-	ProviderName  string            `gorm:"type:varchar(50);not null" json:"provider_name"` // M-Pesa, Tigo Pesa, CRDB, NMB...
+	Type          PaymentMethodType `gorm:"type:varchar(20);not null" json:"type"`           // lipa_namba | bank
+	ProviderName  string            `gorm:"type:varchar(50);not null" json:"provider_name"`  // M-Pesa, Tigo Pesa, CRDB, NMB...
 	AccountNumber string            `gorm:"type:varchar(50);not null" json:"account_number"` // lipa namba number or bank account number
-	AccountName   string            `gorm:"type:varchar(100);not null" json:"account_name"` // registered / business name
+	AccountName   string            `gorm:"type:varchar(100);not null" json:"account_name"`  // registered / business name
 	IsActive      bool              `gorm:"not null;default:true" json:"is_active"`
 	Status        string            `gorm:"type:varchar(20);not null;default:'approved';index" json:"status"` // pending | approved
 	CreatedBy     string            `gorm:"type:uuid;not null" json:"created_by"`
 	ApprovedBy    *string           `gorm:"type:uuid" json:"approved_by,omitempty"`
 	ApprovedAt    *time.Time        `json:"approved_at,omitempty"`
+	DeletedAt     gorm.DeletedAt    `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy     *string           `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt     time.Time         `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt     time.Time         `gorm:"autoUpdateTime" json:"updated_at"`
 }

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -55,6 +56,10 @@ type Group struct {
 	// SMS channel master switch for the group (Part 1). Effective sending
 	// additionally requires a configured provider + per-type opt-in.
 	SMSNotificationsEnabled bool `gorm:"not null;default:false" json:"sms_notifications_enabled"`
+
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+
+	DeletedBy *string `gorm:"type:uuid" json:"deleted_by,omitempty"`
 
 	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`

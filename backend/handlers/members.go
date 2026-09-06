@@ -391,12 +391,54 @@ func (h *MemberHandler) Delete(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
 	}
 
+	userID := middleware.GetUserID(c)
+	// Soft delete with server-derived attribution (GORM DeletedAt scope;
+	// row stays recoverable/auditable, never physically removed).
+	database.DB.Model(&member).Updates(map[string]interface{}{
+		"deleted_by": userID,
+	})
 	database.DB.Delete(&member)
 
-	userID := middleware.GetUserID(c)
 	services.LogAudit(c, &userID, models.AuditDelete, "members", &member.ID, nil, nil)
 
 	return c.JSON(fiber.Map{"message": "Mwanachama amefutwa"})
+}
+
+// RestoreMember reverses a soft delete (deleted_at/deleted_by cleared).
+// Same permission as delete: Chair only (admin stays forbidden).
+// POST /api/v1/members/:id/restore
+func (h *MemberHandler) RestoreMember(c *fiber.Ctx) error {
+	role := middleware.GetUserRole(c)
+	if role == models.RoleAdmin {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Msimamizi hana ruhusa ya kurudisha mwanachama"})
+	}
+
+	id := c.Params("id")
+
+	var member models.Member
+	if err := database.DB.Unscoped().Where("id = ?", id).First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
+	}
+	if !member.DeletedAt.Valid {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mwanachama hakuwa amefutwa"})
+	}
+
+	userID := middleware.GetUserID(c)
+	if err := database.DB.Unscoped().Model(&member).Updates(map[string]interface{}{
+		"deleted_at": nil,
+		"deleted_by": nil,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurudisha"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditUpdate, "members", &member.ID,
+		map[string]interface{}{"deleted": true},
+		map[string]interface{}{"deleted": false},
+	)
+
+	member.DeletedAt = gorm.DeletedAt{}
+	member.DeletedBy = nil
+	return c.JSON(fiber.Map{"message": "Mwanachama amerudishwa", "data": member})
 }
 
 // CreateLogin creates a linked login account for a member that has none

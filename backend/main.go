@@ -244,6 +244,7 @@ func main() {
 	pms.Post("/:pmId/approve", middleware.RequireRoles(models.RoleChair), paymentMethodHandler.Approve)
 	pms.Patch("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Update)
 	pms.Delete("/:pmId", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.Delete)
+	pms.Post("/:pmId/restore", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), paymentMethodHandler.RestorePaymentMethod)
 
 	// User Management routes (Mwenyekiti creates, Katibu approves)
 	users := protected.Group("/users")
@@ -273,6 +274,7 @@ func main() {
 	members.Post("/:id/toggle-active", middleware.RequireRoles(models.RoleSecretary), memberHandler.ToggleActive)
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)
 	members.Delete("/:id", middleware.RequireRoles(models.RoleChair), memberHandler.Delete)
+	members.Post("/:id/restore", middleware.RequireRoles(models.RoleChair), memberHandler.RestoreMember)
 
 	contribs := protected.Group("/contributions")
 	contribs.Get("/", contribHandler.List)
@@ -315,6 +317,7 @@ func main() {
 	committee.Get("/members", committeeHandler.ListMembers)
 	committee.Post("/members", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), committeeHandler.AppointMember)
 	committee.Delete("/members/:id", middleware.RequireRoles(models.RoleChair), committeeHandler.RemoveMember)
+	committee.Post("/members/:id/restore", middleware.RequireRoles(models.RoleChair), committeeHandler.RestoreCommitteeMember)
 	committee.Get("/loans", committeeHandler.ListLoans)
 	committee.Get("/loans/:id", committeeHandler.GetLoan)
 	committee.Post("/loans/:id/review", committeeHandler.SubmitReview)
@@ -350,6 +353,7 @@ func main() {
 	welfare.Post("/contributions/:id/approve", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.ApproveContribution)
 	welfare.Post("/contributions/:id/reject", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RejectContribution)
 	welfare.Delete("/contributions/:id", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RemoveContribution)
+	welfare.Post("/contributions/:id/restore", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RestoreContribution)
 
 	// Disbursement — treasurer disburses after event is approved and fully funded
 	welfare.Post("/events/:id/disburse", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.DisburseEvent)

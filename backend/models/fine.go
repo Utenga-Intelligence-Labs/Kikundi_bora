@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -29,6 +30,8 @@ type FineSettings struct {
 	FineAmount      *decimal.Decimal `gorm:"type:decimal(15,2)" json:"fine_amount,omitempty"`
 	FinePercentage  *decimal.Decimal `gorm:"type:decimal(7,2)" json:"fine_percentage,omitempty"`
 	GracePeriodDays int              `gorm:"not null;default:0" json:"grace_period_days"`
+	DeletedAt       gorm.DeletedAt   `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy       *string          `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt       time.Time        `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
 
@@ -40,8 +43,9 @@ type FineSettings struct {
 // cycle label (occurrence = cycle due date); event-based fines carry an
 // occurrence date with an empty cycle label. Idempotency is enforced by
 // partial unique indexes (see database/migrate.go):
-//   cycle-based: (group, member, offence, cycle_label) WHERE cycle <> ''
-//   event-based: (group, member, offence, occurrence_date) WHERE cycle = ''
+//
+//	cycle-based: (group, member, offence, cycle_label) WHERE cycle <> ''
+//	event-based: (group, member, offence, occurrence_date) WHERE cycle = ''
 type Fine struct {
 	ID                     string          `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	GroupID                string          `gorm:"type:uuid;not null;index:idx_fines_lookup,priority:1" json:"group_id"`
@@ -61,6 +65,8 @@ type Fine struct {
 	WaiverStatus           string          `gorm:"type:varchar(20);not null;default:'none';index" json:"waiver_status"`
 	WaiverRequestedBy      *string         `gorm:"type:uuid" json:"waiver_requested_by,omitempty"`
 	WaiverRequestReason    *string         `gorm:"type:text" json:"waiver_request_reason,omitempty"`
+	DeletedAt              gorm.DeletedAt  `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy              *string         `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt              time.Time       `gorm:"autoCreateTime" json:"created_at"`
 
 	Member      *Member          `gorm:"foreignKey:MemberID" json:"member,omitempty"`

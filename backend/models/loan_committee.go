@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 )
 
@@ -8,14 +9,16 @@ import (
 // Chair, Secretary, and Treasurer are automatically committee members by role
 // and are NOT stored in this table.
 type LoanCommitteeMember struct {
-	ID          string     `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	UserID      string     `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
-	AppointedBy string     `gorm:"type:uuid;not null" json:"appointed_by"`
-	AppointedAt time.Time  `gorm:"autoCreateTime" json:"appointed_at"`
-	RemovedAt   *time.Time `json:"removed_at,omitempty"`
-	IsActive    bool       `gorm:"default:true;not null" json:"is_active"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID          string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	UserID      string         `gorm:"type:uuid;not null;uniqueIndex" json:"user_id"`
+	AppointedBy string         `gorm:"type:uuid;not null" json:"appointed_by"`
+	AppointedAt time.Time      `gorm:"autoCreateTime" json:"appointed_at"`
+	RemovedAt   *time.Time     `json:"removed_at,omitempty"`
+	IsActive    bool           `gorm:"default:true;not null" json:"is_active"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy   *string        `gorm:"type:uuid" json:"deleted_by,omitempty"`
+	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 
 	User      *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Appointer *User `gorm:"foreignKey:AppointedBy" json:"appointer,omitempty"`
@@ -39,6 +42,8 @@ type LoanReview struct {
 	Decision   LoanReviewDecision `gorm:"type:varchar(20);not null;default:'PENDING'" json:"decision"`
 	Comments   *string            `gorm:"type:text" json:"comments,omitempty"`
 	ReviewedAt *time.Time         `json:"reviewed_at,omitempty"`
+	DeletedAt  gorm.DeletedAt     `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy  *string            `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt  time.Time          `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time          `gorm:"autoUpdateTime" json:"updated_at"`
 

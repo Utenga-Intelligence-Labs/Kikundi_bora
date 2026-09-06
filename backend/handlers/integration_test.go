@@ -192,7 +192,7 @@ func TestLoanLifecycleHTTP(t *testing.T) {
 	if code != 201 {
 		t.Fatalf("apply: %d", code)
 	}
-	loanID := hExtract(t, d, "data")
+loanID := hExtract(t, d, "data")
 	t.Logf("Loan: %s", loanID)
 
 	// Step 2: Committee review — 3 leaders approve
@@ -259,7 +259,7 @@ func TestNegativeScenarios(t *testing.T) {
 	if code != 201 {
 		t.Fatalf("apply: %d", code)
 	}
-	loanID := hExtract(t, d, "data")
+loanID := hExtract(t, d, "data")
 
 	// NEGATIVE 1: Disburse before approval
 	code, d = hPost(t, app, fmt.Sprintf("/api/v1/loans/%s/disburse", loanID), nil, treasurer)
@@ -452,7 +452,7 @@ func TestCommitteeReviewFlow(t *testing.T) {
 	code, d = hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
 		"member_id": memberID, "amount": 100000.0, "purpose": "Test", "due_date": "2026-12-31",
 	}, chair)
-	loanID := hExtract(t, d, "data")
+loanID := hExtract(t, d, "data")
 
 	// Try review by non-committee member (asha is committee now though — use a different non-member)
 	// Actually asha IS now committee, so normal member can't review. Skip this sub-test.

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -43,11 +44,15 @@ type GroupSettingProposal struct {
 	ApprovedBy      *string `gorm:"type:uuid" json:"approved_by,omitempty"`
 	RejectionReason *string `gorm:"type:text" json:"rejection_reason,omitempty"`
 
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+
+	DeletedBy *string `gorm:"type:uuid" json:"deleted_by,omitempty"`
+
 	CreatedAt  time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
 	ReviewedAt *time.Time `json:"reviewed_at,omitempty"`
 
-	Group     *Group `gorm:"foreignKey:GroupID" json:"group,omitempty"`
-	Proposer  *User  `gorm:"foreignKey:ProposedBy" json:"proposer,omitempty"`
-	Approver  *User  `gorm:"foreignKey:ApprovedBy" json:"approver,omitempty"`
+	Group    *Group `gorm:"foreignKey:GroupID" json:"group,omitempty"`
+	Proposer *User  `gorm:"foreignKey:ProposedBy" json:"proposer,omitempty"`
+	Approver *User  `gorm:"foreignKey:ApprovedBy" json:"approver,omitempty"`
 }

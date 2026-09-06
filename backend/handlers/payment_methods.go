@@ -239,7 +239,8 @@ func (h *PaymentMethodHandler) Approve(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Njia ya malipo imeidhinishwa — sasa inaonekana kwa wanachama", "data": pm})
 }
 
-// Delete removes a payment method. Mwenyekiti / Mweka Hazina only (route guard).
+// Delete soft-deletes a payment method (recoverable via restore).
+// Mwenyekiti / Mweka Hazina only (route guard).
 // DELETE /api/v1/groups/:id/payment-methods/:pmId
 func (h *PaymentMethodHandler) Delete(c *fiber.Ctx) error {
 	g := loadGroupForPaymentMethods(c)
@@ -247,20 +248,54 @@ func (h *PaymentMethodHandler) Delete(c *fiber.Ctx) error {
 		return nil
 	}
 
-	res := database.DB.Where("id = ? AND group_id = ?", c.Params("pmId"), g.ID).
-		Delete(&models.PaymentMethod{})
-	if res.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kufuta"})
-	}
-	if res.RowsAffected == 0 {
+	var pm models.PaymentMethod
+	if err := database.DB.Where("id = ? AND group_id = ?", c.Params("pmId"), g.ID).First(&pm).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Njia ya malipo haijapatikana"})
 	}
 
 	userID := middleware.GetUserID(c)
-	pmID := c.Params("pmId")
-	services.LogAudit(c, &userID, models.AuditDelete, "payment_methods", &pmID, nil, map[string]interface{}{
+	database.DB.Model(&pm).Updates(map[string]interface{}{
+		"deleted_by": userID,
+	})
+	if err := database.DB.Delete(&pm).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kufuta"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditDelete, "payment_methods", &pm.ID, nil, map[string]interface{}{
 		"group_id": g.ID,
 	})
 
 	return c.JSON(fiber.Map{"message": "Njia ya malipo imefutwa"})
+}
+
+// RestorePaymentMethod reverses a soft delete.
+// POST /api/v1/groups/:id/payment-methods/:pmId/restore
+func (h *PaymentMethodHandler) RestorePaymentMethod(c *fiber.Ctx) error {
+	g := loadGroupForPaymentMethods(c)
+	if g == nil {
+		return nil
+	}
+
+	var pm models.PaymentMethod
+	if err := database.DB.Unscoped().Where("id = ? AND group_id = ?", c.Params("pmId"), g.ID).First(&pm).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Njia ya malipo haijapatikana"})
+	}
+	if !pm.DeletedAt.Valid {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Njia ya malipo haikuwa imefutwa"})
+	}
+
+	userID := middleware.GetUserID(c)
+	if err := database.DB.Unscoped().Model(&pm).Updates(map[string]interface{}{
+		"deleted_at": nil,
+		"deleted_by": nil,
+	}).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kurudisha"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditUpdate, "payment_methods", &pm.ID,
+		map[string]interface{}{"deleted": true},
+		map[string]interface{}{"deleted": false},
+	)
+
+	return c.JSON(fiber.Map{"message": "Njia ya malipo imerudishwa", "data": pm})
 }

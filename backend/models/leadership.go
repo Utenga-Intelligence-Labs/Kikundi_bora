@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"gorm.io/gorm"
+	"time"
+)
 
 // LeadershipRole represents a leadership role within the kikundi.
 type LeadershipRole string
@@ -16,13 +19,15 @@ const (
 // The partial unique index (member_id, role) WHERE is_current=true enforces
 // one active slot per role per member.
 type LeadershipPosition struct {
-	ID        string          `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
-	MemberID  string          `gorm:"type:uuid;not null;index" json:"member_id"`
-	Role      LeadershipRole  `gorm:"type:varchar(20);not null" json:"role"`
-	TermStart time.Time       `gorm:"type:date;not null;default:current_date" json:"term_start"`
-	TermEnd   *time.Time      `gorm:"type:date" json:"term_end,omitempty"`
-	IsCurrent bool            `gorm:"not null;default:true;index" json:"is_current"`
-	CreatedAt time.Time       `gorm:"autoCreateTime" json:"created_at"`
+	ID        string         `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	MemberID  string         `gorm:"type:uuid;not null;index" json:"member_id"`
+	Role      LeadershipRole `gorm:"type:varchar(20);not null" json:"role"`
+	TermStart time.Time      `gorm:"type:date;not null;default:current_date" json:"term_start"`
+	TermEnd   *time.Time     `gorm:"type:date" json:"term_end,omitempty"`
+	IsCurrent bool           `gorm:"not null;default:true;index" json:"is_current"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy *string        `gorm:"type:uuid" json:"deleted_by,omitempty"`
+	CreatedAt time.Time      `gorm:"autoCreateTime" json:"created_at"`
 
 	Member Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
 }

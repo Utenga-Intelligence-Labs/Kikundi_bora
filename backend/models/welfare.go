@@ -1,6 +1,7 @@
 package models
 
 import (
+	"gorm.io/gorm"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -22,9 +23,9 @@ const (
 type WelfareFundingSource string
 
 const (
-	FundTreasury            WelfareFundingSource = "TREASURY"
-	FundMemberContribution  WelfareFundingSource = "MEMBER_CONTRIBUTION"
-	FundBoth                WelfareFundingSource = "BOTH"
+	FundTreasury           WelfareFundingSource = "TREASURY"
+	FundMemberContribution WelfareFundingSource = "MEMBER_CONTRIBUTION"
+	FundBoth               WelfareFundingSource = "BOTH"
 )
 
 // WelfareEventStatus represents the lifecycle status of a welfare event.
@@ -58,6 +59,8 @@ type WelfareEvent struct {
 	DisbursedAt     *time.Time           `json:"disbursed_at,omitempty"`
 	ReceivedAt      *time.Time           `json:"received_at,omitempty"`
 	ReceivedBy      *string              `gorm:"type:uuid" json:"received_by,omitempty"`
+	DeletedAt       gorm.DeletedAt       `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy       *string              `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt       time.Time            `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time            `gorm:"autoUpdateTime" json:"updated_at"`
 
@@ -85,6 +88,8 @@ type WelfareContribution struct {
 	Status     WelfareContributionStatus `gorm:"type:varchar(20);not null;default:'PENDING'" json:"status"`
 	PaidAt     *time.Time                `json:"paid_at,omitempty"`
 	RecordedBy *string                   `gorm:"type:uuid" json:"recorded_by,omitempty"`
+	DeletedAt  gorm.DeletedAt            `gorm:"index" json:"deleted_at,omitempty"`
+	DeletedBy  *string                   `gorm:"type:uuid" json:"deleted_by,omitempty"`
 	CreatedAt  time.Time                 `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt  time.Time                 `gorm:"autoUpdateTime" json:"updated_at"`
 
