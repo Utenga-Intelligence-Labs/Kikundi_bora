@@ -391,3 +391,88 @@ func (h *MemberHandler) Delete(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{"message": "Mwanachama amefutwa"})
 }
+
+// CreateLogin creates a linked login account for a member that has none
+// (e.g. seeded or imported members). Chair only.
+// POST /api/v1/members/:id/create-login
+func (h *MemberHandler) CreateLogin(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var member models.Member
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", id).First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
+	}
+	if member.UserID != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mwanachama huyu tayari ana akaunti ya kuingia"})
+	}
+
+	actorID := middleware.GetUserID(c)
+
+	// If a user with the same phone already exists, link it instead of
+	// creating a duplicate.
+	var existing models.User
+	if err := database.DB.Where("phone = ? AND deleted_at IS NULL", member.Phone).First(&existing).Error; err == nil {
+		member.UserID = &existing.ID
+		if err := database.DB.Save(&member).Error; err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunganisha akaunti"})
+		}
+		services.LogAudit(c, &actorID, models.AuditUpdate, "members", &member.ID, nil, map[string]interface{}{
+			"action": "link_login", "user_id": existing.ID,
+		})
+		return c.JSON(fiber.Map{"message": "Akaunti iliyopo imeunganishwa na mwanachama. Tumia 'Weka upya nenosiri' kumpa nenosiri la muda."})
+	}
+
+	tempPassword := models.DefaultTempPassword()
+	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Hitilafu ya mfumo"})
+	}
+
+	// Mirror the member's standing: already-approved members get an active
+	// login right away, others go through katibu approval like new members.
+	userStatus := models.UserStatusPending
+	if member.ApprovalStatus == "approved" && member.IsActive {
+		userStatus = models.UserStatusActive
+	}
+
+	tx := database.DB.Begin()
+	defer tx.Rollback()
+
+	newUser := models.User{
+		Name:               member.FullName,
+		Phone:              member.Phone,
+		Email:              member.Email,
+		Password:           string(hashedPwd),
+		Role:               models.RoleMember,
+		Status:             userStatus,
+		MustChangePassword: true,
+		IsActive:           true,
+		CreatedBy:          &actorID,
+	}
+	if err := tx.Create(&newUser).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunda akaunti ya kuingia"})
+	}
+	if err := upsertUserPosition(tx, newUser.ID, models.RoleMember); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuweka nafasi ya mtumiaji"})
+	}
+	member.UserID = &newUser.ID
+	if err := tx.Save(&member).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuunganisha akaunti"})
+	}
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi"})
+	}
+
+	services.LogAudit(c, &actorID, models.AuditCreate, "users", &newUser.ID, nil, map[string]interface{}{
+		"action": "chair_create_login", "member_id": member.ID,
+	})
+	services.NotifyUser(newUser.ID, models.NotifSystem,
+		"Akaunti ya Kuingia",
+		"Mwenyekiti amekutengenezea akaunti ya kuingia. Tumia nenosiri la muda ulilopewa; utakazwa kuweka nenosiri jipya.",
+	)
+
+	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
+		"message":       "Akaunti ya kuingia imetengenezwa. Mpe mwanachama nenosiri la muda (halitaonekana tena).",
+		"temp_password": tempPassword,
+	})
+}

@@ -267,6 +267,7 @@ func main() {
 		return c.Params("id"), ""
 	}), dashHandler.MemberSummary)
 	members.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), memberHandler.Create)
+	members.Post("/:id/create-login", middleware.RequireRoles(models.RoleChair), memberHandler.CreateLogin)
 	members.Patch("/:id/approve", middleware.RequireRoles(models.RoleSecretary), memberHandler.ApproveMember)
 	members.Patch("/:id/reject", middleware.RequireRoles(models.RoleSecretary), memberHandler.RejectMember)
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)

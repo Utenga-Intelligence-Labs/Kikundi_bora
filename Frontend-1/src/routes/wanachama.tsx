@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { useMembers, useCreateMember, useUpdateMember } from "@/hooks/use-members";
+import { useMembers, useCreateMember, useUpdateMember, useChairCreateLogin } from "@/hooks/use-members";
 import { useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
@@ -48,6 +48,7 @@ function WanachamaPage() {
   const [lifecycleMember, setLifecycleMember] = useState<{ id: string; full_name: string; is_active: boolean } | null>(null);
   const isChair = hasRole(user, "chair");
   const resetPwd = useChairResetPassword();
+  const createLogin = useChairCreateLogin();
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMsg, setResetMsg] = useState<string | null>(null);
   const [resetTempPassword, setResetTempPassword] = useState<string | null>(null);
@@ -75,13 +76,17 @@ function WanachamaPage() {
   };
 
   const handleResetPassword = async () => {
-    if (!resetMember?.user_id) return;
+    if (!resetMember) return;
     setResetLoading(true);
     setResetMsg(null);
     setResetTempPassword(null);
     setResetFailed(false);
     try {
-      const res = await resetPwd.mutateAsync(resetMember.user_id);
+      // Members with a login account get a password reset; members without
+      // one get a fresh login account (both return a one-time temp password).
+      const res = resetMember.user_id
+        ? await resetPwd.mutateAsync(resetMember.user_id)
+        : await createLogin.mutateAsync(resetMember.id);
       setResetMsg(res.message || "Nenosiri limewekwa upya.");
       if (res.temp_password) setResetTempPassword(res.temp_password);
     } catch (e: unknown) {
@@ -172,6 +177,15 @@ function WanachamaPage() {
                       className="rounded-lg p-1.5 text-amber-600 hover:bg-amber-50"
                     >
                       <KeyRound className="h-4 w-4" />
+                    </button>
+                  )}
+                  {isChair && !w.user_id && (
+                    <button
+                      onClick={() => { setResetMember(w); setResetMsg(null); }}
+                      title="Tengeneza akaunti ya kuingia"
+                      className="rounded-lg p-1.5 text-sky-600 hover:bg-sky-50"
+                    >
+                      <UserPlus className="h-4 w-4" />
                     </button>
                   )}
                   {isChair && (
@@ -301,7 +315,7 @@ function WanachamaPage() {
                   <KeyRound className="h-5 w-5 text-amber-600" />
                 </div>
                 <div>
-                  <h3 className="font-display text-lg font-semibold">Weka Upya Nenosiri</h3>
+                  <h3 className="font-display text-lg font-semibold">{resetMember.user_id ? "Weka Upya Nenosiri" : "Tengeneza Akaunti ya Kuingia"}</h3>
                   <p className="text-xs text-muted-foreground">{resetMember.full_name}</p>
                 </div>
               </div>
@@ -322,7 +336,11 @@ function WanachamaPage() {
               </div>
             ) : (
               <p className="mb-4 text-sm text-muted-foreground">
-                Nenosiri la muda nasibu litatolewa kwa <strong>{resetMember.full_name}</strong>. Litaonyeshwa mara moja baada ya kuthibitisha — mpe mtumiaji moja kwa moja. Atakazwa kuweka nenosiri jipya atakapoingia.
+                {resetMember.user_id ? (
+                  <>Nenosiri la muda nasibu litatolewa kwa <strong>{resetMember.full_name}</strong>. Litaonyeshwa mara moja baada ya kuthibitisha — mpe mtumiaji moja kwa moja. Atakazwa kuweka nenosiri jipya atakapoingia.</>
+                ) : (
+                  <><strong>{resetMember.full_name}</strong> hana akaunti ya kuingia. Akaunti mpya itatengenezwa na nenosiri la muda litaonyeshwa mara moja — mpe mwanachama moja kwa moja. Atakazwa kuweka nenosiri jipya atakapoingia.</>
+                )}
               </p>
             )}
             <div className="flex gap-3">
@@ -339,7 +357,7 @@ function WanachamaPage() {
                   className="flex-1 rounded-xl bg-amber-500 py-2.5 text-sm font-semibold text-white disabled:opacity-60 inline-flex items-center justify-center gap-2"
                 >
                   {resetLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Weka Upya Nenosiri
+                  {resetMember.user_id ? "Weka Upya Nenosiri" : "Tengeneza Akaunti"}
                 </button>
               )}
             </div>

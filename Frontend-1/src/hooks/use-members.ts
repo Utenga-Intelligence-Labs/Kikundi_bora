@@ -53,3 +53,12 @@ export function useDeleteMember() {
     onSuccess: () => qc.invalidateQueries({ queryKey: memberKeys.all }),
   });
 }
+
+/** Chair creates a login account for a member that has none; returns temp_password once */
+export function useChairCreateLogin() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => membersApi.createLogin(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: memberKeys.all }),
+  });
+}
