@@ -232,4 +232,7 @@ export const welfareApi = {
     api.post<MessageResponse>(
       `/welfare/events/${eventId}/confirm-receipt`
     ),
+
+  removeContribution: (id: string) =>
+    api.delete<MessageResponse>(`/welfare/contributions/${id}`),
 };

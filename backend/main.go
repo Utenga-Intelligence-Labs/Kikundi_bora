@@ -349,6 +349,7 @@ func main() {
 	welfare.Post("/events/:id/contributions/:memberId/waive", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.WaiveContribution)
 	welfare.Post("/contributions/:id/approve", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.ApproveContribution)
 	welfare.Post("/contributions/:id/reject", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RejectContribution)
+	welfare.Delete("/contributions/:id", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RemoveContribution)
 
 	// Disbursement — treasurer disburses after event is approved and fully funded
 	welfare.Post("/events/:id/disburse", middleware.RequireRoles(models.RoleTreasurer), welfareHandler.DisburseEvent)

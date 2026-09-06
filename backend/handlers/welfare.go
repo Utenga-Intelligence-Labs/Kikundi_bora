@@ -614,7 +614,56 @@ func (h *WelfareHandler) ApproveContribution(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Mchango umeidhinishwa", "data": contrib})
 }
 
-// ---------- TREASURER: Reject a pending welfare contribution ----------
+// ---------- TREASURER: Remove a pending welfare obligation ----------
+// RemoveContribution deletes a PENDING member obligation entirely — for
+// members who should never have been included (e.g. joined erroneously).
+// Unlike waive (which keeps a WAIVED record), removal leaves no row, so it
+// is only allowed while PENDING. Runs the shared completion check so the
+// event can complete on the remaining rows.
+// DELETE /api/v1/welfare/contributions/:id
+func (h *WelfareHandler) RemoveContribution(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	tx := database.DB.Begin()
+
+	var contrib models.WelfareContribution
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&contrib).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mchango haujapatikana"})
+	}
+
+	if contrib.Status != models.WelfareContribPending {
+		tx.Rollback()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango huu hauwezi kuondolewa. Hali yake ni: " + string(contrib.Status)})
+	}
+
+	var member models.Member
+	database.DB.Select("id", "member_no", "full_name").First(&member, "id = ?", contrib.MemberID)
+
+	if err := tx.Delete(&contrib).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuondoa"})
+	}
+
+	if err := h.maybeCompleteWelfareEvent(tx, contrib.EventID); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukamilisha tukio"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuondoa"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditDelete, "welfare_contributions", &contrib.ID,
+		map[string]interface{}{"status": "PENDING", "member_no": member.MemberNo},
+		map[string]interface{}{"status": "REMOVED"},
+	)
+
+	return c.JSON(fiber.Map{"message": "Mchango wa mwanachama umeondolewa kwenye tukio"})
+}
 // Reject requires a reason (consistent with member/fine-waiver reject flows)
 // and maps to the WAIVED terminal state, exactly like WaiveContribution.
 func (h *WelfareHandler) RejectContribution(c *fiber.Ctx) error {

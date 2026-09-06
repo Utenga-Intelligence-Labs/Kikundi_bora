@@ -22,6 +22,8 @@ func registerApprovalHubRoutes(app *fiber.App) {
 		middleware.RequireRoles(models.RoleTreasurer), welfareHandler.ApproveContribution)
 	g.Post("/welfare/contributions/:id/reject",
 		middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RejectContribution)
+	g.Delete("/welfare/contributions/:id",
+		middleware.RequireRoles(models.RoleTreasurer), welfareHandler.RemoveContribution)
 	g.Get("/welfare/contributions",
 		middleware.RequireRoles(models.RoleTreasurer, models.RoleChair, models.RoleSecretary),
 		welfareHandler.ListContributions)
@@ -189,4 +191,47 @@ func TestWelfarePendingListFilter(t *testing.T) {
 		t.Fatalf("pending total after approve = %d, want 2", list.Total)
 	}
 	_ = eventID
+}
+
+func TestWelfareRemoveContribution(t *testing.T) {
+	app := fullApp()
+	registerApprovalHubRoutes(app)
+	treasurerTok, chairTok, secretaryTok, _, _, contribID := seedApprovalHub(t, app)
+
+	// Non-treasurers get 403.
+	for _, tok := range []string{chairTok, secretaryTok} {
+		if code, _ := doRequest(t, app, "DELETE", "/api/v1/welfare/contributions/"+contribID, nil, tok); code != 403 {
+			t.Errorf("non-treasurer remove = %d, want 403", code)
+		}
+	}
+
+	// Treasurer removes the pending row entirely.
+	code, _ := doRequest(t, app, "DELETE", "/api/v1/welfare/contributions/"+contribID, nil, treasurerTok)
+	if code != 200 {
+		t.Fatalf("remove = %d, want 200", code)
+	}
+	var n int64
+	database.DB.Model(&models.WelfareContribution{}).Where("id = ?", contribID).Count(&n)
+	if n != 0 {
+		t.Fatalf("row still exists after remove")
+	}
+
+	// Removing again → 404.
+	if code, _ := doRequest(t, app, "DELETE", "/api/v1/welfare/contributions/"+contribID, nil, treasurerTok); code != 404 {
+		t.Errorf("second remove = %d, want 404", code)
+	}
+}
+
+func TestWelfareRemoveOnlyPending(t *testing.T) {
+	app := fullApp()
+	registerApprovalHubRoutes(app)
+	treasurerTok, _, _, _, _, contribID := seedApprovalHub(t, app)
+
+	// Approve first, then remove must fail (only PENDING removable).
+	if code, _ := doRequest(t, app, "POST", "/api/v1/welfare/contributions/"+contribID+"/approve", nil, treasurerTok); code != 200 {
+		t.Fatalf("approve = %d, want 200", code)
+	}
+	if code, _ := doRequest(t, app, "DELETE", "/api/v1/welfare/contributions/"+contribID, nil, treasurerTok); code != 400 {
+		t.Errorf("remove paid = %d, want 400", code)
+	}
 }

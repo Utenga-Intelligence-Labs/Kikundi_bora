@@ -3,19 +3,14 @@ import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { blockAdminFromPage, requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
-import { useMembers } from "@/hooks/use-members";
 import {
   useWelfareDashboard,
   useWelfareEvents,
   useWelfareEvent,
-  useCreateWelfareEvent,
   useApproveWelfareEvent,
   useRejectWelfareEvent,
   useMyWelfareContributions,
   useWelfareContributions,
-  useRecordWelfarePayment,
-  useWaiveWelfareContribution,
-  useDisburseWelfareEvent,
   useConfirmWelfareReceipt,
 } from "@/hooks/use-welfare";
 import type {
@@ -28,7 +23,6 @@ import type {
 import { tzs, tarehe } from "@/lib/format";
 import {
   Heart,
-  Plus,
   Check,
   Ban,
   X,
@@ -98,14 +92,23 @@ function MfukoKijamiiPage() {
       title="Mfuko wa Kijamii"
       subtitle={
         isTreasurer
-          ? "Simamia matukio na michango ya kijamii"
+          ? "Matukio na michango ya kijamii — usimamizi upo Ukusanyaji wa Uongozi"
           : isChair
           ? "Idhinisha matukio ya kijamii"
           : isMember
           ? "Michango yako ya kijamii"
           : "Ripoti za mfuko wa kijamii"
       }
-      action={isTreasurer ? <CreateEventButton /> : null}
+      action={
+        isTreasurer ? (
+          <Link
+            to="/uongozi/mfuko"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            <Wallet className="h-4 w-4" /> Usimamizi
+          </Link>
+        ) : null
+      }
     >
       <DashboardStats />
 
@@ -353,11 +356,7 @@ function EventCard({
 function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () => void }) {
   const { user } = useAuth();
   const { data, isLoading, error } = useWelfareEvent(eventId);
-  const recordPayment = useRecordWelfarePayment();
-  const waiveContrib = useWaiveWelfareContribution();
-  const disburseEvent = useDisburseWelfareEvent();
-  const [payingMember, setPayingMember] = useState<string | null>(null);
-  const [payAmount, setPayAmount] = useState("");
+  const confirmReceipt = useConfirmWelfareReceipt();
 
   if (isLoading || !data) {
     if (!isLoading && error) {
@@ -381,7 +380,6 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
   const { data: event, contributions, stats } = data;
   const isTreasurer = user?.role === "treasurer";
   const isLeadership = isTreasurer || user?.role === "chair" || user?.role === "secretary";
-  const confirmReceipt = useConfirmWelfareReceipt();
   const canDisburse =
     isTreasurer &&
     (event.status === "APPROVED" || event.status === "COMPLETED") &&
@@ -536,22 +534,17 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
           </ol>
         </div>
 
-        {/* Disburse + receipt actions */}
+        {/* Disburse (treasurer acts on the Usimamizi page) + receipt actions */}
         {(canDisburse || canConfirmReceipt) && (
           <div className="flex gap-2">
             {canDisburse && (
-              <button
-                onClick={() => disburseEvent.mutate(event.id)}
-                disabled={disburseEvent.isPending}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              <Link
+                to="/uongozi/mfuko"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white"
               >
-                {disburseEvent.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Banknote className="h-4 w-4" />
-                )}
-                Toa Fedha kwa Mlengwa ({tzs(event.amount_approved ?? event.amount_requested)})
-              </button>
+                <Banknote className="h-4 w-4" />
+                Toa Fedha (Ukurasa wa Usimamizi)
+              </Link>
             )}
             {canConfirmReceipt && (
               <button
@@ -595,25 +588,13 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
                       <span className="chip text-[10px] bg-warning/25 text-foreground">Inasubiri</span>
                     )}
                     {isTreasurer && c.status === "PENDING" && (
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => {
-                            setPayingMember(c.member_id);
-                            setPayAmount(String(c.amount));
-                          }}
-                          className="rounded p-1 text-success hover:bg-success/10"
-                          title="Rekodi Malipo"
-                        >
-                          <Wallet className="h-3 w-3" />
-                        </button>
-                        <button
-                          onClick={() => waiveContrib.mutate({ eventId: event.id, memberId: c.member_id })}
-                          className="rounded p-1 text-muted-foreground hover:bg-muted"
-                          title="Samehe"
-                        >
-                          <Ban className="h-3 w-3" />
-                        </button>
-                      </div>
+                      <Link
+                        to="/uongozi/mfuko"
+                        className="rounded p-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                        title="Simamia kwenye ukurasa wa uongozi"
+                      >
+                        Simamia
+                      </Link>
                     )}
                   </div>
                 </div>
@@ -622,39 +603,6 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
           </div>
         )}
       </div>
-
-      {/* Pay dialog */}
-      {payingMember != null && (
-        <div className="mt-4 border-t border-border pt-4">
-          <p className="text-sm font-semibold mb-2">Rekodi Malipo</p>
-          <input
-            type="number"
-            value={payAmount}
-            onChange={(e) => setPayAmount(e.target.value)}
-            placeholder="Kiasi"
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-          <div className="mt-2 flex gap-2">
-            <button onClick={() => setPayingMember(null)} className="flex-1 rounded-lg border border-border py-2 text-xs font-semibold">
-              Ghairi
-            </button>
-            <button
-              onClick={() => {
-                recordPayment.mutate({
-                  eventId: event.id,
-                  memberId: payingMember,
-                  data: { amount: Number(payAmount) },
-                });
-                setPayingMember(null);
-              }}
-              disabled={recordPayment.isPending}
-              className="flex-1 rounded-lg bg-success py-2 text-xs font-semibold text-white disabled:opacity-50"
-            >
-              {recordPayment.isPending ? <Loader2 className="h-3 w-3 animate-spin mx-auto" /> : "Thibitisha"}
-            </button>
-          </div>
-        </div>
-      )}
     </Modal>
   );
 }
@@ -911,143 +859,6 @@ function ReportsTab() {
     </div>
   );
 }
-
-// ---------- Create Event Button ----------
-
-function CreateEventButton() {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
-      >
-        <Plus className="h-4 w-4" /> Unda Tukio
-      </button>
-      {open && <CreateEventForm onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-// ---------- Create Event Form ----------
-
-function CreateEventForm({ onClose }: { onClose: () => void }) {
-  const createEvent = useCreateWelfareEvent();
-  const { data: membersData } = useMembers({ limit: 500 });
-  const members = membersData?.data ?? [];
-
-  const [f, setF] = useState({
-    memberId: "",
-    eventType: "" as WelfareEventType | "",
-    description: "",
-    amount: "",
-    fundingSource: "" as WelfareFundingSource | "",
-    treasuryAmount: "",
-    memberAmount: "",
-  });
-
-  const handleSubmit = async () => {
-    if (!f.memberId || !f.eventType || !f.description || !f.amount || !f.fundingSource) return;
-
-    // Set default amounts based on funding source
-    let treasuryAmount = Number(f.treasuryAmount) || 0;
-    let memberAmount = Number(f.memberAmount) || 0;
-    
-    if (f.fundingSource === "TREASURY" && treasuryAmount === 0) {
-      treasuryAmount = Number(f.amount);
-    } else if (f.fundingSource === "MEMBER_CONTRIBUTION" && memberAmount === 0) {
-      memberAmount = Number(f.amount);
-    }
-
-    const data: CreateWelfareEventRequest = {
-      member_id: f.memberId,
-      event_type: f.eventType as WelfareEventType,
-      description: f.description,
-      amount_requested: Number(f.amount),
-      funding_source: f.fundingSource as WelfareFundingSource,
-      treasury_amount: treasuryAmount,
-      member_amount: memberAmount,
-    };
-
-    try {
-      await createEvent.mutateAsync(data);
-      onClose();
-    } catch { /* handled by RQ */ }
-  };
-
-  return (
-    <Modal title="Tunda Tukio la Kijamii" onClose={onClose}>
-      <div className="space-y-3">
-        <Field
-          label="Mwanachama Aliyeathiriwa"
-          value={f.memberId}
-          onChange={(v) => setF({ ...f, memberId: v })}
-          type="select"
-          options={members.map((m) => ({ value: String(m.id), label: `${m.full_name} (${m.member_no})` }))}
-        />
-        <Field
-          label="Aina ya Tukio"
-          value={f.eventType}
-          onChange={(v) => setF({ ...f, eventType: v as WelfareEventType })}
-          type="select"
-          options={[
-            { value: "MSIBA", label: "Misiba" },
-            { value: "HARUSI", label: "Harusi" },
-            { value: "DHARURA", label: "Dharura" },
-            { value: "MATIBABU", label: "Matibabu" },
-            { value: "KUZALIWA", label: "Kuzaliwa" },
-            { value: "ELIMU", label: "Elimu" },
-          ]}
-        />
-        <div>
-          <label className="text-sm font-medium">Maelezo</label>
-          <textarea
-            value={f.description}
-            onChange={(e) => setF({ ...f, description: e.target.value })}
-            placeholder="Maelezo ya tukio..."
-            className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            rows={3}
-          />
-        </div>
-        <Field label="Kiasi Kinachohitajika (TZS)" value={f.amount} onChange={(v) => setF({ ...f, amount: v })} type="number" />
-        <Field
-          label="Chanzo cha Fedha"
-          value={f.fundingSource}
-          onChange={(v) => setF({ ...f, fundingSource: v as WelfareFundingSource })}
-          type="select"
-          options={[
-            { value: "TREASURY", label: "Hazina ya Kikundi" },
-            { value: "MEMBER_CONTRIBUTION", label: "Michango ya Wanachama" },
-            { value: "BOTH", label: "Hazina + Wanachama" },
-          ]}
-        />
-        {f.fundingSource === "TREASURY" && (
-          <Field label="Kiasi kutoka Hazina (TZS)" value={f.treasuryAmount || f.amount} onChange={(v) => setF({ ...f, treasuryAmount: v })} type="number" />
-        )}
-        {f.fundingSource === "MEMBER_CONTRIBUTION" && (
-          <Field label="Kiasi kutoka Wanachama (TZS)" value={f.memberAmount || f.amount} onChange={(v) => setF({ ...f, memberAmount: v })} type="number" />
-        )}
-        {f.fundingSource === "BOTH" && (
-          <>
-            <Field label="Kiasi kutoka Hazina (TZS)" value={f.treasuryAmount} onChange={(v) => setF({ ...f, treasuryAmount: v })} type="number" />
-            <Field label="Kiasi kutoka Wanachama (TZS)" value={f.memberAmount} onChange={(v) => setF({ ...f, memberAmount: v })} type="number" />
-          </>
-        )}
-      </div>
-      <button
-        onClick={handleSubmit}
-        disabled={createEvent.isPending}
-        className="mt-5 w-full rounded-xl bg-primary py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50 inline-flex items-center justify-center gap-2"
-      >
-        {createEvent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-        Tunda Tukio
-      </button>
-    </Modal>
-  );
-}
-
-// ---------- Shared Components ----------
 
 function Field({
   label,

@@ -6,8 +6,8 @@ describe("sidebarNav", () => {
     expect(sidebarNav["Mwenyekiti"]).toHaveLength(11);
   });
 
-  it("Mweka Hazina has 11 items", () => {
-    expect(sidebarNav["Mweka Hazina"]).toHaveLength(11);
+  it("Mweka Hazina has 12 items", () => {
+    expect(sidebarNav["Mweka Hazina"]).toHaveLength(12);
   });
 
   it("Katibu has 10 items", () => {

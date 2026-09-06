@@ -1,5 +1,5 @@
 // Role-based navigation & permissions for Kikundi.
-import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase, BookOpen, CalendarDays, HandCoins } from "lucide-react";
+import { Home, Users, PiggyBank, Banknote, Receipt, FileBarChart2, User as UserIcon, ShieldCheck, Wallet, ClipboardList, UserPlus, Heart, Settings, Clock, Activity, FileCheck, Crown, Bell, Landmark, Briefcase, BookOpen, CalendarDays, HandCoins, HeartHandshake } from "lucide-react";
 import type { Jukumu, LeadershipRole } from "@/api/types";
 
 export interface NavItem {
@@ -30,6 +30,7 @@ export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] =
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
   { to: "/mikutano", label: "Mikutano na Makosa", icon: CalendarDays, requiredRoles: ["MWENYEKITI", "KATIBU"] },
   { to: "/ukusanyaji", label: "Ukusanyaji", icon: HandCoins, requiredRoles: ["HAZINA"] },
+  { to: "/uongozi/mfuko", label: "Mfuko (Usimamizi)", icon: HeartHandshake, requiredRoles: ["HAZINA"] },
   { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },
@@ -61,6 +62,7 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/wanachama", label: "Wanachama", icon: Users },
     { to: "/ripoti", label: "Ripoti za Fedha", icon: FileBarChart2 },
     { to: "/ukusanyaji", label: "Ukusanyaji", icon: HandCoins },
+    { to: "/uongozi/mfuko", label: "Mfuko (Usimamizi)", icon: HeartHandshake },
     { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   ],
   Katibu: [

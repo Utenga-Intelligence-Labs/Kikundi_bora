@@ -40,6 +40,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as UongoziRipotiRouteImport } from './routes/uongozi/ripoti'
 import { Route as UongoziPortfolioRouteImport } from './routes/uongozi/portfolio'
 import { Route as UongoziMikopoRouteImport } from './routes/uongozi/mikopo'
+import { Route as UongoziMfukoRouteImport } from './routes/uongozi/mfuko'
 import { Route as UongoziImportDataRouteImport } from './routes/uongozi/import-data'
 import { Route as UkaguziMkopoLoanIdRouteImport } from './routes/ukaguzi-mkopo.$loanId'
 
@@ -198,6 +199,11 @@ const UongoziMikopoRoute = UongoziMikopoRouteImport.update({
   path: '/uongozi/mikopo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UongoziMfukoRoute = UongoziMfukoRouteImport.update({
+  id: '/uongozi/mfuko',
+  path: '/uongozi/mfuko',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UongoziImportDataRoute = UongoziImportDataRouteImport.update({
   id: '/uongozi/import-data',
   path: '/uongozi/import-data',
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/import-data': typeof UongoziImportDataRoute
+  '/uongozi/mfuko': typeof UongoziMfukoRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
   '/uongozi/portfolio': typeof UongoziPortfolioRoute
   '/uongozi/ripoti': typeof UongoziRipotiRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/import-data': typeof UongoziImportDataRoute
+  '/uongozi/mfuko': typeof UongoziMfukoRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
   '/uongozi/portfolio': typeof UongoziPortfolioRoute
   '/uongozi/ripoti': typeof UongoziRipotiRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/weka-nenosiri': typeof WekaNenosiriRoute
   '/ukaguzi-mkopo/$loanId': typeof UkaguziMkopoLoanIdRoute
   '/uongozi/import-data': typeof UongoziImportDataRoute
+  '/uongozi/mfuko': typeof UongoziMfukoRoute
   '/uongozi/mikopo': typeof UongoziMikopoRoute
   '/uongozi/portfolio': typeof UongoziPortfolioRoute
   '/uongozi/ripoti': typeof UongoziRipotiRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/import-data'
+    | '/uongozi/mfuko'
     | '/uongozi/mikopo'
     | '/uongozi/portfolio'
     | '/uongozi/ripoti'
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/import-data'
+    | '/uongozi/mfuko'
     | '/uongozi/mikopo'
     | '/uongozi/portfolio'
     | '/uongozi/ripoti'
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/weka-nenosiri'
     | '/ukaguzi-mkopo/$loanId'
     | '/uongozi/import-data'
+    | '/uongozi/mfuko'
     | '/uongozi/mikopo'
     | '/uongozi/portfolio'
     | '/uongozi/ripoti'
@@ -454,6 +466,7 @@ export interface RootRouteChildren {
   WekaNenosiriRoute: typeof WekaNenosiriRoute
   UkaguziMkopoLoanIdRoute: typeof UkaguziMkopoLoanIdRoute
   UongoziImportDataRoute: typeof UongoziImportDataRoute
+  UongoziMfukoRoute: typeof UongoziMfukoRoute
   UongoziMikopoRoute: typeof UongoziMikopoRoute
   UongoziPortfolioRoute: typeof UongoziPortfolioRoute
   UongoziRipotiRoute: typeof UongoziRipotiRoute
@@ -678,6 +691,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UongoziMikopoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/uongozi/mfuko': {
+      id: '/uongozi/mfuko'
+      path: '/uongozi/mfuko'
+      fullPath: '/uongozi/mfuko'
+      preLoaderRoute: typeof UongoziMfukoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/uongozi/import-data': {
       id: '/uongozi/import-data'
       path: '/uongozi/import-data'
@@ -726,6 +746,7 @@ const rootRouteChildren: RootRouteChildren = {
   WekaNenosiriRoute: WekaNenosiriRoute,
   UkaguziMkopoLoanIdRoute: UkaguziMkopoLoanIdRoute,
   UongoziImportDataRoute: UongoziImportDataRoute,
+  UongoziMfukoRoute: UongoziMfukoRoute,
   UongoziMikopoRoute: UongoziMikopoRoute,
   UongoziPortfolioRoute: UongoziPortfolioRoute,
   UongoziRipotiRoute: UongoziRipotiRoute,
