@@ -1,0 +1,32 @@
+# Kikundi Bora — production override for the VPS behind the host Nginx
+# reverse proxy (kikundi-test.ditronics.co.tz).
+#
+# Usage on the server (never plain `docker compose up` in production):
+#   export TAG=<git-sha> GHCR_OWNER=<github-owner-lowercase>
+#   export POSTGRES_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' backend/.env | head -n 1)"
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   docker exec kikundi-backend /app/kikundi-api -migrate
+#
+# What this override changes vs the local dev stack:
+#   1. Uses the prebuilt GHCR images (nothing is built on the server).
+#      Requires TAG and GHCR_OWNER in the environment (the deploy workflow
+#      exports both; GHCR names must be lowercase).
+#   2. Binds the app ports to 127.0.0.1 so the ONLY way in from outside is
+#      through the host Nginx reverse proxy (public 80/443 -> 127.0.0.1:8081
+#      for the SPA, and /api/* -> 127.0.0.1:8080 for the API). The backend is
+#      never directly reachable from the internet, and no separate backend
+#      subdomain/port is exposed.
+#   3. Leaves everything else (db, volumes, networks, env_file, healthchecks)
+#      exactly as in docker-compose.yml.
+
+services:
+  backend:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set (lowercase github owner)}/kikundibora-backend:${TAG:-latest}
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+
+  frontend:
+    image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set (lowercase github owner)}/kikundibora-frontend:${TAG:-latest}
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8081}:8080"

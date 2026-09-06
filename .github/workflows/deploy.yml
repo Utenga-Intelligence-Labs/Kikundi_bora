@@ -1,0 +1,155 @@
+# Kikundibora — build & deploy to the Contabo VPS on push to main.
+#
+# Reality this matches (verified against the repo, not assumed):
+#   - TWO images, not one:  backend/Dockerfile  (Go API, :8080)
+#                           Frontend-1/Dockerfile (nginx SPA, host :8081)
+#   - THREE compose services: backend + frontend + db (postgres).
+#   - The frontend bakes VITE_API_URL at BUILD time, so the production image
+#     must be built with VITE_API_URL=https://<public-host>/api/v1, otherwise
+#     visitors' browsers would call their own localhost and every API call
+#     would fail. The host Nginx (managed separately) proxies /api/* to the
+#     backend, which is bound to 127.0.0.1 (see docker-compose.prod.yml) and
+#     therefore never directly reachable from the internet.
+#
+# Required GitHub repo secrets (already configured):
+#   VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_PORT, VPS_DEPLOY_PATH
+# No extra secret is needed for GHCR: Job 1 pushes with the automatic
+# GITHUB_TOKEN, and Job 2 reuses that same still-valid token to let the VPS
+# pull (passed through the SSH session environment — never written to disk).
+#
+# First-ever run note: pushing creates the GHCR packages
+# (kikundibora-backend / kikundibora-frontend). If the repo is private, set
+# each package to the visibility you want under
+# https://github.com/users/<owner>/packages after the first push.
+
+name: Build & Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PUBLIC_HOST: kikundi-test.ditronics.co.tz
+  IMAGE_BACKEND: kikundibora-backend
+  IMAGE_FRONTEND: kikundibora-frontend
+
+jobs:
+  # ------------------------------------------------------------------
+  # Job 1: build both images on GitHub, push :sha + :latest to GHCR.
+  # ------------------------------------------------------------------
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set lowercase owner for GHCR (registry names must be lowercase)
+        run: echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_BACKEND }}:${{ github.sha }}
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_BACKEND }}:latest
+
+      - name: Build and push frontend image (production API URL baked in)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./Frontend-1
+          file: ./Frontend-1/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_URL=https://${{ env.PUBLIC_HOST }}/api/v1
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
+            ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_FRONTEND }}:latest
+
+  # ------------------------------------------------------------------
+  # Job 2: pull on the VPS and restart (same manual process as setup.sh,
+  # automated: pull -> up -> migrate -> health-check).
+  # ------------------------------------------------------------------
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_ACTOR: ${{ github.actor }}
+          TAG: ${{ github.sha }}
+          GHCR_OWNER: ${{ github.repository_owner }}
+          PUBLIC_HOST: ${{ env.PUBLIC_HOST }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          envs: GHCR_TOKEN,GHCR_ACTOR,TAG,GHCR_OWNER,PUBLIC_HOST
+          script: |
+            set -euo pipefail
+            cd "${{ secrets.VPS_DEPLOY_PATH }}"
+
+            echo "==> 1/6 git pull (compose files must be current)"
+            git pull --ff-only
+
+            # GHCR names must be lowercase even if the GitHub owner is not.
+            GHCR_OWNER="$(echo "$GHCR_OWNER" | tr '[:upper:]' '[:lower:]')"
+            export TAG GHCR_OWNER
+
+            echo "==> 2/6 docker login to GHCR (token lives only in this session)"
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+
+            echo "==> 3/6 wire db password (same rule as setup.sh: compose reads it from the host env, backend from backend/.env)"
+            POSTGRES_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' backend/.env | head -n 1)"
+            [ -n "$POSTGRES_PASSWORD" ] || { echo "ERROR: DB_PASSWORD empty in backend/.env"; exit 1; }
+            export POSTGRES_PASSWORD
+
+            echo "==> 4/6 ensure public origin in backend CORS (browsers block the SPA otherwise)"
+            PUBLIC_ORIGIN="https://$PUBLIC_HOST"
+            CORS_CHANGED=0
+            if grep -q '^CORS_ORIGINS=' backend/.env; then
+              if ! grep -q "$PUBLIC_ORIGIN" backend/.env; then
+                sed -i "s|^CORS_ORIGINS=.*|&,${PUBLIC_ORIGIN}|" backend/.env
+                CORS_CHANGED=1
+              fi
+            else
+              printf '\nCORS_ORIGINS=%s\n' "$PUBLIC_ORIGIN" >> backend/.env
+              CORS_CHANGED=1
+            fi
+            # env_file changes do not trigger a recreate on their own, so
+            # force one when we just edited backend/.env.
+            RECREATE=""
+            [ "$CORS_CHANGED" = "1" ] && RECREATE="--force-recreate"
+
+            echo "==> 5/6 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            # shellcheck disable=SC2086
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d $RECREATE
+
+            echo "==> 6/6 migrate (idempotent) + health checks"
+            docker exec kikundi-backend /app/kikundi-api -migrate
+            curl -sf http://127.0.0.1:8080/health | grep -q '"status":"ok"'
+            echo "backend OK"
+            curl -sf http://127.0.0.1:8081/ > /dev/null
+            echo "frontend OK"
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+
+            echo "DEPLOY DONE — ${PUBLIC_HOST} serving sha ${TAG}"
