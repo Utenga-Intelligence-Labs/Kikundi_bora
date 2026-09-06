@@ -181,10 +181,77 @@ func (h *MemberContributionHandler) MyContributions(c *fiber.Ctx) error {
 		Order("created_at DESC").
 		Find(&contributions)
 
+	// Include treasurer-recorded rows (contributions table) mapped into the
+	// same shape — otherwise members whose payments were receipted by the
+	// treasurer see an empty history (same bug class as the dashboard
+	// member-summary fix: one store must never hide the other).
+	type unifiedRow struct {
+		ID               string  `json:"id"`
+		MemberID         string  `json:"member_id"`
+		ContributionType string  `json:"contribution_type"`
+		PeriodLabel      string  `json:"period_label"`
+		Amount           string  `json:"amount"`
+		ProofImageURL    *string `json:"proof_image_url,omitempty"`
+		ProofMessage     *string `json:"proof_message,omitempty"`
+		Status           string  `json:"status"`
+		ReviewReason     *string `json:"review_reason,omitempty"`
+		WelfareEventID   *string `json:"welfare_event_id,omitempty"`
+		CreatedAt        string  `json:"created_at"`
+		ReviewedAt       *string `json:"reviewed_at,omitempty"`
+		Source           string  `json:"source"`
+	}
+	out := make([]unifiedRow, 0, len(contributions)+4)
+	for _, mc := range contributions {
+		out = append(out, unifiedRow{
+			ID: mc.ID, MemberID: mc.MemberID,
+			ContributionType: string(mc.ContributionType),
+			PeriodLabel:      mc.PeriodLabel,
+			Amount:           mc.Amount.String(),
+			ProofImageURL:    nullable(mc.ProofImageURL),
+			ProofMessage:     nullable(mc.ProofMessage),
+			Status:           string(mc.Status),
+			ReviewReason:     nullable(mc.ReviewReason),
+			WelfareEventID:   mc.WelfareEventID,
+			CreatedAt:        mc.CreatedAt.Format(time.RFC3339),
+			ReviewedAt:       nil,
+			Source:           "self",
+		})
+	}
+
+	var recorded []models.Contribution
+	database.DB.Where("member_id = ?", member.ID).
+		Order("paid_at DESC").
+		Find(&recorded)
+	for _, rc := range recorded {
+		proofURL := rc.ReceiptURL
+		var proofMsg *string
+		if rc.Notes != nil && *rc.Notes != "" {
+			proofMsg = rc.Notes
+		}
+		out = append(out, unifiedRow{
+			ID: rc.ID, MemberID: rc.MemberID,
+			ContributionType: string(models.ContributionAkiba),
+			PeriodLabel:      rc.Month.Format("2006-01"),
+			Amount:           rc.Amount.String(),
+			ProofImageURL:    nullable(proofURL),
+			ProofMessage:     proofMsg,
+			Status:           string(models.ContributionConfirmed),
+			CreatedAt:        rc.PaidAt.Format(time.RFC3339),
+			Source:           "treasurer",
+		})
+	}
+
 	return c.JSON(fiber.Map{
-		"data":  contributions,
-		"total": len(contributions),
+		"data":  out,
+		"total": len(out),
 	})
+}
+
+func nullable(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // AllContributions returns all contributions (leadership only)
