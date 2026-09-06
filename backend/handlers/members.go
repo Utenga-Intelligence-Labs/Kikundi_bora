@@ -354,9 +354,9 @@ func (h *MemberHandler) Update(c *fiber.Ctx) error {
 	if req.Address != nil {
 		member.Address = req.Address
 	}
-	if req.IsActive != nil {
-		member.IsActive = *req.IsActive
-	}
+	// NOTE: is_active is intentionally NOT handled here. Activating /
+	// deactivating members is a katibu-only power via POST
+	// /members/:id/toggle-active, so it cannot be smuggled through edits.
 
 	if err := database.DB.Save(&member).Error; err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kubadilisha"})
@@ -475,4 +475,31 @@ func (h *MemberHandler) CreateLogin(c *fiber.Ctx) error {
 		"message":       "Akaunti ya kuingia imetengenezwa. Mpe mwanachama nenosiri la muda (halitaonekana tena).",
 		"temp_password": tempPassword,
 	})
+}
+
+// ToggleActive flips a member's active flag. Katibu ONLY — neither
+// mwenyekiti nor anyone else may disable/enable members.
+// POST /api/v1/members/:id/toggle-active
+func (h *MemberHandler) ToggleActive(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	var member models.Member
+	if err := database.DB.Where("id = ? AND deleted_at IS NULL", id).First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama hajapatikana"})
+	}
+
+	member.IsActive = !member.IsActive
+	if err := database.DB.Save(&member).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kubadilisha hali"})
+	}
+
+	userID := middleware.GetUserID(c)
+	services.LogAudit(c, &userID, models.AuditUpdate, "members", &member.ID,
+		nil, map[string]interface{}{"is_active": member.IsActive})
+
+	msg := "Mwanachama ameilishwa."
+	if !member.IsActive {
+		msg = "Mwanachama amezimwa."
+	}
+	return c.JSON(fiber.Map{"message": msg, "data": member})
 }

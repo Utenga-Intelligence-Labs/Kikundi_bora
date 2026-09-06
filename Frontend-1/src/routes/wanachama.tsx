@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { useMembers, useCreateMember, useUpdateMember, useChairCreateLogin } from "@/hooks/use-members";
+import { useMembers, useCreateMember, useUpdateMember, useChairCreateLogin, useToggleMemberActive } from "@/hooks/use-members";
 import { useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
@@ -47,6 +47,7 @@ function WanachamaPage() {
   const [resetMember, setResetMember] = useState<typeof members[number] | null>(null);
   const [lifecycleMember, setLifecycleMember] = useState<{ id: string; full_name: string; is_active: boolean } | null>(null);
   const isChair = hasRole(user, "chair");
+  const isSecretary = hasRole(user, "secretary");
   const resetPwd = useChairResetPassword();
   const createLogin = useChairCreateLogin();
   const [resetLoading, setResetLoading] = useState(false);
@@ -63,6 +64,7 @@ function WanachamaPage() {
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
   const updateMember = useUpdateMember();
+  const toggleActive = useToggleMemberActive();
 
   const handlePageChange = useCallback((p: number) => {
     setPage(p);
@@ -197,16 +199,16 @@ function WanachamaPage() {
                       <Pencil className="h-4 w-4" />
                     </button>
                   )}
-                  {isChair && (
+                  {isSecretary && (
                     <button
                       onClick={() => {
                         if (w.is_active) {
                           setLifecycleMember({ id: w.id, full_name: w.full_name, is_active: w.is_active });
                         } else {
-                          updateMember.mutate({ id: w.id, data: { is_active: true } });
+                          toggleActive.mutate(w.id);
                         }
                       }}
-                      disabled={updateMember.isPending}
+                      disabled={toggleActive.isPending}
                       className={`text-xs font-medium disabled:opacity-50 rounded-lg px-2.5 py-1.5 ${
                         w.is_active
                           ? "text-destructive hover:bg-destructive/10"
@@ -270,7 +272,7 @@ function WanachamaPage() {
         />
       )}
 
-      {/* Deactivate confirmation (chair only) */}
+      {/* Deactivate confirmation (katibu only) */}
       {lifecycleMember && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={() => setLifecycleMember(null)}>
           <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
@@ -289,12 +291,11 @@ function WanachamaPage() {
               </button>
               <button
                 type="button"
-                disabled={updateMember.isPending}
+                disabled={toggleActive.isPending}
                 onClick={() => {
-                  updateMember.mutate(
-                    { id: lifecycleMember.id, data: { is_active: false } },
-                    { onSettled: () => setLifecycleMember(null) },
-                  );
+                  toggleActive.mutate(lifecycleMember.id, {
+                    onSettled: () => setLifecycleMember(null),
+                  });
                 }}
                 className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
@@ -525,7 +526,6 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
     full_name: member.full_name,
     phone: member.phone,
     address: member.address ?? "",
-    is_active: member.is_active,
   });
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -542,30 +542,11 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
           full_name: f.full_name,
           phone: f.phone,
           address: f.address || undefined,
-          is_active: f.is_active,
         },
       });
       setSuccess("Mwanachama amebadilishwa.");
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Imeshindikana kubadilisha");
-    }
-  };
-
-  const handleToggleStatus = async () => {
-    setErr(null);
-    setSuccess(null);
-    setActionLoading("status");
-    try {
-      await updateMember.mutateAsync({
-        id: member.id,
-        data: { is_active: !f.is_active },
-      });
-      setF({ ...f, is_active: !f.is_active });
-      setSuccess(f.is_active ? "Mwanachama amezimwa." : "Mwanachama ameilishwa.");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Imeshindikana kubadilisha hali");
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -609,18 +590,6 @@ function EditMemberDialog({ member, onClose }: { member: { id: string; full_name
           <Field label="Jina kamili" value={f.full_name} onChange={(v) => setF({ ...f, full_name: v })} />
           <Field label="Namba ya simu" value={f.phone} onChange={(v) => setF({ ...f, phone: v })} type="tel" />
           <Field label="Anwani" value={f.address} onChange={(v) => setF({ ...f, address: v })} />
-          <div className="flex items-center justify-between rounded-xl border border-input px-3 py-2.5">
-            <span className="text-sm">Hali: <span className={`font-semibold ${f.is_active ? "text-success" : "text-destructive"}`}>{f.is_active ? "Hai" : "Hahai"}</span></span>
-            <button
-              onClick={handleToggleStatus}
-              disabled={actionLoading === "status"}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
-                f.is_active ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"
-              }`}
-            >
-              {actionLoading === "status" ? "Inashughulikiwa..." : f.is_active ? "Zima" : "Amilisha"}
-            </button>
-          </div>
           {member.user_id && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
               <div className="flex items-center justify-between">

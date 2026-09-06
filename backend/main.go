@@ -270,6 +270,7 @@ func main() {
 	members.Post("/:id/create-login", middleware.RequireRoles(models.RoleChair), memberHandler.CreateLogin)
 	members.Patch("/:id/approve", middleware.RequireRoles(models.RoleSecretary), memberHandler.ApproveMember)
 	members.Patch("/:id/reject", middleware.RequireRoles(models.RoleSecretary), memberHandler.RejectMember)
+	members.Post("/:id/toggle-active", middleware.RequireRoles(models.RoleSecretary), memberHandler.ToggleActive)
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)
 	members.Delete("/:id", middleware.RequireRoles(models.RoleChair), memberHandler.Delete)
 

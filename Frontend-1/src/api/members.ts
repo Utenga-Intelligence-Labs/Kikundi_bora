@@ -23,6 +23,9 @@ export const membersApi = {
     api.put<{ message: string; data: Member }>(`/members/${id}`, data),
   delete: (id: string) =>
     api.delete<MessageResponse>(`/members/${id}`),
+  /** Katibu-only: flip a member's active flag */
+  toggleActive: (id: string) =>
+    api.post<{ message: string; data: Member }>(`/members/${id}/toggle-active`),
   /** Chair-only: create a login account for a member that has none */
   createLogin: (id: string) =>
     api.post<MessageResponse & { temp_password?: string }>(`/members/${id}/create-login`),

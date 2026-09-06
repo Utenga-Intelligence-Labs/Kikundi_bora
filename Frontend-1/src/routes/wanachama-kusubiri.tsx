@@ -22,7 +22,7 @@ export const Route = createFileRoute("/wanachama-kusubiri")({
   }),
   beforeLoad: () => {
     requireAuth();
-    requireRole("secretary", "chair");
+    requireRole("secretary");
     blockAdminFromPage();
   },
   component: PendingUsersPage,
@@ -84,11 +84,11 @@ function PendingUsersPage() {
   const [memberAction, setMemberAction] = useState<"approve" | "reject" | null>(null);
   const [memberReason, setMemberReason] = useState("");
 
-  if (!hasRole(user, "secretary", "chair")) {
+  if (!hasRole(user, "secretary")) {
     return (
       <AppShell title="Wanaosubiri">
         <div className="flex items-center justify-center py-20">
-          <p className="text-muted-foreground">Huna ruhusa ya kuona ukurasa huu.</p>
+          <p className="text-muted-foreground">Ukurasa huu ni kwa Katibu tu — ndiye anayeidhinisha wanachama.</p>
         </div>
       </AppShell>
     );

@@ -54,6 +54,15 @@ export function useDeleteMember() {
   });
 }
 
+/** Katibu-only: flip a member's active flag */
+export function useToggleMemberActive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => membersApi.toggleActive(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: memberKeys.all }),
+  });
+}
+
 /** Chair creates a login account for a member that has none; returns temp_password once */
 export function useChairCreateLogin() {
   const qc = useQueryClient();
