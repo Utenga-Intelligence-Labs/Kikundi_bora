@@ -539,8 +539,7 @@ func (h *WelfareHandler) maybeCompleteWelfareEvent(tx *gorm.DB, eventID string) 
 // member contributions — these are the "mifuko" a member can submit a
 // contribution against from the Weka Mchango page.
 // GET /api/v1/welfare/contribute-events
-func (h *WelfareHandler) ListContributeEvents(c *fiber.Ctx) error {
-	var events []models.WelfareEvent
+func (h *WelfareHandler) ListContributeEvents(c *fiber.Ctx) error {	var events []models.WelfareEvent
 	database.DB.
 		Preload("Member", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, member_no, full_name")
@@ -552,6 +551,31 @@ func (h *WelfareHandler) ListContributeEvents(c *fiber.Ctx) error {
 		Find(&events)
 
 	return c.JSON(fiber.Map{"data": events, "total": len(events)})
+}
+
+// MyObligation returns the calling member's own contribution obligation
+// (fixed per-member amount) for one welfare event — this is the exact
+// amount the Weka Mchango form prefills and locks.
+// GET /api/v1/welfare/events/:id/my-obligation
+func (h *WelfareHandler) MyObligation(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	var member models.Member
+	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&member).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Huna usajili wa mwanachama"})
+	}
+
+	var contrib models.WelfareContribution
+	if err := database.DB.
+		Preload("Event", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id, event_type, description, status")
+		}).
+		Where("event_id = ? AND member_id = ?", c.Params("id"), member.ID).
+		First(&contrib).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Huna kiwango kilichowekwa kwa mfuko huu"})
+	}
+
+	return c.JSON(fiber.Map{"data": contrib})
 }
 
 // ---------- LIST: Events (role-filtered) ----------

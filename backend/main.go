@@ -331,6 +331,7 @@ func main() {
 
 	// Events members can contribute to (approved, member-funded)
 	welfare.Get("/contribute-events", welfareHandler.ListContributeEvents)
+	welfare.Get("/events/:id/my-obligation", welfareHandler.MyObligation)
 
 	// Events — all can view, treasurer creates, chair OR secretary approves
 	welfare.Get("/events", welfareHandler.ListEvents)

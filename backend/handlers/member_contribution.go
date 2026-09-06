@@ -105,6 +105,26 @@ func (h *MemberContributionHandler) Submit(c *fiber.Ctx) error {
 				"message": "Mfuko wa kijamii haujapatikana au haukuidhinishwa kuchangia",
 			})
 		}
+		// The amount must equal the member's fixed per-event obligation —
+		// no custom amounts. Already-paid obligations are rejected.
+		var obligation models.WelfareContribution
+		if err := database.DB.
+			Where("event_id = ? AND member_id = ?", req.WelfareEventID, member.ID).
+			First(&obligation).Error; err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"message": "Huna kiwango kilichowekwa kwa mfuko huu",
+			})
+		}
+		if obligation.Status != models.WelfareContribPending {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"message": "Kiwango chako kwa mfuko huu tayari kimeshalipwa",
+			})
+		}
+		if !req.Amount.Equal(obligation.Amount) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"message": fmt.Sprintf("Kiasi lazima kiwe TZS %s — kiwango kilichowekwa kwa mfuko huu", obligation.Amount.StringFixed(0)),
+			})
+		}
 		welfareEventID = &req.WelfareEventID
 	} else if req.WelfareEventID != "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{

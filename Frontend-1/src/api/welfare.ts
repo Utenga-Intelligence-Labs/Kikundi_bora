@@ -122,6 +122,10 @@ export const welfareApi = {
   contributeEvents: () =>
     api.get<{ data: WelfareEvent[]; total: number }>("/welfare/contribute-events"),
 
+  // The calling member's fixed per-event obligation (amount + status)
+  myObligation: (eventId: string) =>
+    api.get<{ data: WelfareContribution }>(`/welfare/events/${eventId}/my-obligation`),
+
   // Events
   listEvents: (params?: {
     page?: number;
