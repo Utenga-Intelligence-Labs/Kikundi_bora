@@ -45,7 +45,7 @@ export function MfukoContributionForm() {
 
   // Fixed per-member obligation for the selected mfuko — fetched from the
   // server, never typed by hand.
-  const { data: obligationData, isLoading: obligationLoading } = useQuery({
+  const { data: obligationData, isLoading: obligationLoading, error: obligationError } = useQuery({
     queryKey: ["welfare", "my-obligation", eventId],
     queryFn: () => welfareApi.myObligation(eventId),
     enabled: !!eventId,
@@ -53,6 +53,7 @@ export function MfukoContributionForm() {
   });
   const obligation = obligationData?.data ?? null;
   const obligationPaid = obligation != null && obligation.status !== "PENDING";
+  const obligationMsg = obligationError instanceof Error ? obligationError.message : null;
 
   const handleSelectEvent = (id: string) => {
     setEventId(id);
@@ -209,7 +210,7 @@ export function MfukoContributionForm() {
                   {obligationPaid && <span className="ml-2 text-xs text-success">✓ Tayari umelipa</span>}
                 </>
               ) : (
-                <span className="text-destructive">Huna kiwango kilichowekwa kwa mfuko huu.</span>
+                <span className="text-destructive">{obligationMsg ?? "Huna kiwango kilichowekwa kwa mfuko huu."}</span>
               )}
             </p>
           </div>

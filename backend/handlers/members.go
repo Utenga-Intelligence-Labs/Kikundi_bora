@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"time"
 
 	"kikundibora/database"
@@ -250,6 +251,12 @@ func (h *MemberHandler) ApproveMember(c *fiber.Ctx) error {
 				"is_active":          true,
 				"must_change_password": true,
 			})
+	}
+
+	// Late joiner: create their fixed-amount rows for already-approved,
+	// member-funded events so they can contribute immediately.
+	if _, err := services.EnsureWelfareObligations(member.ID); err != nil {
+		log.Printf("WARN: welfare obligations for %s: %v", member.MemberNo, err)
 	}
 
 	services.LogAudit(c, &userID, models.AuditApprove, "members", &member.ID,

@@ -564,6 +564,9 @@ func (h *WelfareHandler) MyObligation(c *fiber.Ctx) error {
 	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&member).Error; err != nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Huna usajili wa mwanachama"})
 	}
+	if !member.IsActive || member.ApprovalStatus != "approved" {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Akaunti yako ya mwanachama haijaidhinishwa bado — subiri Katibu"})
+	}
 
 	var contrib models.WelfareContribution
 	if err := database.DB.
@@ -572,6 +575,15 @@ func (h *WelfareHandler) MyObligation(c *fiber.Ctx) error {
 		}).
 		Where("event_id = ? AND member_id = ?", c.Params("id"), member.ID).
 		First(&contrib).Error; err != nil {
+		// Distinguish "event not approved yet" from "no row for you" so the
+		// UI can explain instead of showing a dead end.
+		var event models.WelfareEvent
+		if dbErr := database.DB.Where("id = ?", c.Params("id")).First(&event).Error; dbErr != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mfuko huu haujapatikana"})
+		}
+		if event.Status != models.WelfareApproved {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mfuko huu bado haujafanyiwa approval — subiri kidogo"})
+		}
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Huna kiwango kilichowekwa kwa mfuko huu"})
 	}
 
