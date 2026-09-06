@@ -34,7 +34,9 @@ import {
   Activity,
   Settings,
   CalendarDays,
+  Gift,
 } from "lucide-react";
+import { useWelfareEvents } from "@/hooks/use-welfare";
 
 export const Route = createFileRoute("/dashibodi")({
   head: () => ({
@@ -310,6 +312,16 @@ function MemberView({
   const hideBanner = cycleStatus === "confirmed";
   const isPendingCycle = cycleStatus === "pending";
 
+  // Welfare payouts awaiting THIS member's receipt confirmation.
+  const { data: welfareData } = useWelfareEvents({ status: "COMPLETED", limit: 100 });
+  const awaitingReceipt = (welfareData?.data ?? []).filter(
+    (ev: any) =>
+      !!ev.disbursed_at &&
+      !ev.received_at &&
+      !!memberId &&
+      (ev.member?.id === memberId || ev.member_id === memberId)
+  );
+
   const {
     data: memberData,
     isLoading,
@@ -357,6 +369,27 @@ function MemberView({
 
   return (
     <>
+      {awaitingReceipt.length > 0 && (
+        <div className="card-surface p-4 mb-4 border-l-4 border-l-amber-500 flex items-center gap-3">
+          <Gift className="h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <p className="text-sm font-semibold">
+              Fedha za kijamii zimetolewa — thibitisha kupokea
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {awaitingReceipt.length === 1
+                ? "Mfuko 1 unasubiri uthibitisho wako"
+                : `Mifuko ${awaitingReceipt.length} inasubiri uthibitisho wako`}
+            </p>
+          </div>
+          <Link
+            to="/mfuko-kijamii"
+            className="ml-auto shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+          >
+            Angalia
+          </Link>
+        </div>
+      )}
       {(fixedAmount != null || nextDue) && !hideBanner && (
         <div className={`card-surface p-4 mb-4 border-l-4 flex items-center gap-3 ${isPendingCycle ? "border-l-warning" : "border-l-primary"}`}>
           <CalendarDays className={`h-5 w-5 shrink-0 ${isPendingCycle ? "text-warning" : "text-primary"}`} />

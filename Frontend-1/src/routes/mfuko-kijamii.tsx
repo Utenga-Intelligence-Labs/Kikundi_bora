@@ -229,6 +229,13 @@ function EventsTab() {
             onView={() => setViewingEvent(ev.id)}
             onApprove={(isChair || isSecretary) && ev.status === "PENDING" ? () => setApprovingEvent(ev.id) : undefined}
             onReject={(isChair || isSecretary) && ev.status === "PENDING" ? () => setRejectingEvent(ev.id) : undefined}
+            needsReceipt={
+              ev.status === "COMPLETED" &&
+              !!ev.disbursed_at &&
+              !ev.received_at &&
+              !!user?.member_id &&
+              ev.member?.id === user.member_id
+            }
           />
         ))}
         {events.length === 0 && !isLoading && (
@@ -256,11 +263,13 @@ function EventCard({
   onView,
   onApprove,
   onReject,
+  needsReceipt,
 }: {
   event: WelfareEvent;
   onView: () => void;
   onApprove?: () => void;
   onReject?: () => void;
+  needsReceipt?: boolean;
 }) {
   const statusMap: Record<string, { label: string; cls: string }> = {
     PENDING: { label: "Inasubiri", cls: "bg-warning/25 text-foreground" },
@@ -285,6 +294,12 @@ function EventCard({
       </div>
 
       <p className="mt-2 text-xs text-muted-foreground line-clamp-2">{event.description}</p>
+
+      {needsReceipt && (
+        <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+          Fedha zimetolewa — fungua na uthibitishe kupokea
+        </p>
+      )}
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
         <div>

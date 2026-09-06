@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // wireTestLedger connects the auto-post ledger to the test database so
@@ -97,6 +98,59 @@ func seedWelfarePaidFlow(t *testing.T, app *fiber.App) (treasurerTok, chairTok, 
 }
 
 func decimalPtrWelfare(d decimal.Decimal) *decimal.Decimal { return &d }
+
+func TestWelfareConfirmReceipt(t *testing.T) {
+	app := welfareLedgerApp()
+	treasurerTok, chairTok, eventID, _ := seedWelfarePaidFlow(t, app)
+
+	// Not disbursed yet → 400.
+	code, _ := doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok)
+	if code != 400 {
+		t.Fatalf("confirm before disburse = %d, want 400", code)
+	}
+
+	// Mark disbursed directly (disburse endpoint needs full collection;
+	// covered by TestWelfareDisbursePostsLedgerAndReceipt).
+	now := time.Now()
+	database.DB.Model(&models.WelfareEvent{}).Where("id = ?", eventID).Updates(map[string]interface{}{
+		"status": "COMPLETED", "completed_at": now,
+		"disbursed_by": "00000000-0000-0000-0000-000000000000", "disbursed_at": now,
+	})
+
+	// Stranger member (not beneficiary, not leadership) → 403.
+	// Build a dedicated login-linked member so linkage is deterministic.
+	strangerPwd, _ := bcrypt.GenerateFromPassword([]byte("Stranger123"), bcrypt.MinCost)
+	strangerUser := models.User{
+		Name: "Stranger Mgeni", Phone: "0719999999", Password: string(strangerPwd),
+		Role: models.RoleMember, Status: models.UserStatusActive, IsActive: true,
+	}
+	if err := database.DB.Create(&strangerUser).Error; err != nil {
+		t.Fatalf("create stranger user: %v", err)
+	}
+	var chair models.User
+	database.DB.Where("role = ?", models.RoleChair).First(&chair)
+	database.DB.Create(&models.Member{
+		MemberNo: "KKK-900", FullName: "Stranger Mgeni", Phone: "0719999999",
+		UserID: &strangerUser.ID, IsActive: true, JoinedAt: time.Now(), RegisteredBy: chair.ID,
+	})
+	strangerTok := doLogin(t, app, "0719999999", "Stranger123")
+	code, _ = doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, strangerTok)
+	if code != 403 {
+		t.Fatalf("stranger confirm = %d, want 403", code)
+	}
+
+	// Leadership confirm succeeds.
+	code, _ = doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok)
+	if code != 200 {
+		t.Fatalf("leadership confirm = %d, want 200", code)
+	}
+
+	// Repeat → 409.
+	if code, _ := doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok); code != 409 {
+		t.Fatalf("double confirm = %d, want 409", code)
+	}
+	_ = treasurerTok
+}
 
 func welfareFundBalance(t *testing.T) decimal.Decimal {
 	t.Helper()
