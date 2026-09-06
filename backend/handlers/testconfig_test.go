@@ -5,11 +5,28 @@ import (
 	"kikundibora/database"
 	"kikundibora/models"
 	"os"
+	"strings"
+	"testing"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/shopspring/decimal"
 )
+
+// requireTestDB is the safety guard that keeps destructive test cleanups off
+// real databases. cleanAndSeed / scopedCleanAndSeed / cleanObligationTables
+// DELETE production-shaped data, so they refuse to run unless the connected
+// database name ends in _test (override with DB_NAME for CI).
+func requireTestDB(t *testing.T) {
+	t.Helper()
+	name := ""
+	if config.AppConfig != nil {
+		name = config.AppConfig.DBName
+	}
+	if !strings.HasSuffix(name, "_test") {
+		t.Fatalf("REFUSING to wipe non-test database %q — run tests with DB_NAME=kikundi_test", name)
+	}
+}
 
 // cleanAllTables performs a full, FK-ordered cleanup of every table the
 // handlers touch, so tests always start from a known state regardless of what
@@ -99,7 +116,11 @@ func testConfig() *config.Config {
 		DBPort:      get("DB_PORT", "5432"),
 		DBUser:      get("DB_USER", "postgres"),
 		DBPassword:  get("DB_PASSWORD", ""),
-		DBName:      get("DB_NAME", "kikundi_db"),
+		// Tests NEVER default to the dev database: backend/.env sets
+		// DB_NAME=kikundi_db, so tests use a dedicated TEST_DB_NAME
+		// (default kikundi_test) and requireTestDB refuses anything
+		// else. This is what keeps `go test` from ever wiping live data.
+		DBName:      get("TEST_DB_NAME", "kikundi_test"),
 		DBSSLMode:   get("DB_SSLMODE", "disable"),
 		JWTSecret:   get("JWT_SECRET", "test-secret-key-at-least-32-characters!!"),
 		Port:        "0",

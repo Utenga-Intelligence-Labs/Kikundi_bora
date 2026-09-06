@@ -17,6 +17,7 @@ import (
 func setupTestApp() *fiber.App {
 	config.AppConfig = testConfig()
 	database.Connect()
+	database.AutoMigrate()
 	services.InitEmail()
 
 	app := fiber.New(fiber.Config{AppName: "Kikundi API Test"})

@@ -44,7 +44,7 @@ type User struct {
 	Password           string     `gorm:"type:varchar(255)" json:"-"`
 	Role               Role       `gorm:"type:varchar(20);not null" json:"role"`
 	Status             string     `gorm:"type:varchar(20);default:'PENDING';not null" json:"status"`
-	MustChangePassword bool       `gorm:"default:true" json:"must_change_password"`
+	MustChangePassword bool       `gorm:"default:false" json:"must_change_password"`
 	AvatarURL          string     `gorm:"type:text" json:"avatar_url"`
 	Bio                string     `gorm:"type:text" json:"bio"`
 	IsActive           bool       `gorm:"default:true" json:"is_active"`

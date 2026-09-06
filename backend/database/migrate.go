@@ -88,6 +88,14 @@ func AutoMigrate() {
 		Where("status = '' OR status IS NULL").
 		Update("status", models.PaymentMethodApproved)
 
+	// Data-integrity fix (Sept 2026): users.must_change_password was created
+	// with DB DEFAULT true while seed code passes false. GORM omits
+	// zero-valued fields that carry a `default:` tag, so every seeded user
+	// silently stored true and was forced through "set your password" after
+	// each reseed. The model tag is now default:false; fix the live default
+	// too (AutoMigrate never alters existing column defaults).
+	DB.Exec(`ALTER TABLE users ALTER COLUMN must_change_password SET DEFAULT FALSE`)
+
 	log.Println("Migration complete.")
 }
 

@@ -69,7 +69,9 @@ func hReq(t *testing.T, app *fiber.App, method, path string, body interface{}, t
 	return resp.StatusCode, data
 }
 
-func cleanObligationTables() {
+func cleanObligationTables(t *testing.T) {
+	t.Helper()
+	requireTestDB(t)
 	for _, stmt := range []string{
 		"DELETE FROM meeting_attendances",
 		"DELETE FROM meetings",
@@ -108,8 +110,8 @@ func makeOffence(t *testing.T, groupID, kind, name string, amount decimal.Decima
 
 func TestFineCollectRBAC(t *testing.T) {
 	app := obligationsTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	g := seedObligationGroup(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
@@ -142,8 +144,8 @@ func TestFineCollectRBAC(t *testing.T) {
 
 func TestOffenceApproveRBAC(t *testing.T) {
 	app := obligationsTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	g := seedObligationGroup(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
@@ -175,8 +177,8 @@ func TestOffenceApproveRBAC(t *testing.T) {
 
 func TestWaiverProposeApproveRBAC(t *testing.T) {
 	app := obligationsTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	g := seedObligationGroup(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
@@ -207,8 +209,8 @@ func TestWaiverProposeApproveRBAC(t *testing.T) {
 
 func TestMeetingTriggerRBAC(t *testing.T) {
 	app := obligationsTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	g := seedObligationGroup(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
@@ -255,8 +257,8 @@ func TestMeetingTriggerRBAC(t *testing.T) {
 
 func TestObligationsSummaryMath(t *testing.T) {
 	app := obligationsTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	g := seedObligationGroup(t)
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
 
@@ -311,8 +313,8 @@ func TestObligationsSummaryMath(t *testing.T) {
 
 func TestFineIdempotencyAndDeactivation(t *testing.T) {
 	_ = obligationsTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	g := seedObligationGroup(t)
 
 	ot := makeOffence(t, g.ID, models.OffenceLateContribution, "Kuchelewa", decimal.NewFromInt(2000))

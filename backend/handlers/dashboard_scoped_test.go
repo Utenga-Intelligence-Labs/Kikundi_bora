@@ -20,6 +20,7 @@ import (
 func scopedTestApp() *fiber.App {
 	config.AppConfig = testConfig()
 	database.Connect()
+	database.AutoMigrate()
 
 	app := fiber.New(fiber.Config{AppName: "Kikundi API Test"})
 	api := app.Group("/api/v1")
@@ -68,6 +69,7 @@ func scopedTestApp() *fiber.App {
 // re-seeds demo data (users, members, leadership, group).
 func scopedCleanAndSeed(t *testing.T) {
 	t.Helper()
+	requireTestDB(t)
 	for _, stmt := range []string{
 		"DELETE FROM loan_reviews",
 		"DELETE FROM repayments",

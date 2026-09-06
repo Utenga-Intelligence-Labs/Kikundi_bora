@@ -92,7 +92,7 @@ func smsTestGroup(t *testing.T, smsOn bool) models.Group {
 
 func TestSMSDispatchExactlyOnce(t *testing.T) {
 	app := smsOTPTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	mock := &mockSMSProvider{}
 	services.SetSMSProvider(mock)
 	defer services.SetSMSProvider(services.LoggingSMSProvider{})
@@ -130,7 +130,7 @@ func TestSMSDispatchExactlyOnce(t *testing.T) {
 
 func TestSMSToggleOffStopsSMSOnly(t *testing.T) {
 	smsOTPTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	mock := &mockSMSProvider{}
 	services.SetSMSProvider(mock)
 	defer services.SetSMSProvider(services.LoggingSMSProvider{})
@@ -157,7 +157,7 @@ func TestSMSToggleOffStopsSMSOnly(t *testing.T) {
 
 func TestSMSInvalidPhoneSkipped(t *testing.T) {
 	smsOTPTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	mock := &mockSMSProvider{}
 	services.SetSMSProvider(mock)
 	defer services.SetSMSProvider(services.LoggingSMSProvider{})
@@ -184,7 +184,7 @@ func TestSMSInvalidPhoneSkipped(t *testing.T) {
 
 func TestSMSRetryOnceThenFail(t *testing.T) {
 	smsOTPTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	mock := &mockSMSProvider{failTimes: 100} // always fails
 	services.SetSMSProvider(mock)
 	defer services.SetSMSProvider(services.LoggingSMSProvider{})
@@ -214,7 +214,7 @@ func TestSMSRetryOnceThenFail(t *testing.T) {
 
 func TestOTPDisabledByDefault(t *testing.T) {
 	app := smsOTPTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	if config.AppConfig.OTPVerificationEnabled {
 		t.Fatalf("OTP flag must default to false in tests")
 	}
@@ -248,7 +248,7 @@ func TestOTPDisabledByDefault(t *testing.T) {
 
 func TestOTPEnabledFlow(t *testing.T) {
 	app := smsOTPTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	config.AppConfig.OTPVerificationEnabled = true
 	defer func() { config.AppConfig.OTPVerificationEnabled = false }()
 

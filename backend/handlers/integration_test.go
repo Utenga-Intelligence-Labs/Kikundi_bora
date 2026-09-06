@@ -21,6 +21,7 @@ import (
 func fullTestApp() *fiber.App {
 	config.AppConfig = testConfig()
 	database.Connect()
+	database.AutoMigrate()
 	services.InitEmail()
 
 	app := fiber.New(fiber.Config{AppName: "Kikundi API Test"})
@@ -122,7 +123,9 @@ func hExtract(t *testing.T, data []byte, key string) string {
 	return n["id"].(string)
 }
 
-func cleanAndSeed() {
+func cleanAndSeed(t *testing.T) {
+	t.Helper()
+	requireTestDB(t)
 	// Full dependency-ordered cleanup (FK-safe). A partial delete list lets
 	// FK-referenced rows survive, silently aborts later DELETEs and skips the
 	// reseed — leaving tests running against stale data.
@@ -169,7 +172,7 @@ func cleanAndSeed() {
 
 func TestLoanLifecycleHTTP(t *testing.T) {
 	app := fullTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
 	treasurer := hLogin(t, app, "fatuma@kikundi.tz", "demo123")
@@ -237,7 +240,7 @@ func TestLoanLifecycleHTTP(t *testing.T) {
 
 func TestNegativeScenarios(t *testing.T) {
 	app := fullTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
 	treasurer := hLogin(t, app, "fatuma@kikundi.tz", "demo123")
@@ -319,8 +322,8 @@ func TestNegativeScenarios(t *testing.T) {
 
 func TestContributionFlow(t *testing.T) {
 	app := fullTestApp()
-	cleanAndSeed()
-	cleanObligationTables()
+	cleanAndSeed(t)
+	cleanObligationTables(t)
 	// Hermetic group schedule: fixed 10000/monthly due on the 5th, so the
 	// seeded members (joined 2024) carry ample arrears for allocation.
 	var grp models.Group
@@ -390,7 +393,7 @@ func TestContributionFlow(t *testing.T) {
 
 func TestLoginRateLimiting(t *testing.T) {
 	app := fullTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 	// Rate limiting must actually engage: the local .env disables it for
 	// dev convenience, and the login handler auto-bypasses when config
 	// Environment == "test" (so suites never lock themselves out).
@@ -427,7 +430,7 @@ func TestLoginRateLimiting(t *testing.T) {
 
 func TestCommitteeReviewFlow(t *testing.T) {
 	app := fullTestApp()
-	cleanAndSeed()
+	cleanAndSeed(t)
 
 	chair := hLogin(t, app, "juma@kikundi.tz", "demo123")
 	treasurer := hLogin(t, app, "fatuma@kikundi.tz", "demo123")
