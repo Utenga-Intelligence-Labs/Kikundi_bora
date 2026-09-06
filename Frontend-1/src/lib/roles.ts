@@ -23,7 +23,6 @@ export const memberNav: NavItem[] = [
 // Each item can specify required roles — if omitted, all leadership roles see it.
 export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] = [
   { to: "/michango", label: "Pokea Michango", icon: PiggyBank, requiredRoles: ["HAZINA", "KATIBU"] },
-  { to: "/michango-inayosubiri", label: "Taarifa za Wanaosubiri", icon: ClipboardList },
   { to: "/marejesho", label: "Taarifa Za Marejesho", icon: Receipt },
   { to: "/uongozi/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
   { to: "/uongozi/portfolio", label: "Portfolio ya Mikopo", icon: Briefcase },
@@ -46,7 +45,6 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
     { to: "/wanachama", label: "Wanachama", icon: Users },
     { to: "/mikopo", label: "Idhinisha Mikopo", icon: ShieldCheck },
     { to: "/vitendo-vinavyosubiri", label: "Vitendo Vinavyosubiri", icon: FileCheck },
-    { to: "/michango-inayosubiri", label: "Idhinisha Mifuko", icon: ClipboardList },
     { to: "/marejesho", label: "Marejesho", icon: Receipt },
     { to: "/ripoti", label: "Ripoti", icon: FileBarChart2 },
     { to: "/mikutano", label: "Mikutano na Makosa", icon: CalendarDays },

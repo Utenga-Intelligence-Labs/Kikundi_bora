@@ -24,7 +24,6 @@ import { Route as MipangilioRouteImport } from './routes/mipangilio'
 import { Route as MikutanoRouteImport } from './routes/mikutano'
 import { Route as MikopoRouteImport } from './routes/mikopo'
 import { Route as MichangoYanguRouteImport } from './routes/michango-yangu'
-import { Route as MichangoInayosubiriRouteImport } from './routes/michango-inayosubiri'
 import { Route as MichangoRouteImport } from './routes/michango'
 import { Route as MfukoKijamiiRouteImport } from './routes/mfuko-kijamii'
 import { Route as MarejeshoRouteImport } from './routes/marejesho'
@@ -117,11 +116,6 @@ const MikopoRoute = MikopoRouteImport.update({
 const MichangoYanguRoute = MichangoYanguRouteImport.update({
   id: '/michango-yangu',
   path: '/michango-yangu',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MichangoInayosubiriRoute = MichangoInayosubiriRouteImport.update({
-  id: '/michango-inayosubiri',
-  path: '/michango-inayosubiri',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MichangoRoute = MichangoRouteImport.update({
@@ -229,7 +223,6 @@ export interface FileRoutesByFullPath {
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
-  '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mikutano': typeof MikutanoRoute
@@ -265,7 +258,6 @@ export interface FileRoutesByTo {
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
-  '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mikutano': typeof MikutanoRoute
@@ -302,7 +294,6 @@ export interface FileRoutesById {
   '/marejesho': typeof MarejeshoRoute
   '/mfuko-kijamii': typeof MfukoKijamiiRoute
   '/michango': typeof MichangoRoute
-  '/michango-inayosubiri': typeof MichangoInayosubiriRoute
   '/michango-yangu': typeof MichangoYanguRoute
   '/mikopo': typeof MikopoRoute
   '/mikutano': typeof MikutanoRoute
@@ -340,7 +331,6 @@ export interface FileRouteTypes {
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
-    | '/michango-inayosubiri'
     | '/michango-yangu'
     | '/mikopo'
     | '/mikutano'
@@ -376,7 +366,6 @@ export interface FileRouteTypes {
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
-    | '/michango-inayosubiri'
     | '/michango-yangu'
     | '/mikopo'
     | '/mikutano'
@@ -412,7 +401,6 @@ export interface FileRouteTypes {
     | '/marejesho'
     | '/mfuko-kijamii'
     | '/michango'
-    | '/michango-inayosubiri'
     | '/michango-yangu'
     | '/mikopo'
     | '/mikutano'
@@ -449,7 +437,6 @@ export interface RootRouteChildren {
   MarejeshoRoute: typeof MarejeshoRoute
   MfukoKijamiiRoute: typeof MfukoKijamiiRoute
   MichangoRoute: typeof MichangoRoute
-  MichangoInayosubiriRoute: typeof MichangoInayosubiriRoute
   MichangoYanguRoute: typeof MichangoYanguRoute
   MikopoRoute: typeof MikopoRoute
   MikutanoRoute: typeof MikutanoRoute
@@ -577,13 +564,6 @@ declare module '@tanstack/react-router' {
       path: '/michango-yangu'
       fullPath: '/michango-yangu'
       preLoaderRoute: typeof MichangoYanguRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/michango-inayosubiri': {
-      id: '/michango-inayosubiri'
-      path: '/michango-inayosubiri'
-      fullPath: '/michango-inayosubiri'
-      preLoaderRoute: typeof MichangoInayosubiriRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/michango': {
@@ -729,7 +709,6 @@ const rootRouteChildren: RootRouteChildren = {
   MarejeshoRoute: MarejeshoRoute,
   MfukoKijamiiRoute: MfukoKijamiiRoute,
   MichangoRoute: MichangoRoute,
-  MichangoInayosubiriRoute: MichangoInayosubiriRoute,
   MichangoYanguRoute: MichangoYanguRoute,
   MikopoRoute: MikopoRoute,
   MikutanoRoute: MikutanoRoute,

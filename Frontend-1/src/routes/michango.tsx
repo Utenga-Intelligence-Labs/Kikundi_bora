@@ -5,9 +5,11 @@ import { useAuth } from "@/lib/auth-provider";
 import { blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
 import { api } from "@/api/client";
 import { withUploadToken } from "@/api/upload";
-import { useQuery } from "@tanstack/react-query";
+import { welfareApi, type WelfareContribution } from "@/api/welfare";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAppModal } from "@/components/AppModal";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle, XCircle, Clock, Loader2, Eye, ImageIcon, X, Filter } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Loader2, Eye, ImageIcon, X, Filter, Check, Ban } from "lucide-react";
 
 export const Route = createFileRoute("/michango")({
   head: () => ({
@@ -50,15 +52,68 @@ type StatusFilter = "ALL" | "PENDING_VERIFICATION" | "CONFIRMED" | "REJECTED";
 
 function MichangoPage() {
   const { user } = useAuth();
+  const qc = useQueryClient();
+  const { showModal } = useAppModal();
+  const isTreasurer = user?.role === "treasurer";
+  const [section, setSection] = useState<"kawaida" | "mifuko">("kawaida");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [typeFilter, setTypeFilter] = useState<"ALL" | "AKIBA" | "MFUKO_WA_KIJAMII">("ALL");
   const [viewingContrib, setViewingContrib] = useState<MemberContribution | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
 
   const { data, isLoading, error } = useQuery<{ data: MemberContribution[]; total: number }>({
     queryKey: ["michango", "all"],
     queryFn: async () => {
       return api.get("/michango");
     },
+  });
+
+  const { data: welfareData, isLoading: welfareLoading } = useQuery<{ data: WelfareContribution[]; total: number }>({
+    queryKey: ["welfare", "contributions", "PENDING"],
+    queryFn: async () => {
+      return api.get("/welfare/contributions?status=PENDING");
+    },
+    enabled: section === "mifuko",
+  });
+
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ["michango"] });
+    qc.invalidateQueries({ queryKey: ["welfare", "contributions"] });
+  };
+  const onActionError = (err: Error) =>
+    showModal({ title: "Hitilafu", message: err.message, variant: "error", primaryLabel: "Sawa" });
+
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => api.post(`/michango/${id}/confirm`),
+    onSuccess: invalidateAll,
+    onError: onActionError,
+  });
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.post(`/michango/${id}/reject`, { reason }),
+    onSuccess: () => {
+      invalidateAll();
+      setRejectingId(null);
+      setRejectReason("");
+      setViewingContrib(null);
+    },
+    onError: onActionError,
+  });
+  const approveWelfareMutation = useMutation({
+    mutationFn: (id: string) => welfareApi.approveContribution(id),
+    onSuccess: invalidateAll,
+    onError: onActionError,
+  });
+  const rejectWelfareMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      welfareApi.rejectContribution(id, reason),
+    onSuccess: () => {
+      invalidateAll();
+      setRejectingId(null);
+      setRejectReason("");
+    },
+    onError: onActionError,
   });
 
   if (!user) return null;
@@ -88,6 +143,40 @@ function MichangoPage() {
       title="Michango Zote"
       subtitle="Fuatilia michango ya wanachama wote"
     >
+      {/* Section tabs: regular contributions vs social-fund obligations */}
+      <div className="mb-4 flex gap-2">
+        {([
+          { value: "kawaida", label: "Michango ya Kawaida" },
+          { value: "mifuko", label: "Michango ya Mifuko ya Kijamii" },
+        ] as const).map((t) => (
+          <button
+            key={t.value}
+            onClick={() => setSection(t.value)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              section === t.value
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground/80 hover:bg-muted/80"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {section === "mifuko" ? (
+        <WelfarePendingSection
+          items={welfareData?.data ?? []}
+          isLoading={welfareLoading}
+          isTreasurer={!!isTreasurer}
+          onApprove={(id) => approveWelfareMutation.mutate(id)}
+          onReject={(id) => {
+            setRejectingId(`welfare:${id}`);
+            setRejectReason("");
+          }}
+          approving={approveWelfareMutation.isPending}
+        />
+      ) : (
+      <>
       {/* Summary Cards */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="card-surface p-4 text-center">
@@ -235,6 +324,29 @@ function MichangoPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {contrib.period_label} • {new Date(contrib.created_at).toLocaleDateString("sw-TZ")}
                       </p>
+                      {isTreasurer && contrib.status === "PENDING_VERIFICATION" && contrib.contribution_type === "AKIBA" && (
+                        <div className="mt-2 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => confirmMutation.mutate(contrib.id)}
+                            disabled={confirmMutation.isPending}
+                            className="inline-flex items-center gap-1 rounded-lg bg-success px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Thibitisha
+                          </button>
+                          <button
+                            onClick={() => {
+                              setRejectingId(`michango:${contrib.id}`);
+                              setRejectReason("");
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-white"
+                          >
+                            <Ban className="h-3.5 w-3.5" /> Kataa
+                          </button>
+                        </div>
+                      )}
+                      {isTreasurer && contrib.status === "PENDING_VERIFICATION" && contrib.contribution_type === "MFUKO_WA_KIJAMII" && (
+                        <p className="mt-2 text-[11px] text-muted-foreground">Inasubiri Mwenyekiti.</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -333,10 +445,171 @@ function MichangoPage() {
               >
                 Funga
               </button>
+              {isTreasurer && viewingContrib.status === "PENDING_VERIFICATION" && viewingContrib.contribution_type === "AKIBA" && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      confirmMutation.mutate(viewingContrib.id);
+                      setViewingContrib(null);
+                    }}
+                    disabled={confirmMutation.isPending}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-3 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    <Check className="h-4 w-4" /> Thibitisha
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRejectingId(`michango:${viewingContrib.id}`);
+                      setRejectReason("");
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-3 text-sm font-semibold text-white"
+                  >
+                    <Ban className="h-4 w-4" /> Kataa
+                  </button>
+                </div>
+              )}
+              {isTreasurer && viewingContrib.status === "PENDING_VERIFICATION" && viewingContrib.contribution_type === "MFUKO_WA_KIJAMII" && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Michango ya Mfuko wa Kijamii inathibitishwa na Mwenyekiti.
+                </p>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {/* Reject reason input (shared by both sections) */}
+      {rejectingId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+          onClick={() => {
+            setRejectingId(null);
+            setRejectReason("");
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-display text-lg font-semibold">Kataa Mchango</h3>
+            <p className="text-xs text-muted-foreground mt-1">Sababu inahitajika.</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Andika sababu..."
+              rows={3}
+              className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => {
+                  setRejectingId(null);
+                  setRejectReason("");
+                }}
+                className="flex-1 rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted"
+              >
+                Ghairi
+              </button>
+              <button
+                onClick={() => {
+                  const [kind, id] = rejectingId.split(":");
+                  if (kind === "welfare") {
+                    rejectWelfareMutation.mutate({ id, reason: rejectReason });
+                  } else {
+                    rejectMutation.mutate({ id, reason: rejectReason });
+                  }
+                }}
+                disabled={!rejectReason.trim() || rejectMutation.isPending || rejectWelfareMutation.isPending}
+                className="flex-1 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                Thibitisha Kukataa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
+      )}
     </AppShell>
+  );
+}
+
+function WelfarePendingSection({
+  items,
+  isLoading,
+  isTreasurer,
+  onApprove,
+  onReject,
+  approving,
+}: {
+  items: WelfareContribution[];
+  isLoading: boolean;
+  isTreasurer: boolean;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
+  approving: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="card-surface p-4">
+        <p className="text-xs text-muted-foreground">Michango ya mifuko inayosubiri uhakiki wa Mweka Hazina</p>
+        <p className="font-display text-2xl font-bold text-amber-600">{items.length}</p>
+      </div>
+      {isLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="card-surface p-4">
+              <Skeleton className="h-4 w-32" />
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="card-surface p-8 text-center">
+          <p className="text-muted-foreground">Hakuna michango ya mifuko inayosubiri</p>
+        </div>
+      ) : (
+        items.map((w) => (
+          <div key={w.id} className="card-surface p-4">
+            <div className="flex gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="chip bg-purple-100 text-purple-700 text-[10px] font-semibold px-2 py-0.5 rounded">
+                    {w.event?.event_type ?? "Mfuko"}
+                  </span>
+                  <span className="chip bg-amber-100 text-amber-600 text-[10px] font-semibold px-2 py-0.5 rounded inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Inasubiri
+                  </span>
+                </div>
+                <p className="font-display text-base font-bold">TZS {Number(w.amount).toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">
+                  {w.member?.full_name} ({w.member?.member_no})
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {w.event?.description ?? ""} • {new Date(w.created_at).toLocaleDateString("sw-TZ")}
+                </p>
+              </div>
+            </div>
+            {isTreasurer && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => onApprove(w.id)}
+                  disabled={approving}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  <Check className="h-4 w-4" /> Thibitisha
+                </button>
+                <button
+                  onClick={() => onReject(w.id)}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  <Ban className="h-4 w-4" /> Kataa
+                </button>
+              </div>
+            )}
+          </div>
+        ))
+      )}
+    </div>
   );
 }

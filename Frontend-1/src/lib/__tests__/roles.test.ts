@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { getSidebarNav, mobileNav, sidebarNav, roleSubtitle } from "../roles";
 
 describe("sidebarNav", () => {
-  it("Mwenyekiti has 12 items", () => {
-    expect(sidebarNav["Mwenyekiti"]).toHaveLength(12);
+  it("Mwenyekiti has 11 items (inayosubiri merged into michango)", () => {
+    expect(sidebarNav["Mwenyekiti"]).toHaveLength(11);
   });
 
   it("Mweka Hazina has 11 items", () => {
@@ -37,8 +37,8 @@ describe("sidebarNav", () => {
 
 describe("getSidebarNav", () => {
   it("returns same items for Mwenyekiti regardless of committee", () => {
-    expect(getSidebarNav("Mwenyekiti", false)).toHaveLength(12);
-    expect(getSidebarNav("Mwenyekiti", true)).toHaveLength(12);
+    expect(getSidebarNav("Mwenyekiti", false)).toHaveLength(11);
+    expect(getSidebarNav("Mwenyekiti", true)).toHaveLength(11);
   });
 
   it("inserts committee item for Mwanachama who is committee member", () => {

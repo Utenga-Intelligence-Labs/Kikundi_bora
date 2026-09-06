@@ -461,6 +461,139 @@ func (h *WelfareHandler) RecordPayment(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"message": "Malipo yamerekodiwa", "data": contrib})
 }
 
+// ---------- TREASURER: Approve a pending welfare contribution ----------
+// ApproveContribution marks a PENDING member obligation PAID at its fixed
+// amount — this is the treasurer's receipt review step. Only PAID rows
+// count toward fund totals, so approval is what moves the balance.
+func (h *WelfareHandler) ApproveContribution(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	tx := database.DB.Begin()
+
+	var contrib models.WelfareContribution
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&contrib).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mchango haujapatikana"})
+	}
+
+	if contrib.Status == models.WelfareContribPaid {
+		tx.Rollback()
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mchango huu tayari umelipwa"})
+	}
+
+	if contrib.Status == models.WelfareContribWaived {
+		tx.Rollback()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango huu umesamehewa"})
+	}
+
+	now := time.Now()
+	contrib.Status = models.WelfareContribPaid
+	contrib.PaidAt = &now
+	contrib.RecordedBy = &userID
+	// NOTE: amount is intentionally NOT overwritten — approval confirms
+	// receipt of the fixed obligation, it never reprices it.
+
+	if err := tx.Save(&contrib).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	// Shared completion check (approve path)
+	if err := h.maybeCompleteWelfareEvent(tx, contrib.EventID); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukamilisha tukio"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuidhinisha"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditRecordWelfarePayment, "welfare_contributions", &contrib.ID,
+		map[string]interface{}{"status": "PENDING"},
+		map[string]interface{}{"status": "PAID", "amount": contrib.Amount},
+	)
+
+	// Notify affected member
+	var contribMember models.Member
+	if err := database.DB.First(&contribMember, "id = ?", contrib.MemberID).Error; err == nil {
+		var notifUserID string
+		if contribMember.UserID != nil {
+			notifUserID = *contribMember.UserID
+		}
+		if notifUserID == "" {
+			notifUserID = contribMember.RegisteredBy
+		}
+		if notifUserID != "" {
+			services.NotifyUser(notifUserID, models.NotifWelfarePayment,
+				"Malipo ya Mchango wa Kijamii",
+				"Malipo yako ya TZS "+formatMoney(contrib.Amount)+" kwa tukio la kijamii yameidhinishwa.",
+			)
+		}
+	}
+
+	return c.JSON(fiber.Map{"message": "Mchango umeidhinishwa", "data": contrib})
+}
+
+// ---------- TREASURER: Reject a pending welfare contribution ----------
+// Reject requires a reason (consistent with member/fine-waiver reject flows)
+// and maps to the WAIVED terminal state, exactly like WaiveContribution.
+func (h *WelfareHandler) RejectContribution(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	var req struct {
+		Reason string `json:"reason"`
+	}
+	if err := c.BodyParser(&req); err != nil || req.Reason == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Sababu inahitajika kukataa mchango"})
+	}
+
+	tx := database.DB.Begin()
+
+	var contrib models.WelfareContribution
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("id = ?", id).
+		First(&contrib).Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mchango haujapatikana"})
+	}
+
+	if contrib.Status != models.WelfareContribPending {
+		tx.Rollback()
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango huu hauwezi kukataliwa. Hali yake ni: " + string(contrib.Status)})
+	}
+
+	if err := h.waiveContributionTx(tx, &contrib, req.Reason); err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukataa"})
+	}
+
+	services.LogAudit(c, &userID, models.AuditUpdate, "welfare_contributions", &contrib.ID,
+		map[string]interface{}{"status": "PENDING"},
+		map[string]interface{}{"status": "WAIVED", "reason": req.Reason},
+	)
+
+	return c.JSON(fiber.Map{"message": "Mchango umekataliwa", "data": contrib})
+}
+
+// waiveContributionTx flips a PENDING row to WAIVED with completion check.
+// Shared by WaiveContribution (event+member addressing) and
+// RejectContribution (id addressing) so the two paths cannot drift.
+func (h *WelfareHandler) waiveContributionTx(tx *gorm.DB, contrib *models.WelfareContribution, reason string) error {
+	contrib.Status = models.WelfareContribWaived
+	if err := tx.Save(&contrib).Error; err != nil {
+		return err
+	}
+	return h.maybeCompleteWelfareEvent(tx, contrib.EventID)
+}
+
 // ---------- TREASURER: Waive a welfare contribution ----------
 
 func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
@@ -483,16 +616,9 @@ func (h *WelfareHandler) WaiveContribution(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mchango huu hauwezi kusamehewa. Hali yake ni: " + string(contrib.Status)})
 	}
 
-	contrib.Status = models.WelfareContribWaived
-	if err := tx.Save(&contrib).Error; err != nil {
+	if err := h.waiveContributionTx(tx, &contrib, ""); err != nil {
 		tx.Rollback()
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusamehe"})
-	}
-
-	// Same completion check as pay path: no PENDING remaining → COMPLETED
-	if err := h.maybeCompleteWelfareEvent(tx, eventID); err != nil {
-		tx.Rollback()
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kukamilisha tukio"})
 	}
 
 	if err := tx.Commit().Error; err != nil {

@@ -144,6 +144,18 @@ export const welfareApi = {
   getEvent: (id: string) =>
     api.get<WelfareEventDetail>(`/welfare/events/${id}`),
 
+  // Treasurer-only: approve a pending member obligation at its fixed amount
+  approveContribution: (id: string) =>
+    api.post<{ message: string; data: WelfareContribution }>(
+      `/welfare/contributions/${id}/approve`
+    ),
+
+  // Treasurer-only: reject a pending obligation (reason required)
+  rejectContribution: (id: string, reason: string) =>
+    api.post<{ message: string; data: WelfareContribution }>(
+      `/welfare/contributions/${id}/reject`,
+      { reason }
+    ),
   createEvent: (data: CreateWelfareEventRequest) =>
     api.post<{ message: string; data: WelfareEvent }>("/welfare/events", data),
 
