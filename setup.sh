@@ -55,6 +55,7 @@ if [ -f backend/.env ]; then
 else
   JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   DB_PASSWORD="$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  BACKUP_ENCRYPTION_KEY="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   cat > backend/.env <<EOF
 DB_HOST=db
 DB_PORT=5432
@@ -68,9 +69,22 @@ PUBLIC_BASE_URL=http://localhost:$BACKEND_PORT
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:$FRONTEND_PORT
 ENVIRONMENT=development
 ADMIN_PASSWORD=$ADMIN_PASSWORD
+BACKUP_ENCRYPTION_KEY=$BACKUP_ENCRYPTION_KEY
 EOF
   ok "created backend/.env (random JWT secret generated)"
 fi
+
+# Compose needs the database container password as a host variable, while the
+# backend reads the matching value from backend/.env. Reuse the configured
+# value so a fresh setup cannot start two containers with different passwords.
+CONFIGURED_DB_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' backend/.env | head -n 1)"
+[ -n "$CONFIGURED_DB_PASSWORD" ] || die "DB_PASSWORD is empty in backend/.env; set it before continuing"
+if [ -n "${POSTGRES_PASSWORD:-}" ] && [ "$POSTGRES_PASSWORD" != "$CONFIGURED_DB_PASSWORD" ]; then
+  die "POSTGRES_PASSWORD does not match DB_PASSWORD in backend/.env"
+fi
+POSTGRES_PASSWORD="$CONFIGURED_DB_PASSWORD"
+export POSTGRES_PASSWORD
+ok "Postgres password wired to backend/.env"
 
 # -----------------------------------------------------------------------------
 say "[3/7] Choosing a free host port for PostgreSQL"
