@@ -133,9 +133,11 @@ func addFKConstraints() {
 		// PendingAction → User (two FKs)
 		{"pending_actions", "fk_pending_actions_requester", "requested_by", "users", "id", "RESTRICT"},
 		{"pending_actions", "fk_pending_actions_approver", "approved_by", "users", "id", "SET NULL"},
-		// Member → User (two FKs)
+		// Member → User (three FKs — approved_by points at the katibu's
+		// USER row, never at members)
 		{"members", "fk_members_registered_by", "registered_by", "users", "id", "RESTRICT"},
 		{"members", "fk_members_user", "user_id", "users", "id", "SET NULL"},
+		{"members", "fk_members_approver", "approved_by", "users", "id", "SET NULL"},
 		// Contribution → Member, User
 		{"contributions", "fk_contributions_member", "member_id", "members", "id", "RESTRICT"},
 		{"contributions", "fk_contributions_recorder", "recorded_by", "users", "id", "RESTRICT"},
@@ -199,11 +201,22 @@ func addFKConstraints() {
 	}
 
 	for _, fk := range fks {
-		// Skip if constraint already exists
-		var exists int64
-		DB.Raw(`SELECT 1 FROM pg_constraint WHERE conname = ?`, fk.constraint).Scan(&exists)
-		if exists == 1 {
-			continue
+		// Verify-and-heal: a constraint with the right name but the WRONG
+		// definition (e.g. fk_members_approver pointing at members(id)
+		// instead of users(id), which made katibu approval impossible with
+		// an FK violation on every attempt) is dropped and recreated
+		// correctly. Unmanaged constraints are never touched.
+		if def, found := ExistingFKDef(fk.table, fk.constraint); found {
+			if def.RefTable == fk.refTable && def.Column == fk.column &&
+				def.RefColumn == fk.refColumn && def.OnDelete == fk.onDelete {
+				continue // already correct
+			}
+			log.Printf("FK %s.%s is wrong (%s) — dropping to recreate correctly",
+				fk.table, fk.constraint, def.Describe())
+			if err := DB.Exec(`ALTER TABLE "` + fk.table + `" DROP CONSTRAINT "` + fk.constraint + `"`).Error; err != nil {
+				log.Printf("FK %s.%s drop failed: %v", fk.table, fk.constraint, err)
+				continue
+			}
 		}
 
 		sql := `ALTER TABLE "` + fk.table + `" ADD CONSTRAINT "` + fk.constraint + `"` +
@@ -215,4 +228,48 @@ func addFKConstraints() {
 			log.Printf("FK %s.%s: %v", fk.table, fk.constraint, err)
 		}
 	}
+}
+
+// FkDefActual is the live definition of a single-column FK constraint.
+type FkDefActual struct {
+	RefTable  string
+	Column    string
+	RefColumn string
+	OnDelete  string // CASCADE | RESTRICT | SET NULL | NO ACTION | SET DEFAULT
+}
+
+func (d FkDefActual) Describe() string {
+	return "FOREIGN KEY (" + d.Column + ") REFERENCES " + d.RefTable + "(" + d.RefColumn + ") ON DELETE " + d.OnDelete
+}
+
+// ExistingFKDef returns the live definition of a named FK on a table.
+// found=false when no such constraint exists. Only single-column FKs are
+// compared (every entry in our managed list is single-column).
+func ExistingFKDef(table, constraint string) (def FkDefActual, found bool) {
+	var row struct {
+		RefTable  string
+		Column    string
+		RefColumn string
+		DelType   string
+	}
+	err := DB.Raw(`
+		SELECT c.confrelid::regclass::text AS ref_table,
+		       a.attname AS column,
+		       af.attname AS ref_column,
+		       c.confdeltype AS del_type
+		  FROM pg_constraint c
+		  JOIN pg_attribute a  ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+		  JOIN pg_attribute af ON af.attrelid = c.confrelid AND af.attnum = c.confkey[1]
+		 WHERE c.conname = ? AND c.contype = 'f' AND c.conrelid = ?::regclass
+		   AND array_length(c.conkey, 1) = 1`,
+		constraint, table).Scan(&row).Error
+	if err != nil || row.RefTable == "" {
+		return FkDefActual{}, false
+	}
+	delMap := map[string]string{"c": "CASCADE", "r": "RESTRICT", "n": "SET NULL", "a": "NO ACTION", "d": "SET DEFAULT"}
+	onDelete, ok := delMap[row.DelType]
+	if !ok {
+		onDelete = row.DelType
+	}
+	return FkDefActual{RefTable: row.RefTable, Column: row.Column, RefColumn: row.RefColumn, OnDelete: onDelete}, true
 }

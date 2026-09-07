@@ -42,6 +42,7 @@ func gatingTestApp() *fiber.App {
 
 	members := protected.Group("/members")
 	members.Post("/", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), memberHandler.Create)
+	members.Patch("/:id/approve", middleware.RequireRoles(models.RoleSecretary), memberHandler.ApproveMember)
 
 	michango := protected.Group("/michango")
 	michango.Post("/", memberContribHandler.Submit)
