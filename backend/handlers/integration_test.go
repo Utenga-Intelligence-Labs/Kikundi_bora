@@ -53,6 +53,17 @@ func fullTestApp() *fiber.App {
 	loans := protected.Group("/loans")
 	loans.Post("/apply", loanHandler.Apply)
 	loans.Post("/:id/disburse", middleware.RequirePosition(models.PositionTreasurer), loanHandler.Disburse)
+	loans.Patch("/:id/confirm-received", loanHandler.ConfirmReceived)
+
+	// Sequential loan-approval chain (BUG-2 fix) — outside the leadership
+	// group so appointed bodi members can act on their turn.
+	leadershipHandler := NewLeadershipHandler()
+	protected.Get("/uongozi/mikopo/pending", middleware.RequireLoanCommitteeMember(), leadershipHandler.PendingLoans)
+	protected.Post("/uongozi/mikopo/:id/approve", middleware.RequireLoanCommitteeMember(), leadershipHandler.ApproveLoan)
+
+	welfareHandler := NewWelfareHandler()
+	welfare := protected.Group("/welfare")
+	welfare.Post("/events/:id/confirm-receipt", welfareHandler.ConfirmReceipt)
 
 	committee := protected.Group("/loan-committee")
 	committee.Use(middleware.RequireLoanCommitteeMember())
@@ -200,7 +211,7 @@ func TestLoanLifecycleHTTP(t *testing.T) {
 loanID := hExtract(t, d, "data")
 	t.Logf("Loan: %s", loanID)
 
-	// Step 2: Committee review — 3 leaders approve
+	// Step 2: Committee review — 3 leaders approve (satisfies the BODI stage)
 	review := map[string]interface{}{"decision": "APPROVE"}
 	for _, tok := range []string{chair, treasurer, secretary} {
 		code, _ = hPost(t, app, "/api/v1/loan-committee/loans/"+loanID+"/review", review, tok)
@@ -209,6 +220,17 @@ loanID := hExtract(t, d, "data")
 		}
 	}
 
+	// Step 3: Sequential chain — Hazina → Katibu → Mwenyekiti finalizes
+	chainApprove := func(tok string) {
+		code, d = hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, tok)
+		if code != 200 {
+			t.Fatalf("chain approve: %d %s", code, d)
+		}
+	}
+	chainApprove(treasurer)
+	chainApprove(secretary)
+	chainApprove(chair)
+
 	// Verify APPROVED
 	var loan models.Loan
 	database.DB.First(&loan, "id = ?", loanID)
@@ -216,13 +238,13 @@ loanID := hExtract(t, d, "data")
 		t.Fatalf("not approved: %s", loan.Status)
 	}
 
-	// Step 3: Disburse
+	// Step 4: Disburse
 	code, _ = hPost(t, app, fmt.Sprintf("/api/v1/loans/%s/disburse", loanID), nil, treasurer)
 	if code != 200 {
 		t.Fatalf("disburse: %d", code)
 	}
 
-	// Step 4: Repay
+	// Step 5: Repay
 	code, d = hPost(t, app, "/api/v1/repayments", map[string]interface{}{
 		"loan_id": loanID, "amount": 200000.0, "paid_at": "2026-07-11", "payment_method": "CASH",
 	}, treasurer)
@@ -274,10 +296,14 @@ loanID := hExtract(t, d, "data")
 		t.Logf("disburse-before-approve: %d (expected non-200)", code)
 	}
 
-	// Approve
+	// Approve: committee review satisfies the bodi stage, then the
+	// sequential chain (Hazina → Katibu → Mwenyekiti) finalizes
 	review := map[string]interface{}{"decision": "APPROVE"}
 	for _, tok := range []string{chair, treasurer, secretary} {
 		hPost(t, app, "/api/v1/loan-committee/loans/"+loanID+"/review", review, tok)
+	}
+	for _, tok := range []string{treasurer, secretary, chair} {
+		hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, tok)
 	}
 
 	// Disburse
@@ -452,8 +478,7 @@ func TestCommitteeReviewFlow(t *testing.T) {
 	var ml struct{ Data []struct{ ID string `json:"id"` } `json:"data"` }
 	json.Unmarshal(d, &ml)
 	memberID := ml.Data[0].ID
-
-	// Apply loan
+	fundTreasury(500000) // apply requires treasury coverage
 	code, d = hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
 		"member_id": memberID, "amount": 100000.0, "purpose": "Test", "due_date": "2026-12-31",
 	}, chair)
@@ -462,20 +487,38 @@ loanID := hExtract(t, d, "data")
 	// Try review by non-committee member (asha is committee now though — use a different non-member)
 	// Actually asha IS now committee, so normal member can't review. Skip this sub-test.
 
-	// All 4 committee members (chair, treasurer, secretary, asha) approve
+	// All 4 committee members (chair, treasurer, secretary, asha) approve —
+	// unanimous committee decision satisfies the BODI stage only.
 	review := map[string]interface{}{"decision": "APPROVE"}
 	for _, tok := range []string{chair, treasurer, secretary, member} {
 		code, _ = hPost(t, app, "/api/v1/loan-committee/loans/"+loanID+"/review", review, tok)
 		t.Logf("  review: %d", code)
 	}
 
-	// Verify APPROVED
+	// Verify: back to PENDING with the bodi stage satisfied — NOT approved
+	// (final approval belongs to Mwenyekiti via the sequential chain).
 	var loan models.Loan
 	database.DB.First(&loan, "id = ?", loanID)
-	if loan.Status != models.LoanApproved {
-		t.Errorf("expected APPROVED, got %s (need %d approves)", loan.Status, hGetCommitteeCount())
+	if loan.Status != models.LoanPending {
+		t.Errorf("expected PENDING after unanimous committee (bodi stage only), got %s", loan.Status)
 	}
-	t.Logf("Committee review: %s", loan.Status)
+	if loan.BodiApprovedAt == nil {
+		t.Errorf("expected bodi_approved_at set by unanimous committee")
+	}
+
+	// Complete the sequential chain: Hazina → Katibu → Mwenyekiti finalize
+	// (bodi stage was satisfied by the unanimous committee decision).
+	for _, tok := range []string{treasurer, secretary, chair} {
+		code, d = hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, tok)
+		if code != 200 {
+			t.Fatalf("chain approve: %d %s", code, d)
+		}
+	}
+	database.DB.First(&loan, "id = ?", loanID)
+	if loan.Status != models.LoanApproved {
+		t.Errorf("expected APPROVED after chair finalize, got %s", loan.Status)
+	}
+	t.Logf("Committee review → bodi done → chain finalize: %s", loan.Status)
 }
 
 func hGetUserID(t *testing.T, email string) string {

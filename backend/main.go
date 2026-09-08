@@ -296,10 +296,14 @@ func main() {
 	loans.Get("/outstanding-report", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), loanHandler.OutstandingReport)
 	loans.Get("/:id", loanHandler.Get)
 	loans.Post("/apply", loanHandler.Apply)
-	// Chair/treasurer can approve (legacy direct path); committee unanimous path also finalizes
-	loans.Post("/:id/approve", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), loanHandler.Approve)
-	loans.Post("/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), loanHandler.Reject)
+	// BUG-2 fix: the ONLY approval path is the sequential chain
+	// (Hazina → Katibu → Bodi → Mwenyekiti) via /uongozi/mikopo/:id/approve.
+	// The legacy direct-approve/reject bypass (which let chair/treasurer skip
+	// katibu + bodi entirely) has been removed. Rejection inside the chain
+	// happens via committee review (POST /loan-committee/loans/:id/review).
 	loans.Post("/:id/disburse", middleware.RequirePosition(models.PositionTreasurer), loanHandler.Disburse)
+	// BUG-5: borrower acknowledges receiving the disbursed loan.
+	loans.Patch("/:id/confirm-received", loanHandler.ConfirmReceived)
 
 	// Loan offset (overdue debt paid from member savings): three-role check —
 	// mwenyekiti proposes, katibu approves/rejects, mweka-hazina executes.
@@ -336,7 +340,9 @@ func main() {
 	committee.Use(middleware.RequireLoanCommitteeMember())
 
 	committee.Get("/members", committeeHandler.ListMembers)
-	committee.Post("/members", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), committeeHandler.AppointMember)
+	// BUG-3 fix: appointing members to the loan board is MWENYEKITI's action
+	// only — katibu was incorrectly allowed before.
+	committee.Post("/members", middleware.RequireRoles(models.RoleChair), committeeHandler.AppointMember)
 	committee.Delete("/members/:id", middleware.RequireRoles(models.RoleChair), committeeHandler.RemoveMember)
 	committee.Post("/members/:id/restore", middleware.RequireRoles(models.RoleChair), committeeHandler.RestoreCommitteeMember)
 	committee.Get("/loans", committeeHandler.ListLoans)
@@ -453,10 +459,16 @@ func main() {
 	uongozi.Get("/dashboard", leadershipHandler.Dashboard)
 	uongozi.Get("/quick-stats", leadershipHandler.QuickStats)
 	uongozi.Post("/announcements", announcementHandler.Broadcast)
-	uongozi.Get("/mikopo/pending", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), leadershipHandler.PendingLoans)
-	uongozi.Post("/mikopo/:id/approve", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), leadershipHandler.ApproveLoan)
 	uongozi.Get("/ripoti", leadershipHandler.Reports)
 	uongozi.Get("/wanachama", memberHandler.List)
+
+	// BUG-2 fix: the loan-approval chain routes live OUTSIDE the uongozi
+	// leadership group (its RequireLeadership middleware would block appointed
+	// bodi members, whose users.role is plain member). They are instead
+	// guarded by RequireLoanCommitteeMember — leadership roles OR appointed
+	// bodi members — matching the handler's sequential-stage switch.
+	protected.Get("/uongozi/mikopo/pending", middleware.RequireLoanCommitteeMember(), leadershipHandler.PendingLoans)
+	protected.Post("/uongozi/mikopo/:id/approve", middleware.RequireLoanCommitteeMember(), leadershipHandler.ApproveLoan)
 
 	// Dissolution routes
 	dissolution := protected.Group("/dissolution-proposals")

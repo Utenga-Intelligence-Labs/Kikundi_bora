@@ -195,7 +195,7 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 	services.NotifyRole(models.RoleTreasurer, models.NotifLoanRequest, "Ombi Jipya la Mkopo", msg, "")
 
 	var appointed []models.LoanCommitteeMember
-	database.DB.Where("is_active = TRUE AND deleted_at IS NULL AND approval_status = 'approved'").Find(&appointed)
+	database.DB.Where("is_active = TRUE AND deleted_at IS NULL").Find(&appointed)
 	for _, m := range appointed {
 		services.NotifyUser(m.UserID, models.NotifLoanRequest, "Ombi Jipya la Mkopo", msg)
 	}
@@ -398,6 +398,51 @@ func (h *LoanHandler) Disburse(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"message": "Mkopo umetolewa", "data": loan})
+}
+
+// ConfirmReceived records the borrower's acknowledgement that they actually
+// received the disbursed loan. DISTINCT from Disburse: OUTSTANDING means
+// treasury paid it out; BorrowerConfirmedAt means the borrower confirms.
+// PATCH /api/v1/loans/:id/confirm-received — borrower only.
+func (h *LoanHandler) ConfirmReceived(c *fiber.Ctx) error {
+	id := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	var loan models.Loan
+	if err := database.DB.First(&loan, "id = ?", id).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
+	}
+
+	// Borrower-only: the authenticated user must be the loan's member.
+	var me models.Member
+	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&me).Error; err != nil || me.ID != loan.MemberID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Ni mkopaji pekee anayeweza kuthibitisha kupokea mkopo wake"})
+	}
+
+	if loan.Status != models.LoanOutstanding {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"message": "Mkopo haujatoleshwa bado. Hali yake ni: " + string(loan.Status),
+		})
+	}
+	if loan.BorrowerConfirmedAt != nil {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Tayari umethibitisha kupokea mkopo huu"})
+	}
+
+	now := time.Now()
+	if err := database.DB.Model(&models.Loan{}).Where("id = ?", loan.ID).
+		Update("borrower_confirmed_at", now).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuthibitisha"})
+	}
+	loan.BorrowerConfirmedAt = &now
+
+	services.LogAudit(c, &userID, models.AuditUpdate, "loans", &loan.ID,
+		map[string]interface{}{"borrower_confirmed_at": nil},
+		map[string]interface{}{"borrower_confirmed_at": now},
+	)
+	services.NotifyRole(models.RoleTreasurer, models.NotifLoanDisbursed, "Mkopaji Amethibitisha Kupokea",
+		"Mkopaji amethibitisha kupokea mkopo wa TZS "+formatMoney(loan.Amount)+".", "")
+
+	return c.JSON(fiber.Map{"message": "Asante! Umethibitisha kupokea mkopo.", "data": loan})
 }
 
 func (h *LoanHandler) OutstandingReport(c *fiber.Ctx) error {

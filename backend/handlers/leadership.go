@@ -86,7 +86,12 @@ func (h *LeadershipHandler) QuickStats(c *fiber.Ctx) error {
 	})
 }
 
-// PendingLoans returns loans with status PENDING (leadership view).
+// PendingLoans returns loans in the sequential approval chain
+// (Hazina → Katibu → Bodi → Mwenyekiti) with a computed stage per loan:
+//   - awaiting_role: "hazina" | "katibu" | "bodi" | "mwenyekiti" — whose turn it is
+//   - my_turn: whether the CALLING role is the one whose turn it is
+//
+// Supports ?my_turn=true for the role-scoped "loans awaiting MY action" view.
 // GET /api/v1/uongozi/mikopo/pending
 func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 	var loans []models.Loan
@@ -102,13 +107,112 @@ func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 		})
 	}
 
+	role := middleware.GetUserRole(c)
+	myStage := loanStageForRole(role)
+	myTurnOnly := c.Query("my_turn") == "true"
+
+	out := make([]map[string]interface{}, 0, len(loans))
+	for _, loan := range loans {
+		stage := loanAwaitingStage(&loan)
+		if myTurnOnly && (myStage == "" || stage != myStage) {
+			continue
+		}
+		out = append(out, map[string]interface{}{
+			"id":            loan.ID,
+			"member_id":     loan.MemberID,
+			"amount":        loan.Amount,
+			"purpose":       loan.Purpose,
+			"due_date":      loan.DueDate,
+			"status":        loan.Status,
+			"applied_at":    loan.AppliedAt,
+			"member":        loan.Member,
+			"awaiting_role": stage,
+			"my_turn":       myStage != "" && stage == myStage,
+			// Approval trail timestamps (the pipeline chips in the UI)
+			"hazina_approved_at":      loan.HazinaApprovedAt,
+			"katibu_approved_at":      loan.KatibuApprovedAt,
+			"bodi_approved_at":        loan.BodiApprovedAt,
+			"mwenyekiti_approved_at":  loan.MwenyekitiApprovedAt,
+		})
+	}
+
 	return c.JSON(fiber.Map{
-		"data":  loans,
-		"total": len(loans),
+		"data":  out,
+		"total": len(out),
 	})
 }
 
-// ApproveLoan handles sequential loan approval: Hazina → Katibu → Mwenyekiti.
+// loanAwaitingStage computes which sequential-approval stage a PENDING loan
+// is currently waiting at, from the trail timestamps.
+func loanAwaitingStage(l *models.Loan) string {
+	switch {
+	case l.HazinaApprovedAt == nil:
+		return "hazina"
+	case l.KatibuApprovedAt == nil:
+		return "katibu"
+	case l.BodiApprovedAt == nil:
+		return "bodi"
+	default:
+		return "mwenyekiti"
+	}
+}
+
+// loanStageForRole maps a caller's role to its sequential stage
+// ("bodi" covers appointed committee members, whose users.role is member).
+func loanStageForRole(role models.Role) string {
+	switch role {
+	case models.RoleTreasurer:
+		return "hazina"
+	case models.RoleSecretary:
+		return "katibu"
+	case models.RoleChair:
+		return "mwenyekiti"
+	case models.RoleMember:
+		return "bodi"
+	default:
+		return "" // admin has no stage in the chain
+	}
+}
+
+// notifyLoanStage pings the role that is now on turn in the sequential chain.
+func notifyLoanStage(stage string, loan *models.Loan) {
+	msg := "Mkopo wa TZS " + formatMoney(loan.Amount) + " unasubiri idhini yako (Hatua: " + stage + ")."
+	switch stage {
+	case "hazina":
+		services.NotifyRole(models.RoleTreasurer, models.NotifLoanUnderReview, "Mkopo: Zamu ya Hazina", msg, "")
+	case "katibu":
+		services.NotifyRole(models.RoleSecretary, models.NotifLoanUnderReview, "Mkopo: Zamu ya Katibu", msg, "")
+	case "bodi":
+		var appointed []models.LoanCommitteeMember
+		database.DB.Where("is_active = TRUE").Find(&appointed)
+		for _, m := range appointed {
+			services.NotifyUser(m.UserID, models.NotifLoanUnderReview, "Mkopo: Zamu ya Bodi ya Mikopo", msg)
+		}
+	case "mwenyekiti":
+		services.NotifyRole(models.RoleChair, models.NotifLoanUnderReview, "Mkopo: Zamu ya Mwenyekiti", msg, "")
+	}
+}
+
+// notifyLoanApplicantUser notifies the loan's applicant (their member's login,
+// falling back to the registrar like the committee flow does).
+func notifyLoanApplicantUser(loan *models.Loan, ntype models.NotificationType, title, msg string) {
+	var member models.Member
+	if err := database.DB.First(&member, "id = ?", loan.MemberID).Error; err != nil {
+		return
+	}
+	target := ""
+	if member.UserID != nil {
+		target = *member.UserID
+	}
+	if target == "" {
+		target = member.RegisteredBy
+	}
+	if target != "" {
+		services.NotifyUser(target, ntype, title, msg)
+	}
+}
+
+// ApproveLoan handles sequential loan approval: Hazina → Katibu → Bodi → Mwenyekiti.
 // POST /api/v1/uongozi/mikopo/:id/approve
 func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 	id := c.Params("id")
@@ -227,7 +331,24 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		"status": string(loan.Status), "role": string(role),
 	})
 
-	return c.JSON(fiber.Map{"message": "Mkopo umeidhinishwa", "data": loan})
+	// Route the request to the next stage: ping whoever is now on turn.
+	stageMsg := map[string]string{
+		"hazina":     "Imehifadhiwa. Sasa inasubiri idhini ya Katibu.",
+		"katibu":     "Imehifadhiwa. Sasa inasubiri ukaguzi wa Bodi ya Mikopo.",
+		"bodi":       "Imehifadhiwa. Sasa inasubiri idhini ya mwisho ya Mwenyekiti.",
+	}[loanAwaitingStage(&loan)]
+	if loan.Status == models.LoanPending {
+		notifyLoanStage(loanAwaitingStage(&loan), &loan)
+	} else {
+		stageMsg = "Mkopo umekamilika idhini zote. Mweka Hazina atautolea fedha."
+		// Final stage reached: tell the borrower + treasury (disbursement).
+		notifyLoanApplicantUser(&loan, models.NotifLoanApproved, "Mkopo Umeidhinishwa",
+			"Mkopo wako wa TZS "+formatMoney(loan.Amount)+" umefika mwisho wa mfuatano wa idhini. Utatolewa fedha na Mweka Hazina.")
+		services.NotifyRole(models.RoleTreasurer, models.NotifLoanApproved, "Mkopo Umeidhinishwa — Toa Fedha",
+			"Mkopo wa TZS "+formatMoney(loan.Amount)+" umekamilika idhini zote. Toa fedha (Toa Mkopo).", "")
+	}
+
+	return c.JSON(fiber.Map{"message": stageMsg, "data": loan})
 }
 
 // Reports returns leadership reports (delegates to report handler).

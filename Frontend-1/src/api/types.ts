@@ -209,6 +209,8 @@ export interface Loan {
   katibu_approved_at?: string;
   bodi_approved_at?: string;
   mwenyekiti_approved_at?: string;
+  /** BUG-5: set when the borrower confirms receiving the disbursed loan. */
+  borrower_confirmed_at?: string;
   member?: Pick<Member, "id" | "member_no" | "full_name" | "phone">;
   reviewer?: Pick<User, "id" | "name" | "role">;
 }

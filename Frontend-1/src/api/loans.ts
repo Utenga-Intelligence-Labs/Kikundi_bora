@@ -2,12 +2,9 @@ import { api } from "./client";
 import type {
   Loan,
   ApplyLoanRequest,
-  ApproveLoanRequest,
-  RejectLoanRequest,
   LoanWithRepayments,
   PaginatedResponse,
   OutstandingReportResponse,
-  MessageResponse,
 } from "./types";
 
 // --- Loan Disbursement Portfolio (leadership) ---
@@ -52,7 +49,7 @@ export const loansApi = {
     if (params?.to) q.to = params.to;
     const qs = new URLSearchParams(q).toString();
     return api.get<{ data: LoanPortfolioSummary }>(
-      `/loans/portfolio${qs ? `?${qs}` : ""}`
+      `/loans/portfolio${qs ? `?${qs}` : ""}`,
     );
   },
 
@@ -72,15 +69,47 @@ export const loansApi = {
   get: (id: string) => api.get<LoanWithRepayments>(`/loans/${id}`),
   apply: (data: ApplyLoanRequest) =>
     api.post<{ message: string; data: Loan }>("/loans/apply", data),
-  approve: (id: string, data: ApproveLoanRequest) =>
-    api.post<{ message: string; data: Loan }>(`/loans/${id}/approve`, data),
-  reject: (id: string, data: RejectLoanRequest) =>
-    api.post<{ message: string; data: Loan }>(`/loans/${id}/reject`, data),
+  // NOTE (BUG-2 fix): the legacy direct-approve/reject endpoints were removed
+  // — the ONLY approval path is the sequential chain via
+  // POST /uongozi/mikopo/:id/approve (Hazina → Katibu → Bodi → Mwenyekiti).
   disburse: (id: string) =>
     api.post<{ message: string; data: Loan }>(`/loans/${id}/disburse`),
+  /** Borrower acknowledges receiving the disbursed loan (BUG-5). */
+  confirmReceived: (id: string) =>
+    api.patch<{ message: string; data: Loan }>(`/loans/${id}/confirm-received`),
+  /** Sequential-chain queue: loans at the caller's stage with ?my_turn=true. */
+  pendingApproval: (myTurnOnly: boolean) =>
+    api.get<{ data: PendingApprovalLoan[]; total: number }>(
+      `/uongozi/mikopo/pending${myTurnOnly ? "?my_turn=true" : ""}`,
+    ),
+  /** Sequential chain sign-off — the role must currently hold the stage. */
+  chainApprove: (id: string, data?: { approved_amount?: number }) =>
+    api.post<{ message: string; data: Loan }>(
+      `/uongozi/mikopo/${id}/approve`,
+      data ?? {},
+    ),
   outstandingReport: () =>
     api.get<OutstandingReportResponse>("/loans/outstanding-report"),
 };
+
+export type LoanApprovalStage = "hazina" | "katibu" | "bodi" | "mwenyekiti";
+
+export interface PendingApprovalLoan {
+  id: string;
+  member_id: string;
+  amount: string;
+  purpose?: string;
+  due_date: string;
+  status: string;
+  applied_at: string;
+  awaiting_role: LoanApprovalStage;
+  my_turn: boolean;
+  member?: { id: string; member_no: string; full_name: string; phone: string };
+  hazina_approved_at?: string;
+  katibu_approved_at?: string;
+  bodi_approved_at?: string;
+  mwenyekiti_approved_at?: string;
+}
 
 // --- Loan offset (overdue debt paid from member savings) ---
 // Three-role flow: chair proposes → secretary approves/rejects → treasurer executes.
@@ -119,8 +148,15 @@ export const loanOffsetApi = {
   preview: (loanId: string) =>
     api.get<{ data: OffsetPreview }>(`/loans/${loanId}/offset-preview`),
   propose: (loanId: string, reason?: string) =>
-    api.post<{ message: string; data: LoanOffset }>(`/loans/${loanId}/offset-propose`, reason ? { reason } : {}),
-  list: (params?: { status?: string; loan_id?: string; member_id?: string }) => {
+    api.post<{ message: string; data: LoanOffset }>(
+      `/loans/${loanId}/offset-propose`,
+      reason ? { reason } : {},
+    ),
+  list: (params?: {
+    status?: string;
+    loan_id?: string;
+    member_id?: string;
+  }) => {
     const q: Record<string, string> = {};
     if (params?.status) q.status = params.status;
     if (params?.loan_id) q.loan_id = params.loan_id;
@@ -128,9 +164,16 @@ export const loanOffsetApi = {
     return api.get<{ data: LoanOffset[]; total: number }>(`/loan-offsets`, q);
   },
   approve: (id: string) =>
-    api.post<{ message: string; data: LoanOffset }>(`/loan-offsets/${id}/approve`),
+    api.post<{ message: string; data: LoanOffset }>(
+      `/loan-offsets/${id}/approve`,
+    ),
   reject: (id: string, reason?: string) =>
-    api.post<{ message: string; data: LoanOffset }>(`/loan-offsets/${id}/reject`, reason ? { reason } : {}),
+    api.post<{ message: string; data: LoanOffset }>(
+      `/loan-offsets/${id}/reject`,
+      reason ? { reason } : {},
+    ),
   execute: (id: string) =>
-    api.post<{ message: string; data: LoanOffset }>(`/loan-offsets/${id}/execute`),
+    api.post<{ message: string; data: LoanOffset }>(
+      `/loan-offsets/${id}/execute`,
+    ),
 };

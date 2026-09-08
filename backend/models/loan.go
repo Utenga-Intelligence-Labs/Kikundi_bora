@@ -47,6 +47,12 @@ type Loan struct {
 	MwenyekitiApprovedBy *string    `gorm:"type:uuid" json:"mwenyekiti_approved_by,omitempty"`
 	MwenyekitiApprovedAt *time.Time `json:"mwenyekiti_approved_at,omitempty"`
 
+	// Borrower receipt confirmation — distinct from disbursement: OUTSTANDING
+	// means hazina paid it out; BorrowerConfirmedAt means the borrower
+	// acknowledges actually receiving the funds. Set via
+	// PATCH /api/v1/loans/:id/confirm-received (borrower only).
+	BorrowerConfirmedAt *time.Time `json:"borrower_confirmed_at,omitempty"`
+
 	Member    *Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
 	Reviewer  *User   `gorm:"foreignKey:ReviewedBy" json:"reviewer,omitempty"`
 	Disburser *User   `gorm:"foreignKey:DisbursedBy" json:"disburser,omitempty"`

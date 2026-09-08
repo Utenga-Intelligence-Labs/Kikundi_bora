@@ -7,6 +7,7 @@ import {
   useHazinaDashboardSummary,
 } from "@/hooks/use-scoped-dashboard";
 import { AppShell } from "@/components/AppShell";
+import { LoanApprovalsCard } from "@/components/LoanApprovalsCard";
 import { useAuth } from "@/lib/auth-provider";
 import { roleMap, type User } from "@/api/types";
 import { roleSubtitle } from "@/lib/roles";
@@ -36,8 +37,15 @@ import {
   CalendarDays,
   Gift,
 } from "lucide-react";
-import { useWelfareEvents } from "@/hooks/use-welfare";
-import { DissolvedBanner, DissolutionVotingCard } from "@/components/DissolutionCard";
+import {
+  useWelfareEvents,
+  useConfirmWelfareReceipt,
+} from "@/hooks/use-welfare";
+import { useAppModal } from "@/components/AppModal";
+import {
+  DissolvedBanner,
+  DissolutionVotingCard,
+} from "@/components/DissolutionCard";
 import { dissolutionApi } from "@/api/dissolution";
 
 export const Route = createFileRoute("/dashibodi")({
@@ -99,11 +107,29 @@ function DashboardContent({ user }: { user: User }) {
         </span>
       </div>
 
+      {/* BUG-2 fix: role-scoped "loans awaiting my approval" queue (leadership + bodi) */}
+      <div className="mb-5">
+        <LoanApprovalsCard />
+      </div>
+
       {displayRole === "Mwenyekiti" && (
-        <ChairmanView groupId={groupId} memberId={user.member_id || undefined} />
+        <ChairmanView
+          groupId={groupId}
+          memberId={user.member_id || undefined}
+        />
       )}
-      {displayRole === "Mweka Hazina" && <TreasurerView groupId={groupId} memberId={user.member_id || undefined} />}
-      {displayRole === "Katibu" && <SecretaryView groupId={groupId} memberId={user.member_id || undefined} />}
+      {displayRole === "Mweka Hazina" && (
+        <TreasurerView
+          groupId={groupId}
+          memberId={user.member_id || undefined}
+        />
+      )}
+      {displayRole === "Katibu" && (
+        <SecretaryView
+          groupId={groupId}
+          memberId={user.member_id || undefined}
+        />
+      )}
       {displayRole === "Mwanachama" && (
         <MemberView
           userName={user.name}
@@ -118,7 +144,13 @@ function DashboardContent({ user }: { user: User }) {
 }
 
 // ---------- MWENYEKITI ----------
-function ChairmanView({ groupId, memberId }: { groupId?: string; memberId?: string }) {
+function ChairmanView({
+  groupId,
+  memberId,
+}: {
+  groupId?: string;
+  memberId?: string;
+}) {
   const { isLoading: groupLoading } = useGroupDashboardSummary(groupId);
 
   if (!groupId || groupLoading) return <LoadingSkeleton />;
@@ -142,7 +174,13 @@ function ChairmanView({ groupId, memberId }: { groupId?: string; memberId?: stri
 }
 
 // ---------- MWEKA HAZINA ----------
-function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: string }) {
+function TreasurerView({
+  groupId,
+  memberId,
+}: {
+  groupId?: string;
+  memberId?: string;
+}) {
   const {
     data: hazinData,
     isLoading,
@@ -158,7 +196,9 @@ function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: str
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
             <h3 className="font-semibold text-sm mb-1">Imeshinikana kupakia</h3>
-            <p className="text-xs text-muted-foreground">Haijapatikana data ya hazina. Tafadhali jaribu tena.</p>
+            <p className="text-xs text-muted-foreground">
+              Haijapatikana data ya hazina. Tafadhali jaribu tena.
+            </p>
           </div>
         </div>
       </div>
@@ -179,7 +219,10 @@ function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: str
           value={tzs(Number(hazinData.cash_in_this_period ?? 0))}
           stats={[
             ["Imechukuniwa", tzs(hazinData.cash_in_confirmed ?? 0)],
-            ["Inasub.", `${tzs(hazinData.cash_in_pending ?? 0)} (${hazinData.cash_in_pending_count})`],
+            [
+              "Inasub.",
+              `${tzs(hazinData.cash_in_pending ?? 0)} (${hazinData.cash_in_pending_count})`,
+            ],
             ["Marejesho", tzs(hazinData.repayments_this_month ?? 0)],
             ["Salio", tzs(hazinData.available_balance ?? 0)],
           ]}
@@ -196,12 +239,17 @@ function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: str
           <SectionTitle>Mikopo iliyopewa karibuni</SectionTitle>
           <div className="card-surface divide-y divide-border">
             {(hazinData.recent_disbursements ?? []).slice(0, 5).map((d) => (
-              <div key={d.loan_id} className="flex items-center justify-between px-4 py-3">
+              <div
+                key={d.loan_id}
+                className="flex items-center justify-between px-4 py-3"
+              >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{d.full_name}</p>
                   <p className="text-xs text-muted-foreground">{d.member_no}</p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold">{tzs(Number(d.amount))}</p>
+                <p className="shrink-0 text-sm font-semibold">
+                  {tzs(Number(d.amount))}
+                </p>
               </div>
             ))}
           </div>
@@ -212,7 +260,13 @@ function TreasurerView({ groupId, memberId }: { groupId?: string; memberId?: str
 }
 
 // ---------- KATIBU ----------
-function SecretaryView({ groupId, memberId }: { groupId?: string; memberId?: string }) {
+function SecretaryView({
+  groupId,
+  memberId,
+}: {
+  groupId?: string;
+  memberId?: string;
+}) {
   const {
     data: katibuData,
     isLoading,
@@ -227,7 +281,9 @@ function SecretaryView({ groupId, memberId }: { groupId?: string; memberId?: str
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-sm mb-1">Imeshindikana kupakia</h3>
+            <h3 className="font-semibold text-sm mb-1">
+              Imeshindikana kupakia
+            </h3>
             <p className="text-xs text-muted-foreground">
               Haijapatikana data ya katibu. Tafadhali jaribu tena.
             </p>
@@ -250,16 +306,26 @@ function SecretaryView({ groupId, memberId }: { groupId?: string; memberId?: str
           label="Wanachama wa Kikundi"
           value={String(katibuData.total_active_members ?? 0)}
           stats={[
-            ["Wapya mwezi huu", String(katibuData.members_joined_this_month ?? 0)],
+            [
+              "Wapya mwezi huu",
+              String(katibuData.members_joined_this_month ?? 0),
+            ],
             ["Waliondoka", String(katibuData.members_left_this_month ?? 0)],
-            ["Inasub. idhinisho", String(katibuData.pending_user_approvals ?? 0)],
+            [
+              "Inasub. idhinisho",
+              String(katibuData.pending_user_approvals ?? 0),
+            ],
             ["Walichelewa", String(katibuData.late_payments_count ?? 0)],
           ]}
         />
       </div>
       <SectionTitle>Kazi zako</SectionTitle>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <QuickAction to="/wanachama" icon={ClipboardList} label="Sajili Mwanachama" />
+        <QuickAction
+          to="/wanachama"
+          icon={ClipboardList}
+          label="Sajili Mwanachama"
+        />
         <QuickAction to="/michango" icon={PiggyBank} label="Kumbukumbu" />
         <QuickAction to="/ripoti" icon={TrendingUp} label="Andaa Ripoti" />
       </div>
@@ -278,7 +344,9 @@ function SecretaryView({ groupId, memberId }: { groupId?: string; memberId?: str
                     {p.member_no} • {p.period_label}
                   </p>
                 </div>
-                <span className="chip bg-destructive/30 text-destructive">Chelezo</span>
+                <span className="chip bg-destructive/30 text-destructive">
+                  Chelezo
+                </span>
               </div>
             ))}
           </div>
@@ -317,13 +385,18 @@ function MemberView({
   const isPendingCycle = cycleStatus === "pending";
 
   // Welfare payouts awaiting THIS member's receipt confirmation.
-  const { data: welfareData } = useWelfareEvents({ status: "COMPLETED", limit: 100 });
+  const { data: welfareData } = useWelfareEvents({
+    status: "COMPLETED",
+    limit: 100,
+  });
+  const confirmWelfareReceipt = useConfirmWelfareReceipt();
+  const { showModal } = useAppModal();
   const awaitingReceipt = (welfareData?.data ?? []).filter(
     (ev: any) =>
       !!ev.disbursed_at &&
       !ev.received_at &&
       !!memberId &&
-      (ev.member?.id === memberId || ev.member_id === memberId)
+      (ev.member?.id === memberId || ev.member_id === memberId),
   );
 
   const {
@@ -338,9 +411,13 @@ function MemberView({
     return (
       <div className="card-surface p-6 text-center">
         <AlertCircle className="mx-auto h-10 w-10 text-warning" />
-        <h2 className="mt-3 font-display text-lg font-bold">Jisajili kama mwanachama</h2>
+        <h2 className="mt-3 font-display text-lg font-bold">
+          Jisajili kama mwanachama
+        </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Karibu <span className="font-semibold">{userName}</span> — kamilisha usajili wako kupitia ukurasa wa wasifu ili uweze kuomba mikopo na kuona michango yako.
+          Karibu <span className="font-semibold">{userName}</span> — kamilisha
+          usajili wako kupitia ukurasa wa wasifu ili uweze kuomba mikopo na
+          kuona michango yako.
         </p>
         <Link
           to="/wasifu"
@@ -358,7 +435,9 @@ function MemberView({
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-sm mb-1">Imeshindikana kupakia</h3>
+            <h3 className="font-semibold text-sm mb-1">
+              Imeshindikana kupakia
+            </h3>
             <p className="text-xs text-muted-foreground">
               Haijapatikana data ya akiba yako. Tafadhali jaribu tena.
             </p>
@@ -378,7 +457,7 @@ function MemberView({
           <Gift className="h-5 w-5 shrink-0 text-amber-600" />
           <div>
             <p className="text-sm font-semibold">
-              Fedha za kijamii zimetolewa — thibitisha kupokea
+              Fedha za kijamii zimetolewa kwa niaba yako
             </p>
             <p className="text-xs text-muted-foreground">
               {awaitingReceipt.length === 1
@@ -386,34 +465,81 @@ function MemberView({
                 : `Mifuko ${awaitingReceipt.length} inasubiri uthibitisho wako`}
             </p>
           </div>
-          <Link
-            to="/mfuko-kijamii"
-            className="ml-auto shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
-          >
-            Angalia
-          </Link>
+          {/* BUG-4: inline "Nimepokea" confirmation — the beneficiary closes the
+              loop right here; leadership sees the received status afterwards. */}
+          {awaitingReceipt.length === 1 ? (
+            <button
+              data-testid="confirm-welfare-received"
+              onClick={async () => {
+                try {
+                  await confirmWelfareReceipt.mutateAsync(
+                    awaitingReceipt[0].id,
+                  );
+                  showModal({
+                    title: "Imefanikiwa",
+                    message: "Asante! Umethibitisha kupokea fedha.",
+                    variant: "success",
+                    primaryLabel: "Sawa",
+                  });
+                } catch (e) {
+                  showModal({
+                    title: "Hitilafu",
+                    message: (e as Error).message,
+                    variant: "error",
+                    primaryLabel: "Sawa",
+                  });
+                }
+              }}
+              disabled={confirmWelfareReceipt.isPending}
+              className="ml-auto shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600 disabled:opacity-50"
+            >
+              Nimepokea
+            </button>
+          ) : (
+            <Link
+              to="/mfuko-kijamii"
+              className="ml-auto shrink-0 rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-600"
+            >
+              Angalia
+            </Link>
+          )}
         </div>
       )}
       {(fixedAmount != null || nextDue) && !hideBanner && (
-        <div className={`card-surface p-4 mb-4 border-l-4 flex items-center gap-3 ${isPendingCycle ? "border-l-warning" : "border-l-primary"}`}>
-          <CalendarDays className={`h-5 w-5 shrink-0 ${isPendingCycle ? "text-warning" : "text-primary"}`} />
+        <div
+          className={`card-surface p-4 mb-4 border-l-4 flex items-center gap-3 ${isPendingCycle ? "border-l-warning" : "border-l-primary"}`}
+        >
+          <CalendarDays
+            className={`h-5 w-5 shrink-0 ${isPendingCycle ? "text-warning" : "text-primary"}`}
+          />
           <div>
             {isPendingCycle ? (
               <>
-                <p className="text-sm font-semibold">Mchango wa kipindi hiki umeshapokelewa ✓</p>
+                <p className="text-sm font-semibold">
+                  Mchango wa kipindi hiki umeshapokelewa ✓
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Unasubiri uthibitisho wa Hazina{nextDue ? ` · kipindi kijacho kinaanza baada ya ${nextDue}` : ""}
+                  Unasubiri uthibitisho wa Hazina
+                  {nextDue
+                    ? ` · kipindi kijacho kinaanza baada ya ${nextDue}`
+                    : ""}
                 </p>
               </>
             ) : (
               <>
                 <p className="text-sm font-semibold">
                   Mchango ujao
-                  {fixedAmount != null && <>: TZS {fixedAmount.toLocaleString()}</>}
+                  {fixedAmount != null && (
+                    <>: TZS {fixedAmount.toLocaleString()}</>
+                  )}
                   {nextDue && <> · ifikapo {nextDue}</>}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Kipindi: {settingsData ? INTERVAL_LABELS[settingsData.data.contribution_interval] : "—"} · Wasilisha kupitia "Weka Mchango"
+                  Kipindi:{" "}
+                  {settingsData
+                    ? INTERVAL_LABELS[settingsData.data.contribution_interval]
+                    : "—"}{" "}
+                  · Wasilisha kupitia "Weka Mchango"
                 </p>
               </>
             )}
@@ -436,7 +562,11 @@ function MemberView({
       )}
       <HeroBalance
         label="Akiba Yangu"
-        value={tzs(Number(memberData.available_savings ?? memberData.total_contributions ?? 0))}
+        value={tzs(
+          Number(
+            memberData.available_savings ?? memberData.total_contributions ?? 0,
+          ),
+        )}
         stats={[
           ["Michango", String(memberData.contributions_count ?? 0)],
           ["Mikopo wazi", String(memberData.outstanding_loans_count ?? 0)],
@@ -447,10 +577,13 @@ function MemberView({
       {Number(memberData.total_offsets_applied ?? 0) > 0 && (
         <div className="card-surface mt-3 border-l-4 border-l-amber-500 p-4">
           <p className="text-sm font-semibold">
-            Akiba iliyotumika kulipa mkopo uliochelewa: {tzs(Number(memberData.total_offsets_applied))}
+            Akiba iliyotumika kulipa mkopo uliochelewa:{" "}
+            {tzs(Number(memberData.total_offsets_applied))}
           </p>
           <p className="text-xs text-muted-foreground">
-            Jumla ya michango: {tzs(Number(memberData.total_contributions ?? 0))} · Angalia historia hapa chini kwa maelezo.
+            Jumla ya michango:{" "}
+            {tzs(Number(memberData.total_contributions ?? 0))} · Angalia
+            historia hapa chini kwa maelezo.
           </p>
         </div>
       )}
@@ -460,9 +593,13 @@ function MemberView({
           <CheckCircle2 className="h-8 w-8 text-success" />
           <div>
             <p className="text-sm font-semibold">
-              {meMemberNo ? `Mwanachama #${meMemberNo}` : `Mwanachama #${memberId?.slice(0, 8)}`}
+              {meMemberNo
+                ? `Mwanachama #${meMemberNo}`
+                : `Mwanachama #${memberId?.slice(0, 8)}`}
             </p>
-            <p className="text-xs text-muted-foreground">Namba ya simu: {mePhone}</p>
+            <p className="text-xs text-muted-foreground">
+              Namba ya simu: {mePhone}
+            </p>
           </div>
         </div>
         <div className="card-surface p-4">
@@ -481,22 +618,37 @@ function MemberView({
         <div className="card-surface divide-y divide-border">
           {(memberData.recent_contributions ?? []).slice(0, 6).map((c, i) =>
             c.source === "loan_offset" ? (
-              <div key={`${c.created_at}-${i}`} className="flex items-center justify-between gap-3 bg-amber-50 px-4 py-3">
+              <div
+                key={`${c.created_at}-${i}`}
+                className="flex items-center justify-between gap-3 bg-amber-50 px-4 py-3"
+              >
                 <div>
                   <p className="text-sm font-medium">
-                    Akiba yako imetumika kulipa mkopo uliochelewa — {tzs(c.amount)}
+                    Akiba yako imetumika kulipa mkopo uliochelewa —{" "}
+                    {tzs(c.amount)}
                   </p>
-                  <p className="text-xs text-muted-foreground">{c.period_label} · punguzo la akiba, si malipo ya kawaida</p>
+                  <p className="text-xs text-muted-foreground">
+                    {c.period_label} · punguzo la akiba, si malipo ya kawaida
+                  </p>
                 </div>
-                <span className="chip shrink-0 bg-amber-200 text-amber-800">OFFSET</span>
+                <span className="chip shrink-0 bg-amber-200 text-amber-800">
+                  OFFSET
+                </span>
               </div>
             ) : (
-              <div key={`${c.created_at}-${i}`} className="flex items-center justify-between px-4 py-3">
+              <div
+                key={`${c.created_at}-${i}`}
+                className="flex items-center justify-between px-4 py-3"
+              >
                 <div>
                   <p className="text-sm font-medium">{tzs(c.amount)}</p>
-                  <p className="text-xs text-muted-foreground">{c.period_label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {c.period_label}
+                  </p>
                 </div>
-                <span className="chip bg-success/15 text-success">{c.status}</span>
+                <span className="chip bg-success/15 text-success">
+                  {c.status}
+                </span>
               </div>
             ),
           )}
@@ -556,7 +708,9 @@ function AdminView() {
             <Activity className="h-6 w-6" />
           </span>
           <div>
-            <p className="text-2xl font-bold">{health?.recent_logins_24h ?? 0}</p>
+            <p className="text-2xl font-bold">
+              {health?.recent_logins_24h ?? 0}
+            </p>
             <p className="text-xs text-muted-foreground">Waliingia leo</p>
           </div>
         </div>
@@ -574,11 +728,23 @@ function AdminView() {
 }
 
 // ---------- shared bits ----------
-function HeroBalance({ label, value, stats }: { label: string; value: string; stats: [string, string][] }) {
+function HeroBalance({
+  label,
+  value,
+  stats,
+}: {
+  label: string;
+  value: string;
+  stats: [string, string][];
+}) {
   return (
     <section className="hero-surface px-5 py-6 lg:px-7 lg:py-8">
-      <p className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">{label}</p>
-      <p className="mt-2 font-display text-4xl font-extrabold lg:text-5xl">{value}</p>
+      <p className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">
+        {label}
+      </p>
+      <p className="mt-2 font-display text-4xl font-extrabold lg:text-5xl">
+        {value}
+      </p>
       <div className="mt-5 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
         {stats.map(([k, v]) => (
           <div key={k} className="rounded-xl bg-white/15 px-3 py-2.5">
@@ -592,12 +758,27 @@ function HeroBalance({ label, value, stats }: { label: string; value: string; st
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 mt-7 font-display text-base font-semibold">{children}</h2>;
+  return (
+    <h2 className="mb-3 mt-7 font-display text-base font-semibold">
+      {children}
+    </h2>
+  );
 }
 
-function QuickAction({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
+function QuickAction({
+  to,
+  icon: Icon,
+  label,
+}: {
+  to: string;
+  icon: any;
+  label: string;
+}) {
   return (
-    <Link to={to} className="card-surface flex items-center gap-3 p-3.5 transition-colors hover:border-primary/40">
+    <Link
+      to={to}
+      className="card-surface flex items-center gap-3 p-3.5 transition-colors hover:border-primary/40"
+    >
       <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground">
         <Icon className="h-5 w-5" strokeWidth={2.25} />
       </span>
@@ -607,10 +788,18 @@ function QuickAction({ to, icon: Icon, label }: { to: string; icon: any; label: 
 }
 
 function DissolutionBannerForDashboard({ groupId }: { groupId?: string }) {
-  const { data } = useQuery({ queryKey: ["dissolution","list",groupId], queryFn: ()=>dissolutionApi.listByGroup(groupId!), enabled: !!groupId });
-  const open = data?.data?.find(p=>p.status==="voting_open");
+  const { data } = useQuery({
+    queryKey: ["dissolution", "list", groupId],
+    queryFn: () => dissolutionApi.listByGroup(groupId!),
+    enabled: !!groupId,
+  });
+  const open = data?.data?.find((p) => p.status === "voting_open");
   if (!open) return null;
-  return <div className="mb-4"><DissolutionVotingCard proposalId={open.id} /></div>;
+  return (
+    <div className="mb-4">
+      <DissolutionVotingCard proposalId={open.id} />
+    </div>
+  );
 }
 
 function LoadingSkeleton() {

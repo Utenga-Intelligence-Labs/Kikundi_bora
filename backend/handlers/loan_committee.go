@@ -492,31 +492,38 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		Count(&approveCount)
 
 	if approveCount >= totalCommittee {
-		loan.Status = models.LoanApproved
-		loan.ApprovedAmount = &loan.Amount
-		loan.ReviewedBy = &userID
-		loan.ReviewedAt = &now
+		// Committee unanimous → this satisfies the BODI stage of the
+		// sequential chain (Hazina → Katibu → Bodi → Mwenyekiti). It does
+		// NOT finalize the loan: Mwenyekiti still gives the final approval
+		// via POST /uongozi/mikopo/:id/approve. Status returns to PENDING
+		// so the chain can continue.
+		loan.Status = models.LoanPending
+		if loan.BodiApprovedAt == nil {
+			loan.BodiApprovedBy = &userID
+			loan.BodiApprovedAt = &now
+		}
 		if err := tx.Save(&loan).Error; err != nil {
 			tx.Rollback()
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Imeshindikana kuidhinisha mkopo",
+				"message": "Imeshindikana kuhifadhi uamuzi wa kamati",
 			})
 		}
 		if err := tx.Commit().Error; err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"message": "Imeshindikana kuidhinisha mkopo",
+				"message": "Imeshindikana kuhifadhi uamuzi wa kamati",
 			})
 		}
 
-		services.LogAudit(c, &userID, models.AuditApprove, "loans", &loan.ID,
+		services.LogAudit(c, &userID, models.AuditLoanReview, "loans", &loan.ID,
 			map[string]interface{}{"status": string(models.LoanUnderReview)},
-			map[string]interface{}{"status": "APPROVED", "approved_amount": loan.Amount},
+			map[string]interface{}{"status": string(models.LoanPending), "stage": "bodi_done"},
 		)
-		h.notifyLoanApplicant(loan, models.NotifLoanApproved, "Mkopo Umeidhinishwa",
-			"Mkopo wako wa TZS "+formatMoney(loan.Amount)+" umeidhinishwa na kamati nzima ya mikopo.")
+		services.NotifyRole(models.RoleChair, models.NotifLoanUnderReview,
+			"Mkopo: Zamu ya Mwenyekiti",
+			"Bodi ya mikopo imeimaliza ukaguzi. Mkopo wa TZS "+formatMoney(loan.Amount)+" unasubiri idhini yako ya mwisho.", "")
 
 		return c.JSON(fiber.Map{
-			"message": "Ukaguzi umehifadhiwa. Mkopo umeidhinishwa na kamati nzima!",
+			"message": "Ukaguzi umehifadhiwa. Kamati nzima imeidhinisha — sasa inasubiri idhini ya mwisho ya Mwenyekiti.",
 			"data":    loan,
 		})
 	}
