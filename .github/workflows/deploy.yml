@@ -122,9 +122,9 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-        envs: GHCR_TOKEN,GHCR_ACTOR,TAG,GHCR_OWNER,PUBLIC_HOST
-        command_timeout: 20m
-        script: |
+          envs: GHCR_TOKEN,GHCR_ACTOR,TAG,GHCR_OWNER,PUBLIC_HOST
+          command_timeout: 20m
+          script: |
               set -euo pipefail
               cd "${{ secrets.VPS_DEPLOY_PATH }}"
 
