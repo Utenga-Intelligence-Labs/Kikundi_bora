@@ -26,12 +26,12 @@
 services:
   backend:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set (lowercase github owner)}/kikundibora-backend:${TAG:-latest}
-    ports:
+    ports: !override
       - "127.0.0.1:${BACKEND_PORT:-5050}:8080"
 
   frontend:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set (lowercase github owner)}/kikundibora-frontend:${TAG:-latest}
-    ports:
+    ports: !override
       - "127.0.0.1:${FRONTEND_PORT:-5051}:8080"
 
   db:
