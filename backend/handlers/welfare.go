@@ -375,14 +375,13 @@ func (h *WelfareHandler) DisburseEvent(c *fiber.Ctx) error {
 
 // ---------- BENEFICIARY (or leadership): Confirm receipt of payout ----------
 // ConfirmReceipt records that the beneficiary member received the disbursed
-// welfare money. Allowed for the event's own member (via their login) and
-// for leadership (chair/secretary/treasurer, e.g. cash handover witnessed).
-// Only COMPLETED, not-yet-received events can be confirmed.
+// welfare money. ONLY the event's own member (via their login) may confirm —
+// leadership witnessing a handover does not substitute for the beneficiary's
+// acknowledgement. Only COMPLETED, not-yet-received events can be confirmed.
 // POST /api/v1/welfare/events/:id/confirm-receipt
 func (h *WelfareHandler) ConfirmReceipt(c *fiber.Ctx) error {
 	id := c.Params("id")
 	userID := middleware.GetUserID(c)
-	role := middleware.GetUserRole(c)
 
 	var event models.WelfareEvent
 	if err := database.DB.First(&event, "id = ?", id).Error; err != nil {
@@ -397,14 +396,11 @@ func (h *WelfareHandler) ConfirmReceipt(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusConflict).JSON(fiber.Map{"message": "Mapokezi tayari yamethibitishwa"})
 	}
 
-	// Authorize: the beneficiary member themselves, or leadership.
-	allowed := role == models.RoleChair || role == models.RoleSecretary ||
-		role == models.RoleTreasurer || role == models.RoleAdmin
-	if !allowed {
-		var me models.Member
-		if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&me).Error; err != nil || me.ID != event.MemberID {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Ni mlengwa au uongozi pekee ndio wanaoweza kuthibitisha mapokezi"})
-		}
+	// Authorize: the beneficiary member themselves — nobody else, including
+	// leadership (closed loop: the money must be acknowledged by its recipient).
+	var me models.Member
+	if err := database.DB.Where("user_id = ? AND deleted_at IS NULL", userID).First(&me).Error; err != nil || me.ID != event.MemberID {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Ni mlengwa pekee ndiye anayeweza kuthibitisha mapokezi"})
 	}
 
 	now := time.Now()

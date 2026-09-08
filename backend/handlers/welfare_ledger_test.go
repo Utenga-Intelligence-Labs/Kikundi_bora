@@ -139,17 +139,44 @@ func TestWelfareConfirmReceipt(t *testing.T) {
 		t.Fatalf("stranger confirm = %d, want 403", code)
 	}
 
-	// Leadership confirm succeeds.
+	// Leadership confirm is NO LONGER allowed — only the beneficiary may
+	// confirm receipt (BUG-4 fix: closed loop, recipient acknowledges).
 	code, _ = doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok)
+	if code != 403 {
+		t.Fatalf("leadership confirm = %d, want 403", code)
+	}
+
+	// The beneficiary herself confirms → 200.
+	beneficiaryTok := linkBeneficiaryLogin(t, eventID)
+	code, _ = doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, beneficiaryTok)
 	if code != 200 {
-		t.Fatalf("leadership confirm = %d, want 200", code)
+		t.Fatalf("beneficiary confirm = %d, want 200", code)
 	}
 
 	// Repeat → 409.
-	if code, _ := doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok); code != 409 {
+	if code, _ := doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, beneficiaryTok); code != 409 {
 		t.Fatalf("double confirm = %d, want 409", code)
 	}
 	_ = treasurerTok
+}
+
+// linkBeneficiaryLogin creates a login for the welfare event's beneficiary
+// member (seed members have no linked user) and returns a bearer token.
+func linkBeneficiaryLogin(t *testing.T, eventID string) string {
+	t.Helper()
+	var ev models.WelfareEvent
+	database.DB.First(&ev, "id = ?", eventID)
+
+	pwd, _ := bcrypt.GenerateFromPassword([]byte("Beneficiary123"), bcrypt.MinCost)
+	u := models.User{
+		Name: "Beneficiary Login", Phone: "0718888877", Password: string(pwd),
+		Role: models.RoleMember, Status: models.UserStatusActive, IsActive: true,
+	}
+	if err := database.DB.Create(&u).Error; err != nil {
+		t.Fatalf("create beneficiary user: %v", err)
+	}
+	database.DB.Model(&models.Member{}).Where("id = ?", ev.MemberID).Update("user_id", u.ID)
+	return doLogin(t, welfareLedgerApp(), u.Phone, "Beneficiary123")
 }
 
 func welfareFundBalance(t *testing.T) decimal.Decimal {
@@ -214,8 +241,15 @@ func TestWelfareDisbursePostsLedgerAndReceipt(t *testing.T) {
 		t.Fatalf("unauthenticated confirm = %d, want 401", code)
 	}
 
-	// Leadership confirm succeeds (beneficiary path covered by role branch).
+	// Leadership confirm is no longer allowed (BUG-4 fix).
 	code, _ = doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok)
+	if code != 403 {
+		t.Fatalf("leadership confirm = %d, want 403", code)
+	}
+
+	// The beneficiary confirms → receipt recorded with their identity.
+	beneficiaryTok := linkBeneficiaryLogin(t, eventID)
+	code, _ = doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, beneficiaryTok)
 	if code != 200 {
 		t.Fatalf("confirm receipt = %d, want 200", code)
 	}
@@ -225,7 +259,7 @@ func TestWelfareDisbursePostsLedgerAndReceipt(t *testing.T) {
 	}
 
 	// Double confirm must fail.
-	if code, _ := doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, chairTok); code != 409 {
+	if code, _ := doRequest(t, app, "POST", "/api/v1/welfare/events/"+eventID+"/confirm-receipt", nil, beneficiaryTok); code != 409 {
 		t.Fatalf("double confirm = %d, want 409", code)
 	}
 }
