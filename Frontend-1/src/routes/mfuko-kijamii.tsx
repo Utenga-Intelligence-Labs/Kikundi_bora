@@ -388,11 +388,14 @@ function EventDetailDialog({ eventId, onClose }: { eventId: string; onClose: () 
     stats.pending_count === 0;
   const isBeneficiary =
     !!user?.member_id && event.member?.id != null && user.member_id === event.member.id;
+  // BUG-4 fix: ONLY the beneficiary can confirm receipt — leadership witnessing
+  // a handover does not substitute for the recipient's acknowledgement
+  // (the backend now enforces this too).
   const canConfirmReceipt =
     event.status === "COMPLETED" &&
     !!event.disbursed_at &&
     !event.received_at &&
-    (isBeneficiary || isLeadership);
+    isBeneficiary;
 
   return (
     <Modal title="Taarifa za Tukio" onClose={onClose}>
