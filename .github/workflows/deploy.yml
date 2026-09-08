@@ -118,20 +118,35 @@ jobs:
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
             echo "==> 3/6 wire db password (same rule as setup.sh: compose reads it from the host env, backend from backend/.env)"
-            POSTGRES_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' backend/.env | head -n 1)"
-            [ -n "$POSTGRES_PASSWORD" ] || { echo "ERROR: DB_PASSWORD empty in backend/.env"; exit 1; }
+            ENV_FILE="backend/.env"
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "WARN: $ENV_FILE missing; rebuilding from backend/.env.example"
+              cp backend/.env.example "$ENV_FILE"
+              RECOVERED_DB_PASSWORD="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-db 2>/dev/null | sed -n 's/^POSTGRES_PASSWORD=//p' | head -n 1 || true)"
+              RECOVERED_JWT_SECRET="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-backend 2>/dev/null | sed -n 's/^JWT_SECRET=//p' | head -n 1 || true)"
+              RECOVERED_ADMIN_PASSWORD="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-backend 2>/dev/null | sed -n 's/^ADMIN_PASSWORD=//p' | head -n 1 || true)"
+              POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$RECOVERED_DB_PASSWORD}"
+              [ -n "$POSTGRES_PASSWORD" ] || POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+              JWT_SECRET="${RECOVERED_JWT_SECRET:-$(openssl rand -hex 32)}"
+              ADMIN_PASSWORD="${RECOVERED_ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
+              sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$POSTGRES_PASSWORD|" "$ENV_FILE"
+              sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" "$ENV_FILE"
+              sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$ENV_FILE"
+            fi
+            POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" | head -n 1)}"
+            [ -n "$POSTGRES_PASSWORD" ] || { echo "ERROR: DB_PASSWORD empty in $ENV_FILE"; exit 1; }
             export POSTGRES_PASSWORD
 
             echo "==> 4/6 ensure public origin in backend CORS (browsers block the SPA otherwise)"
             PUBLIC_ORIGIN="https://$PUBLIC_HOST"
             CORS_CHANGED=0
-            if grep -q '^CORS_ORIGINS=' backend/.env; then
-              if ! grep -q "$PUBLIC_ORIGIN" backend/.env; then
-                sed -i "s|^CORS_ORIGINS=.*|&,${PUBLIC_ORIGIN}|" backend/.env
+            if grep -q '^CORS_ORIGINS=' "$ENV_FILE"; then
+              if ! grep -q "$PUBLIC_ORIGIN" "$ENV_FILE"; then
+                sed -i "s|^CORS_ORIGINS=.*|&,${PUBLIC_ORIGIN}|" "$ENV_FILE"
                 CORS_CHANGED=1
               fi
             else
-              printf '\nCORS_ORIGINS=%s\n' "$PUBLIC_ORIGIN" >> backend/.env
+              printf '\nCORS_ORIGINS=%s\n' "$PUBLIC_ORIGIN" >> "$ENV_FILE"
               CORS_CHANGED=1
             fi
             # env_file changes do not trigger a recreate on their own, so
