@@ -12,6 +12,8 @@ import {
   useWelfareEvent,
   useCreateWelfareEvent,
   useDisburseWelfareEvent,
+  useApproveWelfareEvent,
+  useRejectWelfareEvent,
   welfareKeys,
 } from "@/hooks/use-welfare";
 import { welfareApi, type WelfareEventType, type WelfareFundingSource } from "@/api/welfare";
@@ -31,13 +33,13 @@ import {
 export const Route = createFileRoute("/uongozi/mfuko")({
   head: () => ({
     meta: [
-      { title: "Mfuko wa Kijamii (Usimamizi) — Money Seeking" },
-      { name: "description", content: "Usimamizi wa mifuko ya kijamii kwa Mweka Hazina: matukio, michango ya kila mwanachama, malipo." },
+      { title: "Mfuko wa Kijamii (Uongozi) — Money Seeking" },
+      { name: "description", content: "Usimamizi wa mifuko ya kijamii kwa uongozi (Mwenyekiti, Katibu, Mweka Hazina): matukio, michango ya kila mwanachama, malipo." },
     ],
   }),
   beforeLoad: () => {
     requireAuth();
-    requireRole("treasurer");
+    requireRole("treasurer", "chair", "secretary");
     blockAdminFromPage();
   },
   component: MfukoManagementPage,
@@ -82,19 +84,29 @@ function MfukoManagementPage() {
   const { data: eventsData } = useWelfareEvents({ limit: 100 });
   const events = eventsData?.data ?? [];
 
-  if (user?.role !== "treasurer") return null;
+  // Uongozi page: all three leadership roles can view & follow up; only
+  // Mweka Hazina handles money (unda tukio, rekodi/samehe/ondoa, toa fedha);
+  // Mwenyekiti/Katibu idhinisha au kataa matukio.
+  const isTreasurer = user?.role === "treasurer";
+  const isApprover = user?.role === "chair" || user?.role === "secretary";
 
   return (
     <AppShell
-      title="Mfuko wa Kijamii — Usimamizi"
-      subtitle="Matukio, michango ya kila mwanachama, na malipo (Mweka Hazina)"
+      title="Mfuko wa Kijamii — Uongozi"
+      subtitle={
+        isTreasurer
+          ? "Matukio, michango ya kila mwanachama, na malipo (Mweka Hazina)"
+          : "Idhinisha matukio na fuatilia michango ya kila mwanachama"
+      }
       action={
-        <button
-          onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
-        >
-          <Plus className="h-4 w-4" /> Unda Tukio
-        </button>
+        isTreasurer ? (
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            <Plus className="h-4 w-4" /> Unda Tukio
+          </button>
+        ) : null
       }
     >
       <div className="card-surface p-4 mb-4">
@@ -116,7 +128,7 @@ function MfukoManagementPage() {
 
       {showCreate && <CreateEventCard onClose={() => setShowCreate(false)} />}
       {eventId ? (
-        <EventManageCard key={eventId} eventId={eventId} />
+        <EventManageCard key={eventId} eventId={eventId} isTreasurer={isTreasurer} isApprover={isApprover} />
       ) : (
         <div className="card-surface p-8 text-center">
           <HeartHandshake className="mx-auto h-10 w-10 text-muted-foreground/50" />
@@ -215,15 +227,30 @@ function CreateEventCard({ onClose }: { onClose: () => void }) {
   );
 }
 
-function EventManageCard({ eventId }: { eventId: string }) {
+function EventManageCard({
+  eventId,
+  isTreasurer,
+  isApprover,
+}: {
+  eventId: string;
+  isTreasurer: boolean;
+  isApprover: boolean;
+}) {
   const { showModal } = useAppModal();
   const qc = useQueryClient();
   const { data, isLoading } = useWelfareEvent(eventId);
   const actions = useTreasuryWelfareAction();
   const disburseEvent = useDisburseWelfareEvent();
+  const approveEvent = useApproveWelfareEvent();
+  const rejectEvent = useRejectWelfareEvent();
   const [payRow, setPayRow] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const onError = (e: Error) =>
+    showModal({ title: "Hitilafu", message: e.message, variant: "error", primaryLabel: "Sawa" });
 
   if (isLoading) {
     return (
@@ -265,7 +292,64 @@ function EventManageCard({ eventId }: { eventId: string }) {
           </div>
           <span className="chip text-[10px]">{event.status}</span>
         </div>
-        {canDisburse && (
+        {isApprover && event.status === "PENDING" && (
+          <div className="mt-3">
+            {rejecting ? (
+              <div className="space-y-2">
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Andika sababu ya kukataa..."
+                  rows={2}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      rejectEvent.mutate(
+                        { id: event.id, data: { reason: rejectReason || "Haijatolewa sababu" } },
+                        { onSuccess: () => { setRejecting(false); setRejectReason(""); } , onError }
+                      );
+                    }}
+                    disabled={rejectEvent.isPending}
+                    className="flex-1 rounded-xl bg-destructive px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {rejectEvent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Thibitisha Kukataa
+                  </button>
+                  <button
+                    onClick={() => { setRejecting(false); setRejectReason(""); }}
+                    className="rounded-xl border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted"
+                  >
+                    Ghairi
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    approveEvent.mutate(
+                      { id: event.id, data: { approved_amount: event.amount_requested } },
+                      { onError }
+                    )
+                  }
+                  disabled={approveEvent.isPending}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-success px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {approveEvent.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Idhinisha ({tzs(event.amount_requested)})
+                </button>
+                <button
+                  onClick={() => setRejecting(true)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm font-semibold text-destructive hover:bg-destructive/20"
+                >
+                  <Ban className="h-4 w-4" /> Kataa
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {isTreasurer && canDisburse && (
           <button
             onClick={() => disburseEvent.mutate(event.id)}
             disabled={disburseEvent.isPending}
@@ -314,7 +398,7 @@ function EventManageCard({ eventId }: { eventId: string }) {
                   )}
                 </div>
               </div>
-              {c.status === "PENDING" && (
+              {c.status === "PENDING" && isTreasurer && (
                 <div className="mt-2">
                   {payRow === c.id ? (
                     <div className="flex gap-2">

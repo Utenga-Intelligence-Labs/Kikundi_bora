@@ -30,7 +30,7 @@ export const leadershipNav: (NavItem & { requiredRoles?: LeadershipRole[] })[] =
   { to: "/uongozi/ripoti", label: "Ripoti za Kikundi", icon: FileBarChart2 },
   { to: "/mikutano", label: "Mikutano na Makosa", icon: CalendarDays, requiredRoles: ["MWENYEKITI", "KATIBU"] },
   { to: "/ukusanyaji", label: "Ukusanyaji", icon: HandCoins, requiredRoles: ["HAZINA"] },
-  { to: "/uongozi/mfuko", label: "Mfuko (Usimamizi)", icon: HeartHandshake, requiredRoles: ["HAZINA"] },
+  { to: "/uongozi/mfuko", label: "Mfuko (Uongozi)", icon: HeartHandshake, requiredRoles: ["MWENYEKITI", "KATIBU", "HAZINA"] },
   { to: "/kitabu", label: "Kitabu cha Fedha", icon: BookOpen },
   { to: "/uongozi/import-data", label: "Ingiza Data", icon: FileCheck, requiredRoles: ["MWENYEKITI", "HAZINA"] },
   { to: "/wanachama", label: "Wanachama Wote", icon: Users },

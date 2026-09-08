@@ -84,6 +84,7 @@ function MfukoKijamiiPage() {
   const isChair = user.role === "chair";
   const isMember = user.role === "member";
   const isSecretary = user.role === "secretary";
+  const isLeadership = isTreasurer || isChair || isSecretary;
 
   const [tab, setTab] = useState<Tab>("matukio");
 
@@ -93,19 +94,19 @@ function MfukoKijamiiPage() {
       subtitle={
         isTreasurer
           ? "Matukio na michango ya kijamii — usimamizi upo Ukusanyaji wa Uongozi"
-          : isChair
-          ? "Idhinisha matukio ya kijamii"
+          : isChair || isSecretary
+          ? "Idhinisha matukio ya kijamii — usimamizi upo upande wa Uongozi"
           : isMember
           ? "Michango yako ya kijamii"
           : "Ripoti za mfuko wa kijamii"
       }
       action={
-        isTreasurer ? (
+        isLeadership ? (
           <Link
             to="/uongozi/mfuko"
             className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground"
           >
-            <Wallet className="h-4 w-4" /> Usimamizi
+            <Wallet className="h-4 w-4" /> Uongozi
           </Link>
         ) : null
       }
