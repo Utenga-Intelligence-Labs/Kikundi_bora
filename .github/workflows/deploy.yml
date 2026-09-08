@@ -82,14 +82,33 @@ jobs:
             ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
             ghcr.io/${{ env.OWNER_LC }}/${{ env.IMAGE_FRONTEND }}:latest
 
-  # ------------------------------------------------------------------
-  # Job 2: pull on the VPS and restart (same manual process as setup.sh,
-  # automated: pull -> up -> migrate -> health-check).
-  # ------------------------------------------------------------------
+#   deploy:
+#     needs: build-and-push
+#   Job 2: pull on the VPS and restart (same manual process as setup.sh,
+#   automated: pull -> up -> migrate -> health-check).
+#   NOTE: git pull on the VPS is retried with backoff (it once failed with
+#   "Failed to connect to github.com port 443" — flaky VPS egress), and the
+#   compose files are always scp'd fresh from the checkout so a deploy never
+#   depends on the VPS being able to reach github.com.
+# ------------------------------------------------------------------
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Ship compose files to the VPS (never rely on git pull from the VPS)
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "docker-compose.yml,docker-compose.prod.yml,docs/deploy/nginx-site.conf"
+          target: ${{ secrets.VPS_DEPLOY_PATH }}
+          overwrite: true
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1
         env:
@@ -103,102 +122,115 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          envs: GHCR_TOKEN,GHCR_ACTOR,TAG,GHCR_OWNER,PUBLIC_HOST
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.VPS_DEPLOY_PATH }}"
+        envs: GHCR_TOKEN,GHCR_ACTOR,TAG,GHCR_OWNER,PUBLIC_HOST
+        command_timeout: 20m
+        script: |
+              set -euo pipefail
+              cd "${{ secrets.VPS_DEPLOY_PATH }}"
 
-            echo "==> 1/6 git pull (compose files must be current)"
-            git pull --ff-only
+              echo "==> 1/6 git pull (compose files are scp'd separately — this is best-effort)"
+              # VPS egress to github.com can be flaky (once timed out after 133s);
+              # retry with backoff but never fail the deploy over it — the compose
+              # files were just scp'd fresh by the workflow above.
+              PULL_OK=0
+              for i in 1 2 3 4 5; do
+                if git pull --ff-only; then PULL_OK=1; break; fi
+                echo "git pull attempt $i failed; retrying in 15s..."
+                sleep 15
+              done
+              if [ "${PULL_OK:-0}" != "1" ]; then
+                echo "WARN: git pull unreachable from the VPS — continuing with the scp'd compose files."
+                echo "      (check VPS egress to github.com: curl -4 -m 10 -v https://github.com -o /dev/null)"
+              fi
 
-            # GHCR names must be lowercase even if the GitHub owner is not.
-            GHCR_OWNER="$(echo "$GHCR_OWNER" | tr '[:upper:]' '[:lower:]')"
-            export TAG GHCR_OWNER
+              # GHCR names must be lowercase even if the GitHub owner is not.
+              GHCR_OWNER="$(echo "$GHCR_OWNER" | tr '[:upper:]' '[:lower:]')"
+              export TAG GHCR_OWNER
 
-            echo "==> 2/6 docker login to GHCR (token lives only in this session)"
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+              echo "==> 2/6 docker login to GHCR (token lives only in this session)"
+              echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
-            echo "==> 3/6 wire db password (same rule as setup.sh: compose reads it from the host env, backend from backend/.env)"
-            ENV_FILE="backend/.env"
-            if [ ! -f "$ENV_FILE" ]; then
-              echo "WARN: $ENV_FILE missing; rebuilding from backend/.env.example"
-              cp backend/.env.example "$ENV_FILE"
-              RECOVERED_DB_PASSWORD="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-db 2>/dev/null | sed -n 's/^POSTGRES_PASSWORD=//p' | head -n 1 || true)"
-              RECOVERED_JWT_SECRET="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-backend 2>/dev/null | sed -n 's/^JWT_SECRET=//p' | head -n 1 || true)"
-              RECOVERED_ADMIN_PASSWORD="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-backend 2>/dev/null | sed -n 's/^ADMIN_PASSWORD=//p' | head -n 1 || true)"
-              POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$RECOVERED_DB_PASSWORD}"
-              [ -n "$POSTGRES_PASSWORD" ] || POSTGRES_PASSWORD="$(openssl rand -hex 16)"
-              JWT_SECRET="${RECOVERED_JWT_SECRET:-$(openssl rand -hex 32)}"
-              ADMIN_PASSWORD="${RECOVERED_ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
-              sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$POSTGRES_PASSWORD|" "$ENV_FILE"
-              sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" "$ENV_FILE"
-              sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$ENV_FILE"
-            fi
-            POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" | head -n 1)}"
-            [ -n "$POSTGRES_PASSWORD" ] || { echo "ERROR: DB_PASSWORD empty in $ENV_FILE"; exit 1; }
-            export POSTGRES_PASSWORD
+              echo "==> 3/6 wire db password (same rule as setup.sh: compose reads it from the host env, backend from backend/.env)"
+              ENV_FILE="backend/.env"
+              if [ ! -f "$ENV_FILE" ]; then
+                echo "WARN: $ENV_FILE missing; rebuilding from backend/.env.example"
+                cp backend/.env.example "$ENV_FILE"
+                RECOVERED_DB_PASSWORD="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-db 2>/dev/null | sed -n 's/^POSTGRES_PASSWORD=//p' | head -n 1 || true)"
+                RECOVERED_JWT_SECRET="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-backend 2>/dev/null | sed -n 's/^JWT_SECRET=//p' | head -n 1 || true)"
+                RECOVERED_ADMIN_PASSWORD="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-backend 2>/dev/null | sed -n 's/^ADMIN_PASSWORD=//p' | head -n 1 || true)"
+                POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$RECOVERED_DB_PASSWORD}"
+                [ -n "$POSTGRES_PASSWORD" ] || POSTGRES_PASSWORD="$(openssl rand -hex 16)"
+                JWT_SECRET="${RECOVERED_JWT_SECRET:-$(openssl rand -hex 32)}"
+                ADMIN_PASSWORD="${RECOVERED_ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
+                sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$POSTGRES_PASSWORD|" "$ENV_FILE"
+                sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$JWT_SECRET|" "$ENV_FILE"
+                sed -i "s|^ADMIN_PASSWORD=.*|ADMIN_PASSWORD=$ADMIN_PASSWORD|" "$ENV_FILE"
+              fi
+              POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(sed -n 's/^DB_PASSWORD=//p' "$ENV_FILE" | head -n 1)}"
+              [ -n "$POSTGRES_PASSWORD" ] || { echo "ERROR: DB_PASSWORD empty in $ENV_FILE"; exit 1; }
+              export POSTGRES_PASSWORD
 
-            echo "==> 4/6 ensure public origin in backend CORS (browsers block the SPA otherwise)"
-            PUBLIC_ORIGIN="https://$PUBLIC_HOST"
-            CORS_CHANGED=0
-            if grep -q '^CORS_ORIGINS=' "$ENV_FILE"; then
-              if ! grep -q "$PUBLIC_ORIGIN" "$ENV_FILE"; then
-                sed -i "s|^CORS_ORIGINS=.*|&,${PUBLIC_ORIGIN}|" "$ENV_FILE"
+              echo "==> 4/6 ensure public origin in backend CORS (browsers block the SPA otherwise)"
+              PUBLIC_ORIGIN="https://$PUBLIC_HOST"
+              CORS_CHANGED=0
+              if grep -q '^CORS_ORIGINS=' "$ENV_FILE"; then
+                if ! grep -q "$PUBLIC_ORIGIN" "$ENV_FILE"; then
+                  sed -i "s|^CORS_ORIGINS=.*|&,${PUBLIC_ORIGIN}|" "$ENV_FILE"
+                  CORS_CHANGED=1
+                fi
+              else
+                printf '\nCORS_ORIGINS=%s\n' "$PUBLIC_ORIGIN" >> "$ENV_FILE"
                 CORS_CHANGED=1
               fi
-            else
-              printf '\nCORS_ORIGINS=%s\n' "$PUBLIC_ORIGIN" >> "$ENV_FILE"
-              CORS_CHANGED=1
-            fi
-            # env_file changes do not trigger a recreate on their own, so
-            # force one when we just edited backend/.env.
-            RECREATE=""
-            [ "$CORS_CHANGED" = "1" ] && RECREATE="--force-recreate"
+              # env_file changes do not trigger a recreate on their own, so
+              # force one when we just edited backend/.env.
+              RECREATE=""
+              [ "$CORS_CHANGED" = "1" ] && RECREATE="--force-recreate"
 
-            free_backend_port_5050() {
-              CONFLICTING_5050_CONTAINERS="$(
-                docker ps -a --format '{{.ID}} {{.Ports}}' \
-                  | awk '$0 ~ /(0\.0\.0\.0:5050->|127\.0\.0\.1:5050->|:::5050->)/ {print $1}' \
-                  | sort -u \
-                  || true
-              )"
-              if [ -n "$CONFLICTING_5050_CONTAINERS" ]; then
-                echo "$CONFLICTING_5050_CONTAINERS" | xargs -r docker rm -f
-              fi
-              for _ in 1 2 3 4 5; do
-                if ! ss -ltnH '( sport = :5050 )' | grep -q .; then
-                  return 0
+              free_backend_port_5050() {
+                CONFLICTING_5050_CONTAINERS="$(
+                  docker ps -a --format '{{.ID}} {{.Ports}}' \
+                    | awk '$0 ~ /(0\.0\.0\.0:5050->|127\.0\.0\.1:5050->|:::5050->)/ {print $1}' \
+                    | sort -u \
+                    || true
+                )"
+                if [ -n "$CONFLICTING_5050_CONTAINERS" ]; then
+                  echo "$CONFLICTING_5050_CONTAINERS" | xargs -r docker rm -f
                 fi
-                sleep 1
-              done
-              return 1
-            }
+                for _ in 1 2 3 4 5; do
+                  if ! ss -ltnH '( sport = :5050 )' | grep -q .; then
+                    return 0
+                  fi
+                  sleep 1
+                done
+                return 1
+              }
 
-            echo "==> 5/7 free backend host port (docker-proxy collisions break deploy)"
-            if ! free_backend_port_5050; then
-              echo "ERROR: host port 127.0.0.1:5050 is still in use; cannot continue safely"
-              ss -ltnH '( sport = :5050 )'
-              exit 1
-            fi
+              echo "==> 5/7 free backend host port (docker-proxy collisions break deploy)"
+              if ! free_backend_port_5050; then
+                echo "ERROR: host port 127.0.0.1:5050 is still in use; cannot continue safely"
+                ss -ltnH '( sport = :5050 )'
+                exit 1
+              fi
 
-            echo "==> 6/7 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            if ! free_backend_port_5050; then
-              echo "ERROR: host port 127.0.0.1:5050 became busy while pulling images; cannot continue safely"
-              ss -ltnH '( sport = :5050 )'
-              exit 1
-            fi
-            # shellcheck disable=SC2086
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d $RECREATE
+              echo "==> 6/7 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+              if ! free_backend_port_5050; then
+                echo "ERROR: host port 127.0.0.1:5050 became busy while pulling images; cannot continue safely"
+                ss -ltnH '( sport = :5050 )'
+                exit 1
+              fi
+              # shellcheck disable=SC2086
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d $RECREATE
 
-            echo "==> 7/7 migrate (idempotent) + health checks"
-            docker exec kikundi-backend /app/kikundi-api -migrate
-            curl -sf http://127.0.0.1:5050/health | grep -q '"status":"ok"'
-            echo "backend OK"
-            curl -sf http://127.0.0.1:5051/ > /dev/null
-            echo "frontend OK"
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+              echo "==> 7/7 migrate (idempotent) + health checks"
+              docker exec kikundi-backend /app/kikundi-api -migrate
+              curl -sf http://127.0.0.1:5050/health | grep -q '"status":"ok"'
+              echo "backend OK"
+              curl -sf http://127.0.0.1:5051/ > /dev/null
+              echo "frontend OK"
+              docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 
-            echo "DEPLOY DONE — ${PUBLIC_HOST} serving sha ${TAG}
-            REMINDER: the host Nginx must proxy the SPA to 127.0.0.1:5051 and
-            /api/* to 127.0.0.1:5050 (see docs/deploy/nginx-site.conf)."
+              echo "DEPLOY DONE — ${PUBLIC_HOST} serving sha ${TAG}
+              REMINDER: the host Nginx must proxy the SPA to 127.0.0.1:5051 and
+              /api/* to 127.0.0.1:5050 (see docs/deploy/nginx-site.conf)."
