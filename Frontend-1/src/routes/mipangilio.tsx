@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { requireAuth } from "@/lib/role-guards";
 import { useAuth } from "@/lib/auth-provider";
 import { ContributionSettingsCard } from "@/components/ContributionSettingsCard";
+import { openGroupSetup } from "@/components/OnboardingWizard";
 import { PaymentMethodsCard } from "@/components/PaymentMethodsCard";
 import { PendingApprovalsCard } from "@/components/PendingApprovalsCard";
 import { SmsSettingsCard } from "@/components/SmsSettingsCard";
@@ -95,6 +96,22 @@ function MipangilioPage() {
     <AppShell title="Mipangilio" subtitle="Sanidi mfumo kulingana na kikundi chako">
       <DissolvedBanner />
       <DissolutionSection />
+      {isChair && (
+        <div className="card-surface p-4 flex items-center justify-between gap-3" data-testid="group-setup-card">
+          <div>
+            <p className="font-display text-sm font-semibold">Setup ya Kikundi</p>
+            <p className="text-xs text-muted-foreground">
+              Rudi kwenye mwongozo wa kuandaa kikundi — mipangilio ya michango, njia za malipo na wanachama.
+            </p>
+          </div>
+          <button
+            onClick={openGroupSetup}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            <Cog className="h-3.5 w-3.5" /> Fungua Setup
+          </button>
+        </div>
+      )}
       <ContributionSettingsCard />
       <div className="mt-4">
         <PendingApprovalsCard />

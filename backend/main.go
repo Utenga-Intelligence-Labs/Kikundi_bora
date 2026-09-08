@@ -192,6 +192,12 @@ func main() {
 	settings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Approve)
 	settings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Reject)
 
+	// Onboarding: wizard resume status + completion flag (chair), and the
+	// member app-tour "seen" flag. Steps reuse the endpoints above.
+	onboardingHandler := handlers.NewOnboardingHandler()
+	groups.Get("/:id/onboarding-status", onboardingHandler.Status)
+	groups.Patch("/:id/onboarding-complete", middleware.RequireRoles(models.RoleChair), onboardingHandler.Complete)
+
 	// Member obligations (arrears + current + fines combined).
 	// Member reads own; leadership reads all (self-or-leadership).
 	memberOblig := protected.Group("/members/:id/obligations")
@@ -276,6 +282,7 @@ func main() {
 	members.Put("/:id", middleware.RequireRoles(models.RoleChair, models.RoleSecretary), memberHandler.Update)
 	members.Delete("/:id", middleware.RequireRoles(models.RoleChair), memberHandler.Delete)
 	members.Post("/:id/restore", middleware.RequireRoles(models.RoleChair), memberHandler.RestoreMember)
+	members.Patch("/:id/onboarding-seen", onboardingHandler.MarkOnboardingSeen)
 
 	contribs := protected.Group("/contributions")
 	contribs.Get("/", contribHandler.List)

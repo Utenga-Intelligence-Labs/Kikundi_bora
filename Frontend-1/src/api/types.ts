@@ -59,6 +59,8 @@ export interface User {
   role: "chair" | "treasurer" | "secretary" | "member" | "admin";
   status: UserStatus;
   must_change_password: boolean;
+  /** First-login app tour flag — true once the tour is completed/dismissed. */
+  onboarding_seen?: boolean;
   avatar_url?: string;
   bio?: string;
   is_active: boolean;

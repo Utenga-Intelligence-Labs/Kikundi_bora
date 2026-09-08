@@ -46,7 +46,10 @@ type User struct {
 	Role               Role           `gorm:"type:varchar(20);not null" json:"role"`
 	Status             string         `gorm:"type:varchar(20);default:'PENDING';not null" json:"status"`
 	MustChangePassword bool           `gorm:"default:false" json:"must_change_password"`
-	AvatarURL          string         `gorm:"type:text" json:"avatar_url"`
+	// OnboardingSeen: true once the user completes/dismisses the first-login
+	// app tour (members). Never auto-shown again afterwards.
+	OnboardingSeen bool  `gorm:"not null;default:false" json:"onboarding_seen"`
+	AvatarURL      string `gorm:"type:text" json:"avatar_url"`
 	Bio                string         `gorm:"type:text" json:"bio"`
 	IsActive           bool           `gorm:"default:true" json:"is_active"`
 	CreatedBy          *string        `gorm:"type:uuid" json:"created_by,omitempty"`

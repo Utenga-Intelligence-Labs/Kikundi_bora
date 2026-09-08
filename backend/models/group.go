@@ -57,6 +57,11 @@ type Group struct {
 	// additionally requires a configured provider + per-type opt-in.
 	SMSNotificationsEnabled bool `gorm:"not null;default:false" json:"sms_notifications_enabled"`
 
+	// Onboarding: false on a freshly created group; flipped true when the
+	// Mwenyekiti finishes (or explicitly skips) the first-time setup wizard.
+	// Gates whether the wizard auto-opens on the next chair login.
+	OnboardingCompleted bool `gorm:"not null;default:false" json:"onboarding_completed"`
+
 	Status string `gorm:"type:varchar(20);not null;default:'active'" json:"status"` // active | dissolved
 
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"deleted_at,omitempty"`

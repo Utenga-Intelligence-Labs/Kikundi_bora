@@ -211,7 +211,7 @@ func addFKConstraints() {
 				def.RefColumn == fk.refColumn && def.OnDelete == fk.onDelete {
 				continue // already correct
 			}
-			log.Printf("FK %s.%s is wrong (%s) — dropping to recreate correctly",
+			log.Printf("Migration: updating FK %s.%s (%s) — recreating with correct definition",
 				fk.table, fk.constraint, def.Describe())
 			if err := DB.Exec(`ALTER TABLE "` + fk.table + `" DROP CONSTRAINT "` + fk.constraint + `"`).Error; err != nil {
 				log.Printf("FK %s.%s drop failed: %v", fk.table, fk.constraint, err)

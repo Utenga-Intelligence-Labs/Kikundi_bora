@@ -4,12 +4,20 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   tanstackStart: {
     server: { entry: "server" },
+    router: {
+      // Ignore colocated tests — TanStack matches this against file/dir names.
+      routeFileIgnorePattern: "__tests__|\\.test\\.",
+    },
     // Static hosting (nginx/docker): disable SSR hydration entirely so the
     // client bundle boots from a prerendered shell instead of expecting
     // server-injected window.__TSS data (which caused "Invariant failed").
     spa: { enabled: true, maskPath: "/" },
   },
   vite: {
+    server: {
+      // Backend Go API uses :8080 — keep Vite on :8081.
+      port: 8081,
+    },
     plugins: [
       VitePWA({
         registerType: "autoUpdate",

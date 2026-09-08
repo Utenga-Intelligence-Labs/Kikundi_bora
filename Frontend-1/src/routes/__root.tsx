@@ -22,6 +22,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { registerPWA } from "../lib/pwa-register";
 import { AuthProvider } from "../lib/auth-provider";
 import { AppModalProvider } from "@/components/AppModal";
+import { OnboardingGate } from "@/components/OnboardingGate";
 import type { RouterContext } from "../router";
 
 function NotFoundComponent() {
@@ -123,6 +124,8 @@ function RootComponent() {
       <AuthProvider>
         <AppModalProvider>
           <Outlet />
+          {/* Onboarding overlays (setup wizard / member tour) — never blocking */}
+          <OnboardingGate />
         </AppModalProvider>
       </AuthProvider>
     </QueryClientProvider>
