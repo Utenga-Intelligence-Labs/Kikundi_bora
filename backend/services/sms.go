@@ -47,6 +47,18 @@ func InitSMS() {
 	switch strings.ToLower(strings.TrimSpace(config.AppConfig.SMSProvider)) {
 	case "", "noop", "logging":
 		smsProvider = LoggingSMSProvider{}
+	case "sendafrica":
+		if config.AppConfig.SMSAPIKey == "" {
+			log.Printf("WARN: SMS_PROVIDER=sendafrica but SMS_API_KEY is empty — falling back to noop logger")
+			smsProvider = LoggingSMSProvider{}
+			break
+		}
+		base := config.AppConfig.SMSBaseURL
+		if base == "" {
+			base = sendAfricaDefaultBaseURL
+		}
+		smsProvider = NewSendAfricaProvider(config.AppConfig.SMSAPIKey, config.AppConfig.SMSSenderID, base)
+		log.Printf("SMS provider: sendafrica (base=%s sender=%q)", base, config.AppConfig.SMSSenderID)
 	default:
 		log.Printf("WARN: unknown SMS_PROVIDER %q — falling back to noop logger",
 			config.AppConfig.SMSProvider)
