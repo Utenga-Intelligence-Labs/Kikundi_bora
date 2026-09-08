@@ -1,8 +1,9 @@
 # Kikundibora — build & deploy to the Contabo VPS on push to main.
 #
 # Reality this matches (verified against the repo, not assumed):
-#   - TWO images, not one:  backend/Dockerfile  (Go API, :8080)
-#                           Frontend-1/Dockerfile (nginx SPA, host :8081)
+#   - TWO images, not one:  backend/Dockerfile  (Go API, :8080 internal)
+#                           Frontend-1/Dockerfile (nginx SPA, internal :8080)
+#   - Host-published ports (127.0.0.1): backend 5050, frontend 5051
 #   - THREE compose services: backend + frontend + db (postgres).
 #   - The frontend bakes VITE_API_URL at BUILD time, so the production image
 #     must be built with VITE_API_URL=https://<public-host>/api/v1, otherwise
@@ -154,18 +155,18 @@ jobs:
             RECREATE=""
             [ "$CORS_CHANGED" = "1" ] && RECREATE="--force-recreate"
 
-            free_backend_port_8080() {
-              CONFLICTING_8080_CONTAINERS="$(
+            free_backend_port_5050() {
+              CONFLICTING_5050_CONTAINERS="$(
                 docker ps -a --format '{{.ID}} {{.Ports}}' \
-                  | awk '$0 ~ /(0\.0\.0\.0:8080->|127\.0\.0\.1:8080->|:::8080->)/ {print $1}' \
+                  | awk '$0 ~ /(0\.0\.0\.0:5050->|127\.0\.0\.1:5050->|:::5050->)/ {print $1}' \
                   | sort -u \
                   || true
               )"
-              if [ -n "$CONFLICTING_8080_CONTAINERS" ]; then
-                echo "$CONFLICTING_8080_CONTAINERS" | xargs -r docker rm -f
+              if [ -n "$CONFLICTING_5050_CONTAINERS" ]; then
+                echo "$CONFLICTING_5050_CONTAINERS" | xargs -r docker rm -f
               fi
               for _ in 1 2 3 4 5; do
-                if ! ss -ltnH '( sport = :8080 )' | grep -q .; then
+                if ! ss -ltnH '( sport = :5050 )' | grep -q .; then
                   return 0
                 fi
                 sleep 1
@@ -174,17 +175,17 @@ jobs:
             }
 
             echo "==> 5/7 free backend host port (docker-proxy collisions break deploy)"
-            if ! free_backend_port_8080; then
-              echo "ERROR: host port 127.0.0.1:8080 is still in use; cannot continue safely"
-              ss -ltnH '( sport = :8080 )'
+            if ! free_backend_port_5050; then
+              echo "ERROR: host port 127.0.0.1:5050 is still in use; cannot continue safely"
+              ss -ltnH '( sport = :5050 )'
               exit 1
             fi
 
             echo "==> 6/7 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            if ! free_backend_port_8080; then
-              echo "ERROR: host port 127.0.0.1:8080 became busy while pulling images; cannot continue safely"
-              ss -ltnH '( sport = :8080 )'
+            if ! free_backend_port_5050; then
+              echo "ERROR: host port 127.0.0.1:5050 became busy while pulling images; cannot continue safely"
+              ss -ltnH '( sport = :5050 )'
               exit 1
             fi
             # shellcheck disable=SC2086
@@ -192,10 +193,12 @@ jobs:
 
             echo "==> 7/7 migrate (idempotent) + health checks"
             docker exec kikundi-backend /app/kikundi-api -migrate
-            curl -sf http://127.0.0.1:8080/health | grep -q '"status":"ok"'
+            curl -sf http://127.0.0.1:5050/health | grep -q '"status":"ok"'
             echo "backend OK"
-            curl -sf http://127.0.0.1:8081/ > /dev/null
+            curl -sf http://127.0.0.1:5051/ > /dev/null
             echo "frontend OK"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 
-            echo "DEPLOY DONE — ${PUBLIC_HOST} serving sha ${TAG}"
+            echo "DEPLOY DONE — ${PUBLIC_HOST} serving sha ${TAG}
+            REMINDER: the host Nginx must proxy the SPA to 127.0.0.1:5051 and
+            /api/* to 127.0.0.1:5050 (see docs/deploy/nginx-site.conf)."

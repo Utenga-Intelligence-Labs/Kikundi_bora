@@ -20,10 +20,11 @@ services:
     environment:
       PORT: "8080"
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5050}
       DB_HOST: db
     ports:
-      - "${BACKEND_PORT:-8080}:8080"
+      # Host 5050 -> container 8080 (the app's internal listen port is unchanged)
+      - "${BACKEND_PORT:-5050}:8080"
     volumes:
       - backend_uploads:/app/uploads
       - backend_backups:/app/backups
@@ -40,12 +41,13 @@ services:
       dockerfile: Dockerfile
       args:
         # Browser must reach the API (host-published port, not docker-internal hostname)
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api/v1}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5050/api/v1}
     image: ${DOCKERHUB_USER:-kikundi}/kikundi-bora-frontend:${TAG:-latest}
     container_name: kikundi-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-8081}:8080"
+      # Host 5051 -> container 8080 (nginx inside listens on 8080 — unchanged)
+      - "${FRONTEND_PORT:-5051}:8080"
     networks:
       - kikundi-net
     depends_on:

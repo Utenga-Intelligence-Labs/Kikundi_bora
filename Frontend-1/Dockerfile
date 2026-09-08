@@ -17,7 +17,9 @@ RUN npm install --no-audit --no-fund
 COPY . .
 
 # Bake API URL into the client bundle at build time (browser-facing)
-ARG VITE_API_URL=http://localhost:8080/api/v1
+# Defaults to the host-published backend port (5050); the deploy workflow
+# overrides this with the public https://<host>/api/v1 URL.
+ARG VITE_API_URL=http://localhost:5050/api/v1
 ENV VITE_API_URL=$VITE_API_URL
 
 RUN npm run build \

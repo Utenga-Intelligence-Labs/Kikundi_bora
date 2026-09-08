@@ -13,10 +13,11 @@
 #      Requires TAG and GHCR_OWNER in the environment (the deploy workflow
 #      exports both; GHCR names must be lowercase).
 #   2. Binds the app ports to 127.0.0.1 so the ONLY way in from outside is
-#      through the host Nginx reverse proxy (public 80/443 -> 127.0.0.1:8081
-#      for the SPA, and /api/* -> 127.0.0.1:8080 for the API). The backend is
+#      through the host Nginx reverse proxy (public 80/443 -> 127.0.0.1:5051
+#      for the SPA, and /api/* -> 127.0.0.1:5050 for the API). The backend is
 #      never directly reachable from the internet, and no separate backend
-#      subdomain/port is exposed.
+#      subdomain/port is exposed. NOTE: update the host Nginx proxy_pass
+#      targets together with this change (see docs/deploy/nginx-site.conf).
 #   3. Rebinds db host publishing to 127.0.0.1:${DB_HOST_PORT:-15432} to avoid
 #      collisions with host-level postgres on 5432 during deploy.
 #   4. Leaves everything else (db, volumes, networks, env_file, healthchecks)
@@ -26,12 +27,12 @@ services:
   backend:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set (lowercase github owner)}/kikundibora-backend:${TAG:-latest}
     ports:
-      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+      - "127.0.0.1:${BACKEND_PORT:-5050}:8080"
 
   frontend:
     image: ghcr.io/${GHCR_OWNER:?GHCR_OWNER must be set (lowercase github owner)}/kikundibora-frontend:${TAG:-latest}
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8081}:8080"
+      - "127.0.0.1:${FRONTEND_PORT:-5051}:8080"
 
   db:
     # Keep Postgres host-bound for maintenance access, but on a non-default

@@ -4,8 +4,8 @@
 #
 # Sets up the full stack:
 #   1. PostgreSQL 16        (container, host port configurable, default 5433)
-#   2. Backend Go API       -> http://localhost:8080
-#   3. Frontend React SPA   -> http://localhost:8081
+#   2. Backend Go API       -> http://localhost:5050  (container listens on 8080)
+#   3. Frontend React SPA   -> http://localhost:5051  (container listens on 8080)
 #
 # Safe to re-run: it skips steps that are already done.
 #
@@ -19,8 +19,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-BACKEND_PORT="${BACKEND_PORT:-8080}"
-FRONTEND_PORT="${FRONTEND_PORT:-8081}"
+BACKEND_PORT="${BACKEND_PORT:-5050}"
+FRONTEND_PORT="${FRONTEND_PORT:-5051}"
 DB_HOST_PORT="${DB_HOST_PORT:-5433}"   # avoid clashing with a local Postgres on 5432
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-$(openssl rand -hex 16)}"
 
@@ -45,7 +45,8 @@ say "[1/7] Checking prerequisites"
 # -----------------------------------------------------------------------------
 command -v docker >/dev/null 2>&1 || die "docker is not installed. Install Docker first: https://docs.docker.com/engine/install/"
 docker info >/dev/null 2>&1       || die "Docker daemon is not running. Start it (e.g. 'sudo systemctl start docker') and retry."
-ok "docker $(docker --version | awk '{print $3}' | tr -d ',')"
+docker compose version >/dev/null 2>&1 || die "'docker compose' (v2 plugin) is not available. Install it: https://docs.docker.com/compose/install/linux/"
+ok "docker $(docker --version | awk '{print $3}' | tr -d ',') + compose $(docker compose version --short)"
 
 # -----------------------------------------------------------------------------
 say "[2/7] Generating backend/.env"
@@ -169,7 +170,7 @@ elif [ "$FAIL" = "0" ]; then
      Frontend : http://localhost:$FRONTEND_PORT
      Login    : http://localhost:$FRONTEND_PORT/ingia
      Backend  : http://localhost:$BACKEND_PORT
-     Postgres : localhost:$DB_HOST_PORT (kikundi / kikundi_secret_2024)
+     Postgres : localhost:$DB_HOST_PORT (user kikundi — password in backend/.env)
 
      Demo accounts (password: demo123):
        Mwenyekiti   juma@kikundi.tz

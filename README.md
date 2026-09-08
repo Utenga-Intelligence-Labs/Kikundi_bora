@@ -62,7 +62,39 @@ Kikundi_bora/
 
 ## Quick Start
 
-### Prerequisites
+### Docker (recommended) — one command
+
+```bash
+git clone https://github.com/Utenga-Intelligence-Labs/Kikundi_bora.git
+cd Kikundi_bora
+./setup.sh
+```
+
+That single command checks prerequisites (docker + compose plugin), generates
+`backend/.env` from random secrets (or keeps yours), builds all images, starts
+PostgreSQL + backend + frontend, waits for the database, runs migrations +
+seed, and verifies everything:
+
+- **Frontend:** http://localhost:5051 (login: `/ingia`)
+- **Backend API:** http://localhost:5050 (`/health`, API under `/api/v1`)
+- **PostgreSQL:** host port auto-picked from 5433 (internal traffic uses the
+  docker network)
+
+Demo accounts are seeded automatically (password `demo123`): juma@kikundi.tz
+(Mwenyekiti), fatuma@kikundi.tz (Mweka Hazina), rashidi@kikundi.tz (Katibu),
+asha@kikundi.tz (Mwanachama). Re-running `./setup.sh` is safe — it never wipes
+data; use `./stop.sh` to stop (data kept) or `./stop.sh -v` to also wipe.
+
+> Port note: the container images listen on **8080 internally**; the Docker
+> host mapping is **5050 → backend** and **5051 → frontend**. Override with
+> `BACKEND_PORT` / `FRONTEND_PORT` if those are taken. Bare-metal dev
+> (`go run .` + `npm run dev`) still uses the internal 8080/8081.
+
+### Prerequisites (Docker path)
+
+- Docker Engine + the `docker compose` v2 plugin
+
+### Bare-metal path (no Docker)
 
 - Go 1.24+
 - Node.js 18+
@@ -93,7 +125,7 @@ JWT_SECRET=generate-with-openssl-rand-hex-32
 ADMIN_PASSWORD=YourAdminPassword123
 ```
 
-### 3. Run
+### 3. Run (bare-metal)
 
 ```bash
 ./start.sh
@@ -103,6 +135,9 @@ This will:
 1. Create the database tables and seed demo data
 2. Start the backend on `http://localhost:8080`
 3. Install frontend dependencies and start on `http://localhost:8081`
+
+(The bare-metal dev server uses the app's internal ports — the Dockerized
+stack is published on 5050/5051 instead; see the Docker Quick Start above.)
 
 ### Demo Accounts
 
@@ -117,7 +152,7 @@ This will:
 
 ## API Overview
 
-Base URL: `http://localhost:8080/api/v1`
+Base URL: `http://localhost:5050/api/v1` (Docker) · `http://localhost:8080/api/v1` (bare-metal dev)
 
 ### Authentication
 

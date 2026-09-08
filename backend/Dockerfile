@@ -50,7 +50,7 @@ USER nonroot:nonroot
 
 ENV PORT=8080 \
     ENVIRONMENT=production \
-    PUBLIC_BASE_URL=http://localhost:8080
+    PUBLIC_BASE_URL=http://localhost:5050
 
 EXPOSE 8080
 
