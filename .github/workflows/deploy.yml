@@ -154,19 +154,39 @@ jobs:
             RECREATE=""
             [ "$CORS_CHANGED" = "1" ] && RECREATE="--force-recreate"
 
+            free_backend_port_8080() {
+              CONFLICTING_8080_CONTAINERS="$(
+                docker ps -a --format '{{.ID}} {{.Ports}}' \
+                  | awk '$0 ~ /(0\.0\.0\.0:8080->|127\.0\.0\.1:8080->|:::8080->)/ {print $1}' \
+                  | sort -u \
+                  || true
+              )"
+              if [ -n "$CONFLICTING_8080_CONTAINERS" ]; then
+                echo "$CONFLICTING_8080_CONTAINERS" | xargs -r docker rm -f
+              fi
+              for _ in 1 2 3 4 5; do
+                if ! ss -ltnH '( sport = :8080 )' | grep -q .; then
+                  return 0
+                fi
+                sleep 1
+              done
+              return 1
+            }
+
             echo "==> 5/7 free backend host port (docker-proxy collisions break deploy)"
-            CONFLICTING_8080_CONTAINERS="$(docker ps --filter "publish=8080" --format '{{.ID}}' || true)"
-            if [ -n "$CONFLICTING_8080_CONTAINERS" ]; then
-              echo "$CONFLICTING_8080_CONTAINERS" | xargs -r docker stop
-            fi
-            if ss -ltnH '( sport = :8080 )' | grep -q .; then
-              echo "ERROR: host port 127.0.0.1:8080 is still in use by a non-docker process; cannot continue safely"
+            if ! free_backend_port_8080; then
+              echo "ERROR: host port 127.0.0.1:8080 is still in use; cannot continue safely"
               ss -ltnH '( sport = :8080 )'
               exit 1
             fi
 
             echo "==> 6/7 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+            if ! free_backend_port_8080; then
+              echo "ERROR: host port 127.0.0.1:8080 became busy while pulling images; cannot continue safely"
+              ss -ltnH '( sport = :8080 )'
+              exit 1
+            fi
             # shellcheck disable=SC2086
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d $RECREATE
 
