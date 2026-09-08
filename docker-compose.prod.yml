@@ -17,7 +17,9 @@
 #      for the SPA, and /api/* -> 127.0.0.1:8080 for the API). The backend is
 #      never directly reachable from the internet, and no separate backend
 #      subdomain/port is exposed.
-#   3. Leaves everything else (db, volumes, networks, env_file, healthchecks)
+#   3. Rebinds db host publishing to 127.0.0.1:${DB_HOST_PORT:-15432} to avoid
+#      collisions with host-level postgres on 5432 during deploy.
+#   4. Leaves everything else (db, volumes, networks, env_file, healthchecks)
 #      exactly as in docker-compose.yml.
 
 services:
