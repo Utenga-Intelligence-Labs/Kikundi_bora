@@ -54,8 +54,22 @@ say "[2/7] Generating backend/.env"
 if [ -f backend/.env ]; then
   ok "backend/.env already exists — keeping it"
 else
+  # If a database volume already exists (e.g. from a previous run that was
+  # interrupted), Postgres was initialized with ITS password and ignores a new
+  # POSTGRES_PASSWORD. Recover it from the existing container instead of
+  # generating a fresh one that would never authenticate (SASL 28P01).
+  RECOVERED_DB_PASSWORD="$(
+    docker volume ls -q 2>/dev/null | grep -qx 'kikundi-bora_pgdata' >/dev/null \
+      && docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' kikundi-db 2>/dev/null \
+           | sed -n 's/^POSTGRES_PASSWORD=//p' | head -n 1 || true
+  )"
+  if [ -n "$RECOVERED_DB_PASSWORD" ]; then
+    DB_PASSWORD="$RECOVERED_DB_PASSWORD"
+    ok "recovered existing database password from the running kikundi-db container"
+  else
+    DB_PASSWORD="$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  fi
   JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  DB_PASSWORD="$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   BACKUP_ENCRYPTION_KEY="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   cat > backend/.env <<EOF
 DB_HOST=db

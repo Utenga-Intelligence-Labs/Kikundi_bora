@@ -69,11 +69,24 @@ this reminder after every deploy.
 ## Verification (fresh clone, zero manual steps)
 
 - Fresh clone into a clean directory (`git clone … /tmp/…`), ports 5050/5051
-  verified free, then `./setup.sh` — full pass: images built, containers up,
-  PostgreSQL healthy, migrations + seed applied, `/health` 200 on :5050,
-  demo login works, SPA serves on :5051 (see the log excerpt below).
-- Re-run on the already-running stack: idempotent, exits green without
-  touching data.
+  verified free, then `./setup.sh` — **full pass, exit 0**: images built,
+  containers up, PostgreSQL healthy, migrations + seed applied, `/health` 200
+  on :5050, demo login works (`asha@kikundi.tz`), SPA 200 on :5051, and the
+  SPA's `/api/*` proxy reaches the backend (login through :5051 returns a JWT).
+- CORS verified: `Access-Control-Allow-Origin: http://localhost:5051` on the
+  backend response for the SPA origin.
+- **Idempotency:** re-running `./setup.sh` on the already-running stack exits
+  green ("backend/.env already exists — keeping it"), keeps data, re-verifies.
+- **`./stop.sh` verified**: containers down, data volume kept; `docker compose
+  up -d` brings it back healthy on the same ports.
+- Two real bugs were found by the fresh-clone test and fixed in this PR:
+  1. `stop.sh` initially failed because compose interpolation requires
+     `POSTGRES_PASSWORD` even for `down` — now wired from `backend/.env`.
+  2. `setup.sh` could generate a brand-new DB password when an existing
+     `kikundi-bora_pgdata` volume had been initialized with a different one
+     (SASL 28P01 auth failure with no hint) — it now **recovers** the existing
+     database password from the previous `kikundi-db` container before
+     generating `.env`.
 
 ## Post-change smoke checks
 

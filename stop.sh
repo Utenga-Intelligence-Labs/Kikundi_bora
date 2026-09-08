@@ -12,6 +12,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
+# compose interpolates POSTGRES_PASSWORD for the db service even when just
+# stopping — wire it the same way setup.sh does, or `down` fails on the
+# required-variable check.
+CONFIGURED_DB_PASSWORD="$(sed -n 's/^DB_PASSWORD=//p' backend/.env 2>/dev/null | head -n 1)"
+if [ -z "${POSTGRES_PASSWORD:-}" ] && [ -n "$CONFIGURED_DB_PASSWORD" ]; then
+  POSTGRES_PASSWORD="$CONFIGURED_DB_PASSWORD"
+  export POSTGRES_PASSWORD
+fi
+
 if [ "${1:-}" = "-v" ]; then
   echo "Stopping AND removing volumes (database data will be wiped)..."
   docker compose down -v
