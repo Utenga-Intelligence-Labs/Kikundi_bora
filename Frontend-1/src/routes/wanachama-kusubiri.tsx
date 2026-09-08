@@ -2,22 +2,40 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { usePendingUsers, useApproveUser, useRejectUser } from "@/hooks/use-user-management";
+import {
+  usePendingUsers,
+  useApproveUser,
+  useRejectUser,
+} from "@/hooks/use-user-management";
 import { roleMap } from "@/api/types";
 import type { User } from "@/api/types";
 import { useAuth } from "@/lib/auth-provider";
-import { hasRole, blockAdminFromPage, requireAuth, requireRole } from "@/lib/role-guards";
+import {
+  hasRole,
+  blockAdminFromPage,
+  requireAuth,
+  requireRole,
+} from "@/lib/role-guards";
 import { api } from "@/api/client";
 import { tzs } from "@/lib/format";
 import {
-  Clock, CheckCircle2, XCircle, Phone, Calendar, Loader2, User as UserIcon,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Phone,
+  Calendar,
+  Loader2,
+  User as UserIcon,
 } from "lucide-react";
 
 export const Route = createFileRoute("/wanachama-kusubiri")({
   head: () => ({
     meta: [
       { title: "Wanaosubiri — Kikundi" },
-      { name: "description", content: "Orodha ya watumiaji na wanachama wanaosubiri kuidhinishwa." },
+      {
+        name: "description",
+        content: "Orodha ya watumiaji na wanachama wanaosubiri kuidhinishwa.",
+      },
     ],
   }),
   beforeLoad: () => {
@@ -36,6 +54,8 @@ interface PendingMember {
   gender?: string | null;
   occupation?: string | null;
   email?: string | null;
+  address?: string | null;
+  joined_at?: string | null;
   next_of_kin_name?: string | null;
   next_of_kin_phone?: string | null;
   photo_url?: string | null;
@@ -53,7 +73,9 @@ function PendingUsersPage() {
   const rejectMutation = useRejectUser();
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
+  const [actionType, setActionType] = useState<"approve" | "reject" | null>(
+    null,
+  );
   const [remarks, setRemarks] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -61,12 +83,17 @@ function PendingUsersPage() {
   const isKatibu = user?.role === "secretary";
   const { data: pendingMembersData, isLoading: membersLoading } = useQuery({
     queryKey: ["members", "pending"],
-    queryFn: () => api.get<{ data: PendingMember[] }>("/members?status=pending&limit=50"),
+    queryFn: () =>
+      api.get<{ data: PendingMember[] }>("/members?status=pending&limit=50"),
   });
   const pendingMembers: PendingMember[] = pendingMembersData?.data ?? [];
 
   const memberActionMutation = useMutation({
-    mutationFn: (vars: { id: string; action: "approve" | "reject"; reason?: string }) => {
+    mutationFn: (vars: {
+      id: string;
+      action: "approve" | "reject";
+      reason?: string;
+    }) => {
       if (vars.action === "approve") {
         return api.patch(`/members/${vars.id}/approve`);
       }
@@ -80,15 +107,21 @@ function PendingUsersPage() {
     },
   });
 
-  const [selectedMember, setSelectedMember] = useState<PendingMember | null>(null);
-  const [memberAction, setMemberAction] = useState<"approve" | "reject" | null>(null);
+  const [selectedMember, setSelectedMember] = useState<PendingMember | null>(
+    null,
+  );
+  const [memberAction, setMemberAction] = useState<"approve" | "reject" | null>(
+    null,
+  );
   const [memberReason, setMemberReason] = useState("");
 
   if (!hasRole(user, "secretary")) {
     return (
       <AppShell title="Wanaosubiri">
         <div className="flex items-center justify-center py-20">
-          <p className="text-muted-foreground">Ukurasa huu ni kwa Katibu tu — ndiye anayeidhinisha wanachama.</p>
+          <p className="text-muted-foreground">
+            Ukurasa huu ni kwa Katibu tu — ndiye anayeidhinisha wanachama.
+          </p>
         </div>
       </AppShell>
     );
@@ -99,9 +132,15 @@ function PendingUsersPage() {
     setActionLoading(true);
     try {
       if (actionType === "approve") {
-        await approveMutation.mutateAsync({ id: selectedUser.id, data: { remarks } });
+        await approveMutation.mutateAsync({
+          id: selectedUser.id,
+          data: { remarks },
+        });
       } else {
-        await rejectMutation.mutateAsync({ id: selectedUser.id, data: { remarks } });
+        await rejectMutation.mutateAsync({
+          id: selectedUser.id,
+          data: { remarks },
+        });
       }
       setSelectedUser(null);
       setActionType(null);
@@ -146,21 +185,41 @@ function PendingUsersPage() {
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">
               {m.full_name}{" "}
-              <span className="text-xs font-normal text-muted-foreground">({m.member_no})</span>
+              <span className="text-xs font-normal text-muted-foreground">
+                ({m.member_no})
+              </span>
             </p>
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Phone className="h-3 w-3" /> {m.phone}
               </span>
-              {m.gender && <span>Jinsia: {m.gender === "MME" ? "Mwanamume" : "Mwanamke"}</span>}
+              {m.gender && (
+                <span>
+                  Jinsia: {m.gender === "MME" ? "Mwanamume" : "Mwanamke"}
+                </span>
+              )}
               {m.occupation && <span>Kazi: {m.occupation}</span>}
               {m.email && <span>{m.email}</span>}
+              {m.address && <span>Anwani: {m.address}</span>}
+              {m.joined_at && (
+                <span>
+                  Alijiunga:{" "}
+                  {new Date(m.joined_at).toLocaleDateString("sw-TZ", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              )}
             </div>
             {(m.next_of_kin_name || m.next_of_kin_phone) && (
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Mlezi: {m.next_of_kin_name ?? "—"} {m.next_of_kin_phone ? `(${m.next_of_kin_phone})` : ""}
+                Mlezi: {m.next_of_kin_name ?? "—"}{" "}
+                {m.next_of_kin_phone ? `(${m.next_of_kin_phone})` : ""}
               </p>
             )}
+            {/* BUG-1: the reviewer must see EVERYTHING captured at registration
+                before deciding — full record, not a name/phone summary. */}
             {/* Audit trail */}
             <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
               <Calendar className="h-3 w-3" />
@@ -202,12 +261,19 @@ function PendingUsersPage() {
   );
 
   return (
-    <AppShell title="Wanaosubiri Kuidhinishwa" subtitle="Watumiaji na wanachama walioundwa na Mwenyekiti">
+    <AppShell
+      title="Wanaosubiri Kuidhinishwa"
+      subtitle="Watumiaji na wanachama walioundwa na Mwenyekiti"
+    >
       {/* ---- Pending MEMBERS (katibu approval queue) ---- */}
       <div className="mb-3 flex items-center gap-2">
-        <h2 className="font-display text-base font-semibold">Wanachama Wanaosubiri</h2>
+        <h2 className="font-display text-base font-semibold">
+          Wanachama Wanaosubiri
+        </h2>
         {pendingMembers.length > 0 && (
-          <span className="chip bg-amber-100 text-amber-700 text-[10px]">{pendingMembers.length}</span>
+          <span className="chip bg-amber-100 text-amber-700 text-[10px]">
+            {pendingMembers.length}
+          </span>
         )}
       </div>
       {membersLoading ? (
@@ -217,7 +283,9 @@ function PendingUsersPage() {
       ) : pendingMembers.length === 0 ? (
         <div className="card-surface flex flex-col items-center px-4 py-8 text-center">
           <CheckCircle2 className="mb-2 h-8 w-8 text-success" />
-          <p className="text-sm text-muted-foreground">Hakuna mwanachama anayesubiri idhini.</p>
+          <p className="text-sm text-muted-foreground">
+            Hakuna mwanachama anayesubiri idhini.
+          </p>
         </div>
       ) : (
         <div className="card-surface divide-y divide-border">
@@ -227,9 +295,13 @@ function PendingUsersPage() {
 
       {/* ---- Pending USERS (account approval) ---- */}
       <div className="mb-3 mt-7 flex items-center gap-2">
-        <h2 className="font-display text-base font-semibold">Akaunti za Watumiaji</h2>
+        <h2 className="font-display text-base font-semibold">
+          Akaunti za Watumiaji
+        </h2>
         {pendingUsers.length > 0 && (
-          <span className="chip bg-amber-100 text-amber-700 text-[10px]">{pendingUsers.length}</span>
+          <span className="chip bg-amber-100 text-amber-700 text-[10px]">
+            {pendingUsers.length}
+          </span>
         )}
       </div>
       {isLoading ? (
@@ -243,19 +315,31 @@ function PendingUsersPage() {
         </div>
       ) : error ? (
         <div className="card-surface px-4 py-8 text-center">
-          <p className="text-sm text-destructive">Imeshindikana kupakua data.</p>
-          <button onClick={() => refetch()} className="mt-2 text-sm font-medium text-primary">Jaribu tena</button>
+          <p className="text-sm text-destructive">
+            Imeshindikana kupakua data.
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="mt-2 text-sm font-medium text-primary"
+          >
+            Jaribu tena
+          </button>
         </div>
       ) : pendingUsers.length === 0 ? (
         <div className="card-surface flex flex-col items-center px-4 py-12 text-center">
           <CheckCircle2 className="mb-3 h-10 w-10 text-success" />
           <p className="text-sm font-medium">Hakuna mtumiaji anayesubiri.</p>
-          <p className="text-xs text-muted-foreground">Watumiaji wote wamekaguliwa.</p>
+          <p className="text-xs text-muted-foreground">
+            Watumiaji wote wamekaguliwa.
+          </p>
         </div>
       ) : (
         <div className="card-surface divide-y divide-border">
           {pendingUsers.map((u) => (
-            <div key={u.id} className="flex items-center justify-between px-4 py-3">
+            <div
+              key={u.id}
+              className="flex items-center justify-between px-4 py-3"
+            >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -264,26 +348,41 @@ function PendingUsersPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{u.name}</p>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{u.phone}</span>
-                      <span className="chip bg-amber-100 text-amber-700 text-[10px]">{roleMap[u.role] ?? u.role}</span>
+                      <span className="flex items-center gap-1">
+                        <Phone className="h-3 w-3" />
+                        {u.phone}
+                      </span>
+                      <span className="chip bg-amber-100 text-amber-700 text-[10px]">
+                        {roleMap[u.role] ?? u.role}
+                      </span>
                     </div>
                   </div>
                 </div>
                 <p className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                   <Calendar className="h-3 w-3" />
-                  {new Date(u.created_at).toLocaleDateString("sw-TZ", { day: "numeric", month: "short", year: "numeric" })}
+                  {new Date(u.created_at).toLocaleDateString("sw-TZ", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => { setSelectedUser(u); setActionType("approve"); }}
+                  onClick={() => {
+                    setSelectedUser(u);
+                    setActionType("approve");
+                  }}
                   className="rounded-lg bg-success/10 px-3 py-1.5 text-xs font-medium text-success hover:bg-success/20"
                 >
                   <CheckCircle2 className="inline h-3.5 w-3.5 mr-1" />
                   Idhinisha
                 </button>
                 <button
-                  onClick={() => { setSelectedUser(u); setActionType("reject"); }}
+                  onClick={() => {
+                    setSelectedUser(u);
+                    setActionType("reject");
+                  }}
                   className="rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20"
                 >
                   <XCircle className="inline h-3.5 w-3.5 mr-1" />
@@ -299,21 +398,27 @@ function PendingUsersPage() {
       {selectedMember && memberAction && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center"
-          onClick={() => { setSelectedMember(null); setMemberAction(null); }}
+          onClick={() => {
+            setSelectedMember(null);
+            setMemberAction(null);
+          }}
         >
           <div
             className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-display text-lg font-bold">
-              {memberAction === "approve" ? "Idhinisha Mwanachama" : "Kataa Mwanachama"}
+              {memberAction === "approve"
+                ? "Idhinisha Mwanachama"
+                : "Kataa Mwanachama"}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {selectedMember.full_name} — {selectedMember.member_no}
             </p>
             {memberAction === "approve" ? (
               <p className="mt-3 text-sm">
-                Mwanachama atahesabiwa kwenye jumla ya wanachama na atapata ufikiaji wa dashibodi mara moja.
+                Mwanachama atahesabiwa kwenye jumla ya wanachama na atapata
+                ufikiaji wa dashibodi mara moja.
               </p>
             ) : (
               <div className="mt-4">
@@ -333,7 +438,11 @@ function PendingUsersPage() {
             )}
             <div className="mt-4 flex gap-3">
               <button
-                onClick={() => { setSelectedMember(null); setMemberAction(null); setMemberReason(""); }}
+                onClick={() => {
+                  setSelectedMember(null);
+                  setMemberAction(null);
+                  setMemberReason("");
+                }}
                 className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted"
               >
                 Ghairi
@@ -363,21 +472,38 @@ function PendingUsersPage() {
 
       {/* User approve/reject Modal */}
       {selectedUser && actionType && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={() => { setSelectedUser(null); setActionType(null); }}>
-          <div className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center"
+          onClick={() => {
+            setSelectedUser(null);
+            setActionType(null);
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl bg-card p-5 sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="font-display text-lg font-bold">
-              {actionType === "approve" ? "Idhinisha Mtumiaji" : "Kataa Mtumiaji"}
+              {actionType === "approve"
+                ? "Idhinisha Mtumiaji"
+                : "Kataa Mtumiaji"}
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {selectedUser.name} — {selectedUser.phone}
             </p>
             <div className="mt-4">
               <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">Maoni (si lazima)</span>
+                <span className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Maoni (si lazima)
+                </span>
                 <textarea
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder={actionType === "approve" ? "Maoni ya uidhinishaji..." : "Sababu ya kukataa..."}
+                  placeholder={
+                    actionType === "approve"
+                      ? "Maoni ya uidhinishaji..."
+                      : "Sababu ya kukataa..."
+                  }
                   className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/20"
                   rows={3}
                 />
@@ -385,7 +511,11 @@ function PendingUsersPage() {
             </div>
             <div className="mt-4 flex gap-3">
               <button
-                onClick={() => { setSelectedUser(null); setActionType(null); setRemarks(""); }}
+                onClick={() => {
+                  setSelectedUser(null);
+                  setActionType(null);
+                  setRemarks("");
+                }}
                 className="flex-1 rounded-xl border border-border py-2.5 text-sm font-medium hover:bg-muted"
               >
                 Ghairi
@@ -397,7 +527,11 @@ function PendingUsersPage() {
                   actionType === "approve" ? "bg-success" : "bg-destructive"
                 }`}
               >
-                {actionLoading ? "Inashughulikiwa..." : actionType === "approve" ? "Idhinisha" : "Kataa"}
+                {actionLoading
+                  ? "Inashughulikiwa..."
+                  : actionType === "approve"
+                    ? "Idhinisha"
+                    : "Kataa"}
               </button>
             </div>
           </div>
