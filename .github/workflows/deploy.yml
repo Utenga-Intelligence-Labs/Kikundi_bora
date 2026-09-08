@@ -154,12 +154,23 @@ jobs:
             RECREATE=""
             [ "$CORS_CHANGED" = "1" ] && RECREATE="--force-recreate"
 
-            echo "==> 5/6 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
+            echo "==> 5/7 free backend host port (docker-proxy collisions break deploy)"
+            CONFLICTING_8080_CONTAINERS="$(docker ps --filter "publish=8080" --format '{{.ID}}' || true)"
+            if [ -n "$CONFLICTING_8080_CONTAINERS" ]; then
+              echo "$CONFLICTING_8080_CONTAINERS" | xargs -r docker stop
+            fi
+            if ss -ltnH '( sport = :8080 )' | grep -q .; then
+              echo "ERROR: host port 127.0.0.1:8080 is still in use by a non-docker process; cannot continue safely"
+              ss -ltnH '( sport = :8080 )'
+              exit 1
+            fi
+
+            echo "==> 6/7 pull + restart (127.0.0.1-bound per docker-compose.prod.yml)"
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             # shellcheck disable=SC2086
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d $RECREATE
 
-            echo "==> 6/6 migrate (idempotent) + health checks"
+            echo "==> 7/7 migrate (idempotent) + health checks"
             docker exec kikundi-backend /app/kikundi-api -migrate
             curl -sf http://127.0.0.1:8080/health | grep -q '"status":"ok"'
             echo "backend OK"
