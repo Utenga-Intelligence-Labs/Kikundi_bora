@@ -93,10 +93,15 @@ export function SmsSettingsCard() {
           />
         </label>
 
-        {!settings.provider_real && (
+        {!settings.provider_real ? (
           <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
             Mtoa huduma wa SMS bado haujaunganishwa — ujumbe utaandikwa kwenye
             kumbukumbu tu hadi mtoa huduma awekwe (SMS_PROVIDER).
+          </p>
+        ) : (
+          <p className="flex items-center gap-1.5 rounded-lg bg-success/10 px-3 py-2 text-xs font-semibold text-success">
+            <MessageSquare className="h-3.5 w-3.5" />
+            SMS zinauma kwa kupitia {settings.provider === "sendafrica" ? "SendAfrica" : settings.provider}
           </p>
         )}
 

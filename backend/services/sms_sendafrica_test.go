@@ -84,6 +84,25 @@ func TestSendAfricaSenderIDIncluded(t *testing.T) {
 	}
 }
 
+func TestSendAfricaQueuedStatusAccepted(t *testing.T) {
+	// The live API returns status "queued" (not the documented "Success").
+	p, _ := newSendAfricaTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"data": map[string]interface{}{
+				"message_id":   "SA-5ddf7956-c26d-451a-ace4-4c83a081a853",
+				"status":       "queued",
+				"credits_used": 1,
+			},
+			"timestamp": "2026-09-08T12:13:27Z",
+		})
+	})
+	if err := p.SendSMS(context.Background(), "+255680185784", "msg"); err != nil {
+		t.Fatalf("queued status must be accepted, got: %v", err)
+	}
+}
+
 func TestSendAfricaInsufficientCreditsNotRetried(t *testing.T) {
 	var attempts int32
 	p, _ := newSendAfricaTestServer(t, func(w http.ResponseWriter, r *http.Request) {

@@ -105,8 +105,8 @@ func (p *SendAfricaProvider) SendSMS(ctx context.Context, phoneE164, message str
 	for attempt := 1; attempt <= sendAfricaMaxAttempts; attempt++ {
 		env, retryable, err := p.attempt(ctx, body, idemKey)
 		if err == nil {
-			log.Printf("SMS[sendafrica] to=%s message_id=%s credits_used=%d",
-				phoneE164, env.Data.MessageID, env.Data.CreditsUsed)
+			log.Printf("SMS[sendafrica] to=%s status=%s message_id=%s credits_used=%d",
+				phoneE164, env.Data.Status, env.Data.MessageID, env.Data.CreditsUsed)
 			return nil
 		}
 		lastErr = err
@@ -167,8 +167,12 @@ func (p *SendAfricaProvider) attempt(ctx context.Context, body []byte, idemKey s
 			// Well-formed envelope reporting failure.
 			return env, false, fmt.Errorf("sendafrica: %s (request_id %s)", errText, reqID)
 		}
-		if env.Data.Status != "Success" {
-			return env, false, fmt.Errorf("sendafrica: unexpected status %q (request_id %s)", env.Data.Status, reqID)
+		// success=true means provider accepted the submission. The live API
+		// has returned both "Success" (docs) and "queued" (observed) — treat
+		// any status as accepted and record it; delivery is reconciled later
+		// via the account message logs.
+		if env.Data.Status == "" {
+			return env, false, fmt.Errorf("sendafrica: missing submission status (request_id %s)", reqID)
 		}
 		return env, false, nil
 
