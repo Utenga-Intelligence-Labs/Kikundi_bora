@@ -28,6 +28,12 @@ export default defineConfig({
         workbox: {
           navigateFallback: "/",
           navigateFallbackDenylist: [/^\/~oauth/, /^\/api\//],
+          // A stuck waiting SW keeps serving a stale cached index.html
+          // (whose hashed assets no longer exist after the next deploy and
+          // whose inline scripts the strict CSP blocks) = permanent white
+          // screen until all tabs close. Activate updates immediately.
+          skipWaiting: true,
+          clientsClaim: true,
           globPatterns: ["**/*.{js,css,html,svg,png,ico,webmanifest,woff,woff2}"],
           runtimeCaching: [
             {
