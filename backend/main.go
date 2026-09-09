@@ -31,6 +31,7 @@ func main() {
 
 	config.Load()
 	database.Connect()
+	services.InitSentry()
 	services.InitEmail()
 	services.InitSMS()
 
@@ -110,6 +111,7 @@ func main() {
 	app.Use(middleware.SetupCORS())
 	app.Use(middleware.SecurityHeaders())
 	app.Use(middleware.GlobalRateLimiter())
+	app.Use(middleware.Sentry())
 	app.Use(middleware.RequestLogger())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -493,6 +495,7 @@ func main() {
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		log.Println("Shutting down gracefully...")
+		services.FlushSentry()
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := app.ShutdownWithContext(ctx); err != nil {
@@ -513,6 +516,9 @@ func errorHandler(c *fiber.Ctx, err error) error {
 		code = e.Code
 	}
 	log.Printf("ERROR [%d]: %v", code, err)
+	if code >= 500 && services.Enabled {
+		services.CaptureError(err, c.Method(), c.Path())
+	}
 	message := "Hitilafu ya mfumo"
 	if code < 500 {
 		message = err.Error()

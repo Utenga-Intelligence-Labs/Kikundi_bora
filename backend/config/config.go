@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
@@ -28,6 +29,10 @@ type Config struct {
 	// OTP verification (Part 2): off by default. When false the auth flow
 	// behaves exactly as before; the OTP model/endpoints stay dormant.
 	OTPVerificationEnabled bool
+	// Sentry error/tracing observability. Empty DSN = disabled (local dev
+	// default). All values come from env, never hardcoded.
+	SentryDSN                string
+	SentryTracesSampleRate   float64
 }
 
 var AppConfig *Config
@@ -66,6 +71,8 @@ func Load() {
 		SMSSenderID:   getEnv("SMS_SENDER_ID", ""),
 		SMSBaseURL:    getEnv("SMS_BASE_URL", ""),
 		OTPVerificationEnabled: getEnvBool("OTP_VERIFICATION_ENABLED", false),
+		SentryDSN:                getEnv("SENTRY_DSN", ""),
+		SentryTracesSampleRate:   getEnvFloat("SENTRY_TRACES_SAMPLE_RATE", 1.0),
 	}
 }
 
@@ -89,4 +96,22 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		return fallback
+	}
+	if f < 0 {
+		return 0
+	}
+	if f > 1 {
+		return 1
+	}
+	return f
 }
