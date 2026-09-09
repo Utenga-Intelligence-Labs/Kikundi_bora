@@ -23,25 +23,33 @@ if (!fs.existsSync(assetsDir)) {
 // all window.$_TSR boot data. Serving it as index.html is the whole story.
 const shellPath = path.join(clientDir, "_shell.html");
 if (fs.existsSync(shellPath)) {
-  let html = fs.readFileSync(shellPath, "utf8");
-  const inlineScripts = [];
+  const html = fs.readFileSync(shellPath, "utf8");
+  // Snapshot ALL matches first: the regex is stateful (lastIndex) and the
+  // replacement shortens the string, so replacing inside the exec loop
+  // silently skips every script after the first (shipped an inline
+  // $tsr-stream-barrier → CSP blocked it → white screen "Invariant failed").
   const scriptRegex = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
-  let match;
-  let idx = 0;
-  while ((match = scriptRegex.exec(html)) !== null) {
+  const matches = [...html.matchAll(scriptRegex)];
+  let out = html;
+  const inlineScripts = [];
+  matches.forEach((match, idx) => {
     const fullTag = match[0];
     const content = match[1].trim();
-    if (!content) continue;
+    if (!content) return;
     const assetName = idx === 0 ? "tsr-scroll-restoration.js" : `tsr-inline-${idx}.js`;
-    const assetPath = path.join(assetsDir, assetName);
-    fs.writeFileSync(assetPath, content + "\n");
+    fs.writeFileSync(path.join(assetsDir, assetName), content + "\n");
     const attrs = fullTag.match(/^<script([^>]*)>/)[1];
-    const replacement = `<script${attrs} src="/assets/${assetName}"></script>`;
-    html = html.replace(fullTag, replacement);
+    out = out.replace(fullTag, `<script${attrs} src="/assets/${assetName}"></script>`);
     inlineScripts.push(assetName);
-    idx++;
+  });
+  // Fail loudly: any remaining inline script breaks under the strict
+  // script-src 'self' CSP (white screen). Never ship that silently again.
+  const leftover = [...out.matchAll(scriptRegex)].filter((m) => m[1].trim());
+  if (leftover.length > 0) {
+    console.error(`FATAL: ${leftover.length} inline script(s) remain after externalization — refusing to write index.html`);
+    process.exit(1);
   }
-  fs.writeFileSync(path.join(clientDir, "index.html"), html);
+  fs.writeFileSync(path.join(clientDir, "index.html"), out);
   console.log(`SPA shell → index.html (externalized ${inlineScripts.length} inline scripts: ${inlineScripts.join(", ")})`);
   process.exit(0);
 }

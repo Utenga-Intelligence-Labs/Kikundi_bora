@@ -29,8 +29,10 @@ func SecurityHeaders() fiber.Handler {
 			c.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
 		}
 
-		// Content Security Policy - restrict resource loading
-		csp := "default-src 'self'; script-src 'self' 'sha256-TiYE7JINmfE3eHoE5sRGDqhVzXq3eddxFPPnED4qymw=' 'sha256-TW2vUPSTTNkYr9M7QQRmBQ/LgadN2lN4t8GejBvmUGs='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		// Content Security Policy - restrict resource loading.
+		// script-src is plain 'self': the SPA ships zero inline scripts
+		// (build externalizes them), so no hash allowlist to drift.
+		csp := "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 		if config.AppConfig != nil && config.AppConfig.Environment == "development" {
 			csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 		}
