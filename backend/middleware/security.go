@@ -30,7 +30,7 @@ func SecurityHeaders() fiber.Handler {
 		}
 
 		// Content Security Policy - restrict resource loading
-		csp := "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+		csp := "default-src 'self'; script-src 'self' 'sha256-TiYE7JINmfE3eHoE5sRGDqhVzXq3eddxFPPnED4qymw=' 'sha256-TW2vUPSTTNkYr9M7QQRmBQ/LgadN2lN4t8GejBvmUGs='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 		if config.AppConfig != nil && config.AppConfig.Environment == "development" {
 			csp = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
 		}
