@@ -72,10 +72,13 @@ func testRequest(t *testing.T, app *fiber.App, method, path string) int {
 //   - propose: mwenyekiti (chair) only
 //   - approve/reject: katibu (secretary) only
 //   - member: neither
+//   - admin: neither — admin is a system-level role, NOT group leadership,
+//     and passes ONLY when explicitly listed (e.g. audit-logs, notification-settings).
 //
 // Payment-methods permission matrix:
 //   - create/edit/delete: mwenyekiti (chair) + mweka hazina (treasurer) only
 //   - member: read-only (all writes 403)
+//   - admin: read-only (all writes 403) — same reason as above.
 func TestRequireRolesContributionSettingsPermissions(t *testing.T) {
 	cases := []struct {
 		role        models.Role
@@ -86,7 +89,7 @@ func TestRequireRolesContributionSettingsPermissions(t *testing.T) {
 		{models.RoleSecretary, 403, 200},
 		{models.RoleMember, 403, 403},
 		{models.RoleTreasurer, 403, 403},
-		{models.RoleAdmin, 200, 200}, // admin bypasses
+		{models.RoleAdmin, 403, 403}, // admin is distinct from leadership — no bypass
 	}
 	for _, tc := range cases {
 		app := newRoleTestApp(tc.role)
@@ -110,7 +113,7 @@ func TestRequireRolesPaymentMethodPermissions(t *testing.T) {
 		{models.RoleTreasurer, 200, 200, 200},
 		{models.RoleMember, 403, 403, 403},
 		{models.RoleSecretary, 403, 403, 403},
-		{models.RoleAdmin, 200, 200, 200}, // admin bypasses
+		{models.RoleAdmin, 403, 403, 403}, // admin is not group leadership — no bypass
 	}
 	for _, tc := range cases {
 		app := newRoleTestApp(tc.role)
@@ -142,7 +145,7 @@ func TestRequireRolesMemberApprovalPermissions(t *testing.T) {
 		{models.RoleSecretary, 200, 200},
 		{models.RoleTreasurer, 403, 403},
 		{models.RoleMember, 403, 403},
-		{models.RoleAdmin, 200, 200}, // admin bypasses
+		{models.RoleAdmin, 403, 403}, // admin is not katibu — no bypass
 	}
 	for _, tc := range cases {
 		app := newRoleTestApp(tc.role)
@@ -155,7 +158,8 @@ func TestRequireRolesMemberApprovalPermissions(t *testing.T) {
 	}
 }
 
-// Loan portfolio: mwenyekiti/katibu/mweka hazina can view; member cannot.
+// Loan portfolio: mwenyekiti/katibu/mweka hazina can view; member and
+// system-level admin cannot (admin is not a group participant).
 func TestRequireRolesLoanPortfolioPermissions(t *testing.T) {
 	cases := []struct {
 		role models.Role
@@ -165,7 +169,7 @@ func TestRequireRolesLoanPortfolioPermissions(t *testing.T) {
 		{models.RoleSecretary, 200},
 		{models.RoleTreasurer, 200},
 		{models.RoleMember, 403},
-		{models.RoleAdmin, 200},
+		{models.RoleAdmin, 403},
 	}
 	for _, tc := range cases {
 		app := newRoleTestApp(tc.role)
@@ -186,7 +190,7 @@ func TestRequireRolesPokeaMichangoPermissions(t *testing.T) {
 		{models.RoleTreasurer, 200},
 		{models.RoleSecretary, 200}, // katibu keeps records view
 		{models.RoleMember, 403},
-		{models.RoleAdmin, 200},
+		{models.RoleAdmin, 403}, // admin is not group operations
 	}
 	for _, tc := range cases {
 		app := newRoleTestApp(tc.role)
@@ -207,12 +211,55 @@ func TestRequireRolesWelfareContributionsPermissions(t *testing.T) {
 		{models.RoleChair, 200},
 		{models.RoleSecretary, 200},
 		{models.RoleTreasurer, 200},
-		{models.RoleAdmin, 200},
+		{models.RoleAdmin, 403}, // admin is not group operations
 	}
 	for _, tc := range cases {
 		app := newRoleTestApp(tc.role)
 		if got := testRequest(t, app, "GET", "/welfare/contributions"); got != tc.code {
 			t.Errorf("role=%s welfare contributions: got %d, want %d", tc.role, got, tc.code)
+		}
+	}
+}
+
+// Admin is a distinct system-level role: it passes ONLY when explicitly
+// listed (audit-logs / notification-settings pattern: chair + admin).
+// Group-operational guards above prove the negative side; this proves the
+// positive side — explicit listing still grants admin access.
+func TestRequireRolesExplicitAdminAllowlist(t *testing.T) {
+	newAdminApp := func(role models.Role) *fiber.App {
+		app := fiber.New()
+		app.Use(func(c *fiber.Ctx) error {
+			c.Locals("role", role)
+			return c.Next()
+		})
+		// Mirrors main.go: audit-logs + notification-settings (chairAdmin).
+		app.Get("/audit-logs", RequireRoles(models.RoleChair, models.RoleAdmin), func(c *fiber.Ctx) error {
+			return c.JSON(fiber.Map{"ok": true})
+		})
+		// Mirrors main.go: /admin/* (adminOnly).
+		app.Get("/admin/users", RequireRoles(models.RoleAdmin), func(c *fiber.Ctx) error {
+			return c.JSON(fiber.Map{"ok": true})
+		})
+		return app
+	}
+	cases := []struct {
+		role      models.Role
+		auditCode int
+		adminCode int
+	}{
+		{models.RoleAdmin, 200, 200},
+		{models.RoleChair, 200, 403},
+		{models.RoleMember, 403, 403},
+		{models.RoleSecretary, 403, 403},
+		{models.RoleTreasurer, 403, 403},
+	}
+	for _, tc := range cases {
+		app := newAdminApp(tc.role)
+		if got := testRequest(t, app, "GET", "/audit-logs"); got != tc.auditCode {
+			t.Errorf("role=%s audit-logs: got %d, want %d", tc.role, got, tc.auditCode)
+		}
+		if got := testRequest(t, app, "GET", "/admin/users"); got != tc.adminCode {
+			t.Errorf("role=%s admin/users: got %d, want %d", tc.role, got, tc.adminCode)
 		}
 	}
 }

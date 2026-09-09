@@ -9,9 +9,11 @@ import (
 
 // RequireSelfOrLeadership ensures the authenticated user is the target
 // themselves (member row or user id), or holds an elevated role
-// (chair/secretary/treasurer/admin), or holds any current leadership
+// (chair/secretary/treasurer), or holds any current leadership
 // position (dual plane). RBAC-M02: promotes the fragile handler-level
 // checks to middleware so future refactors cannot drop them silently.
+// NOTE: admin is a system-level role (not a group member / leader) and
+// does NOT bypass here — it may only view its own user record.
 func RequireSelfOrLeadership(resolveTarget func(c *fiber.Ctx) (targetMemberID, targetUserID string)) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userID := GetUserID(c)
@@ -20,9 +22,6 @@ func RequireSelfOrLeadership(resolveTarget func(c *fiber.Ctx) (targetMemberID, t
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "Huna ruhusa ya kufikia rasilimali hii",
 			})
-		}
-		if role == models.RoleAdmin {
-			return c.Next()
 		}
 		if role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer {
 			return c.Next()
@@ -53,14 +52,11 @@ func RequireSelfOrLeadership(resolveTarget func(c *fiber.Ctx) (targetMemberID, t
 		})
 	}
 }
-// Admin bypasses. Returns 403 if no member found.
+// RequireMember ensures the caller holds a group member row.
+// Admin has no member row (system-level role) and does NOT bypass —
+// it gets 403 like any non-member.
 func RequireMember() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		role := GetUserRole(c)
-		if role == models.RoleAdmin {
-			return c.Next()
-		}
-
 		userID := GetUserID(c)
 		if userID == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -82,14 +78,10 @@ func RequireMember() fiber.Handler {
 }
 
 // RequireLeadership ensures the authenticated user holds at least one of the specified leadership roles.
-// Admin bypasses. Leadership is checked via leadership_positions table (not user.role).
+// Leadership is checked via leadership_positions table (not user.role).
+// Admin does NOT bypass — it is a system-level role, not group leadership.
 func RequireLeadership(roles ...models.LeadershipRole) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		role := GetUserRole(c)
-		if role == models.RoleAdmin {
-			return c.Next()
-		}
-
 		userID := GetUserID(c)
 		if userID == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{

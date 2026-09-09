@@ -66,8 +66,9 @@ func loadGroupForPaymentMethods(c *fiber.Ctx) *models.Group {
 	return &g
 }
 
-// List returns the group's payment methods. Members (and any non-leadership
-// role) see only active ones; leadership sees all (including deactivated).
+// List returns the group's payment methods. Only chair/treasurer see the
+// full list (incl. pending/deactivated); everyone else — members AND the
+// system-level admin (not a group participant) — sees only active ones.
 // GET /api/v1/groups/:id/payment-methods
 func (h *PaymentMethodHandler) List(c *fiber.Ctx) error {
 	g := loadGroupForPaymentMethods(c)
@@ -77,7 +78,7 @@ func (h *PaymentMethodHandler) List(c *fiber.Ctx) error {
 
 	role := middleware.GetUserRole(c)
 	query := database.DB.Where("group_id = ?", g.ID)
-	if role != models.RoleChair && role != models.RoleTreasurer && role != models.RoleAdmin {
+	if role != models.RoleChair && role != models.RoleTreasurer {
 		query = query.Where("status = ? AND is_active = TRUE", models.PaymentMethodApproved)
 	}
 
@@ -177,12 +178,13 @@ func (h *PaymentMethodHandler) Update(c *fiber.Ctx) error {
 	}
 
 	// Treasurer edits to an approved method send it back to pending for
-	// re-approval; chair edits approve immediately.
+	// re-approval; chair edits approve immediately. Admin cannot reach
+	// here (route guard) and never auto-approves.
 	role := middleware.GetUserRole(c)
 	userID := middleware.GetUserID(c)
 	msg := "Mabadiliko yamehifadhiwa"
 	now := time.Now()
-	if role == models.RoleChair || role == models.RoleAdmin {
+	if role == models.RoleChair {
 		pm.Status = models.PaymentMethodApproved
 		pm.ApprovedBy = &userID
 		pm.ApprovedAt = &now
@@ -206,7 +208,8 @@ func (h *PaymentMethodHandler) Update(c *fiber.Ctx) error {
 }
 
 // Approve marks a pending payment method as approved so members can see it.
-// Mwenyekiti only (route guard; admin bypasses via RequireRoles).
+// Mwenyekiti only (route guard). Admin is NOT allowed — it is a
+// system-level role, not group leadership.
 // POST /api/v1/groups/:id/payment-methods/:pmId/approve
 func (h *PaymentMethodHandler) Approve(c *fiber.Ctx) error {
 	g := loadGroupForPaymentMethods(c)

@@ -130,8 +130,10 @@ func (h *LoanHandler) Apply(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mwanachama huyu hayupo au si hai"})
 	}
 
-	// Members may only apply for their own linked member record; staff may apply on behalf
-	canApplyOnBehalf := role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer || role == models.RoleAdmin
+	// Members may only apply for their own linked member record; leadership
+	// staff (chair/secretary/treasurer) may apply on behalf. Admin is a
+	// system-level role, NOT group staff — no on-behalf privilege.
+	canApplyOnBehalf := role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer
 	if !canApplyOnBehalf {
 		if member.UserID == nil || *member.UserID != userID {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{

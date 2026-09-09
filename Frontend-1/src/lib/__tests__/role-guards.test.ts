@@ -28,9 +28,13 @@ describe("hasRole", () => {
     expect(hasRole(createUser("chair"), "chair", "secretary")).toBe(true);
   });
 
-  it("admin bypasses all role checks", () => {
-    expect(hasRole(createUser("admin"), "chair")).toBe(true);
-    expect(hasRole(createUser("admin"), "member")).toBe(true);
+  it("admin is distinct — passes ONLY when explicitly listed", () => {
+    expect(hasRole(createUser("admin"), "admin")).toBe(true);
+    expect(hasRole(createUser("admin"), "chair")).toBe(false);
+    expect(hasRole(createUser("admin"), "member")).toBe(false);
+    expect(hasRole(createUser("admin"), "secretary")).toBe(false);
+    // Explicit allowlist (e.g. audit-logs / notification-settings pattern)
+    expect(hasRole(createUser("admin"), "chair", "admin")).toBe(true);
   });
 
   it("normal member is not admin", () => {

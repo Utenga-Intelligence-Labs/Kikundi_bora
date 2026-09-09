@@ -789,7 +789,7 @@ var leadershipPositions = []models.PositionType{
 }
 
 // isEligibleCommitteeVoter matches who may vote: leadership role, leadership position, or appointed.
-// System admin is not a committee voter (may still access committee routes via middleware for oversight).
+// System admin is not a group participant and is not a committee voter.
 func (h *LoanCommitteeHandler) isEligibleCommitteeVoter(db *gorm.DB, userID string, role models.Role) bool {
 	if role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer {
 		return true

@@ -14,11 +14,12 @@ import { Stamp } from "lucide-react";
 /**
  * PendingApprovalsCard — extends the leadership settings page with the
  * katibu approvals queue for offence-type changes and fine waivers.
- * Only katibu (and admin) see the decide buttons; others see nothing.
+ * Only katibu sees the decide buttons; others see nothing. Admin is a
+ * system-level role (not group leadership) and is excluded.
  */
 export function PendingApprovalsCard() {
   const { user } = useAuth();
-  const isSecretary = hasRole(user, "secretary", "admin");
+  const isSecretary = hasRole(user, "secretary");
   const { data: gs } = useQuery({
     queryKey: ["groups", "current"],
     queryFn: () => groupsApi.current(),

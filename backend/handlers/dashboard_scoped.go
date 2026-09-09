@@ -114,17 +114,15 @@ func sumContributionsBothStores(memberID string, onlyAkiba bool) (decimal.Decima
 }
 
 // requesterIsSelfOrLeadership reports whether the authenticated user may view
-// the given target member's / user's data: themself, an admin, a leadership
+// the given target member's / user's data: themself, a leadership
 // user role (chair/secretary/treasurer), or a holder of a current leadership
-// position (dual plane).
+// position (dual plane). Admin is system-level (not a group participant)
+// and may only view its OWN record — no blanket bypass.
 func requesterIsSelfOrLeadership(c *fiber.Ctx, targetMemberID, targetUserID string) bool {
 	userID := middleware.GetUserID(c)
 	role := middleware.GetUserRole(c)
 	if userID == "" {
 		return false
-	}
-	if role == models.RoleAdmin {
-		return true
 	}
 
 	var own models.Member
@@ -656,7 +654,7 @@ func (h *DashboardHandler) UserRoles(c *fiber.Ctx) error {
 		})
 	}
 
-	// Privacy guard: self, admin or leadership only.
+	// Privacy guard: self or leadership only (admin: self only).
 	if !requesterIsSelfOrLeadership(c, "", targetUserID) {
 		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 			"message": "Huna ruhusa ya kuona majukumu ya mtumiaji huyu",

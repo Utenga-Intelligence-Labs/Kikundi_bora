@@ -8,14 +8,9 @@ import (
 )
 
 // RequirePosition checks if the authenticated user holds at least one of the specified positions.
-// Admin role bypasses this check.
+// Admin is a system-level role (no group position) and does NOT bypass.
 func RequirePosition(positions ...models.PositionType) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		role, ok := c.Locals("role").(models.Role)
-		if ok && role == models.RoleAdmin {
-			return c.Next()
-		}
-
 		userID := GetUserID(c)
 
 		var count int64

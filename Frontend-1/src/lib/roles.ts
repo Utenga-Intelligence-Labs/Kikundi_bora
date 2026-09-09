@@ -93,11 +93,17 @@ export const sidebarNav: Record<Jukumu, NavItem[]> = {
 };
 
 // Dual plane navigation: returns member nav + leadership nav (if applicable)
+// Admin (Msimamizi) is a system-level role — NOT a group member and NOT
+// group leadership — so it gets only the admin nav (no member items, no
+// leadership items, no group-operational links).
 export function getDualPlaneNav(
   jukumu: Jukumu,
   isCommitteeMember: boolean,
   leadership: LeadershipRole[] = []
 ): { member: NavItem[]; leadership: NavItem[] } {
+  if (jukumu === "Msimamizi") {
+    return { member: [...sidebarNav.Msimamizi], leadership: [] };
+  }
   const member = [...memberNav];
   
   // Filter leadership nav based on user's actual leadership roles

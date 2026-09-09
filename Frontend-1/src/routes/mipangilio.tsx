@@ -95,7 +95,8 @@ function MipangilioPage() {
   return (
     <AppShell title="Mipangilio" subtitle="Sanidi mfumo kulingana na kikundi chako">
       <DissolvedBanner />
-      <DissolutionSection />
+      {/* Dissolution voting/execution is a group-member operation — not admin's. */}
+      {!isAdmin && <DissolutionSection />}
       {isChair && (
         <div className="card-surface p-4 flex items-center justify-between gap-3" data-testid="group-setup-card">
           <div>
@@ -112,18 +113,24 @@ function MipangilioPage() {
           </button>
         </div>
       )}
-      <ContributionSettingsCard />
-      <div className="mt-4">
-        <PendingApprovalsCard />
-      </div>
+      {/* Group-operational sections — mwenyekiti/katibu concern, NOT admin.
+          Admin is a system-level role (not a group participant). */}
+      {!isAdmin && <ContributionSettingsCard />}
+      {!isAdmin && (
+        <div className="mt-4">
+          <PendingApprovalsCard />
+        </div>
+      )}
       {(isChair || isAdmin) && (
         <div className="mt-4">
           <SmsSettingsCard />
         </div>
       )}
-      <div className="mt-4">
-        <PaymentMethodsCard />
-      </div>
+      {!isAdmin && (
+        <div className="mt-4">
+          <PaymentMethodsCard />
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-2 mt-4">
         <Card icon={Cog} title="Taarifa za Kikundi">
           <Row k="Jina la kikundi" v="Money Seeking" />

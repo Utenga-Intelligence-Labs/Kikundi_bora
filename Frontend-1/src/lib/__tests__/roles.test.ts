@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSidebarNav, mobileNav, sidebarNav, roleSubtitle } from "../roles";
+import { getSidebarNav, mobileNav, sidebarNav, roleSubtitle, getDualPlaneNav } from "../roles";
 
 describe("sidebarNav", () => {
   it("Mwenyekiti has 11 items (inayosubiri merged into michango)", () => {
@@ -86,5 +86,24 @@ describe("roleSubtitle", () => {
     for (const role of roles) {
       expect(roleSubtitle[role as keyof typeof roleSubtitle]).toBeTruthy();
     }
+  });
+});
+
+describe("getDualPlaneNav admin isolation", () => {
+  it("admin (Msimamizi) gets only admin nav — no member or leadership items", () => {
+    const { member, leadership } = getDualPlaneNav("Msimamizi", false, []);
+    expect(leadership).toHaveLength(0);
+    expect(member.map((i) => i.to).sort()).toEqual(
+      ["/admin", "/admin-logs", "/dashibodi"].sort()
+    );
+  });
+
+  it("admin gets no group-operational links even with committee flag", () => {
+    const { member, leadership } = getDualPlaneNav("Msimamizi", true, ["MWENYEKITI"]);
+    expect(leadership).toHaveLength(0);
+    const tos = member.map((i) => i.to);
+    expect(tos).not.toContain("/weka-mchango");
+    expect(tos).not.toContain("/michango");
+    expect(tos).not.toContain("/njia-za-malipo");
   });
 });

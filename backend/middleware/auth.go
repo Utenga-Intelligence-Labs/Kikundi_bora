@@ -106,10 +106,13 @@ func RequireRoles(roles ...models.Role) fiber.Handler {
 			})
 		}
 
-		// Admin bypasses all role checks
-		if role == models.RoleAdmin {
-			return c.Next()
-		}
+		// Admin is a distinct system-level role — NOT a superset of
+		// leadership/member roles. It passes ONLY when explicitly listed
+		// (e.g. RequireRoles(RoleChair, RoleAdmin) for audit-logs /
+		// notification-settings, RequireRoles(RoleAdmin) for /admin/*).
+		// Group-operational endpoints (contribution-settings propose/
+		// approve, payment-methods manage, michango, etc.) list only
+		// leadership roles, so admin correctly gets 403 there.
 
 		for _, r := range roles {
 			if role == r {
@@ -124,9 +127,11 @@ func RequireRoles(roles ...models.Role) fiber.Handler {
 }
 
 // RequireLoanCommitteeMember allows access if the user is an eligible committee voter:
-// - Admin or leadership role (chair / secretary / treasurer)
+// - Leadership role (chair / secretary / treasurer)
 // - Active leadership position (CHAIRPERSON, SECRETARY, TREASURER)
 // - Active appointed committee member in loan_committee_members
+// Admin is a system-level role, NOT a committee voter — it must use
+// explicit admin endpoints, so it is NOT auto-allowed here.
 // Matches handlers.LoanCommitteeHandler.isEligibleCommitteeVoter.
 func RequireLoanCommitteeMember() fiber.Handler {
 	return func(c *fiber.Ctx) error {
@@ -138,8 +143,10 @@ func RequireLoanCommitteeMember() fiber.Handler {
 			})
 		}
 
-		// Admin and leadership roles may access (same as review eligibility)
-		if role == models.RoleAdmin || role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer {
+		// Leadership roles may access (same as review eligibility).
+		// NOTE: admin is NOT included — it is a system-level role, not a
+		// group member or committee voter.
+		if role == models.RoleChair || role == models.RoleSecretary || role == models.RoleTreasurer {
 			return c.Next()
 		}
 

@@ -22,7 +22,9 @@ export function PaymentMethodsCard() {
   const qc = useQueryClient();
   const { showModal } = useAppModal();
   const canManage = user?.role === "chair" || user?.role === "treasurer";
-  const canApprove = user?.role === "chair" || user?.role === "admin";
+  // Approve is mwenyekiti-only. Admin is a system-level role (not group
+  // leadership) and must NOT approve payment methods.
+  const canApprove = user?.role === "chair";
   const isPending = (pm: PaymentMethod) => pm.status === "pending";
 
   const { data: gs } = useQuery({

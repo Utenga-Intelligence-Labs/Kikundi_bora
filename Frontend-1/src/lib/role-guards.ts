@@ -26,13 +26,13 @@ export function requireAuth(user?: User | null) {
 
 /**
  * beforeLoad guard: require auth + one of the given roles (from JWT payload).
- * Admin bypasses role checks. Used for /admin, money pages, etc.
+ * Admin is a distinct system-level role and passes ONLY when explicitly
+ * listed (e.g. requireRole("admin") for /admin). No blanket bypass.
  */
 export function requireRole(...roles: string[]) {
   requireAuth();
   if (typeof window === "undefined") return;
   const role = getTokenRole();
-  if (role === "admin") return;
   if (!role || !roles.includes(role)) {
     throw redirect({ to: "/dashibodi" });
   }
@@ -40,6 +40,7 @@ export function requireRole(...roles: string[]) {
 
 /**
  * Component-level check against a resolved User from /me.
+ * Admin passes ONLY when explicitly listed — no blanket bypass.
  */
 export function requireUserRole(
   user: User | null | undefined,
@@ -47,7 +48,6 @@ export function requireUserRole(
 ) {
   requireAuth(user);
   if (!user) return; // still loading, requireAuth already checked token exists
-  if (user.role === "admin") return;
   if (!roles.includes(user.role)) {
     throw redirect({ to: "/dashibodi" });
   }
@@ -58,7 +58,6 @@ export function hasRole(
   ...roles: string[]
 ): boolean {
   if (!user) return false;
-  if (user.role === "admin") return true;
   return roles.includes(user.role);
 }
 
@@ -71,19 +70,19 @@ export function blockAdminFromPage() {
   }
 }
 
-// Dual plane guard: requires user to have a linked member row
+// Dual plane guard: requires user to have a linked member row.
+// Admin has no member row (system-level role) — no bypass.
 export function requireMember(user: User | null | undefined) {
   requireAuth(user);
-  if (user && user.role === "admin") return;
   if (user && !user.member_id) {
     throw redirect({ to: "/dashibodi" });
   }
 }
 
-// Dual plane guard: requires user to hold at least one of the given leadership roles
+// Dual plane guard: requires user to hold at least one of the given leadership roles.
+// Admin is not group leadership — no bypass.
 export function requireLeadership(user: User | null | undefined, ...roles: string[]) {
   requireAuth(user);
-  if (user && user.role === "admin") return;
   if (user && (!user.leadership || !user.leadership.some((r) => roles.includes(r)))) {
     throw redirect({ to: "/dashibodi" });
   }
