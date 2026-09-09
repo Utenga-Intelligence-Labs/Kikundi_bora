@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"time"
 
 	"kikundibora/database"
@@ -144,6 +145,73 @@ type proposeRequest struct {
 	ContributionInterval    string           `json:"contribution_interval"`
 	ContributionDueDate     string           `json:"contribution_due_date"`
 	FixedContributionAmount *decimal.Decimal `json:"fixed_contribution_amount"`
+}
+
+// profileUpdateRequest patches group profile metadata (name / location /
+// founded year). Direct edit — deliberately OUTSIDE the contribution
+// proposal flow (chair-propose + secretary-approve), which governs ONLY
+// contribution interval/due-date/amount.
+type profileUpdateRequest struct {
+	Name        *string `json:"name"`
+	Location    *string `json:"location"`
+	FoundedYear *int    `json:"founded_year"`
+}
+
+// PATCH /api/v1/groups/:id/profile — Mwenyekiti + Msimamizi only.
+// Msimamizi (system admin) manages platform/group metadata but stays out
+// of group financial operations (see contribution-settings guards).
+func (h *GroupSettingsHandler) UpdateProfile(c *fiber.Ctx) error {
+	if ok, err := database.IsCurrentGroup(c.Params("id")); err != nil || !ok {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+	}
+	var g models.Group
+	if err := database.DB.First(&g, "id = ?", c.Params("id")).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Kikundi hakijapatikana"})
+	}
+
+	var req profileUpdateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Data si sahihi"})
+	}
+	if req.Name == nil && req.Location == nil && req.FoundedYear == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hakuna mabadiliko yaliyotumwa"})
+	}
+
+	if req.Name != nil {
+		name := strings.TrimSpace(*req.Name)
+		if len(name) < 2 || len(name) > 150 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Jina la kikundi lazima liwe na herufi 2–150"})
+		}
+		g.Name = name
+	}
+	if req.Location != nil {
+		loc := strings.TrimSpace(*req.Location)
+		if len(loc) > 150 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mahali pafupi sana (max herufi 150)"})
+		}
+		if loc == "" {
+			g.Location = nil
+		} else {
+			g.Location = &loc
+		}
+	}
+	if req.FoundedYear != nil {
+		if *req.FoundedYear < 1900 || *req.FoundedYear > time.Now().Year() {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mwaka ulioanzishwa si sahihi"})
+		}
+		g.FoundedYear = req.FoundedYear
+	}
+
+	if err := database.DB.Save(&g).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kuhifadhi taarifa za kikundi"})
+	}
+
+	userID := middleware.GetUserID(c)
+	services.LogAudit(c, &userID, models.AuditUpdate, "groups", &g.ID, nil, map[string]interface{}{
+		"name": g.Name, "location": g.Location, "founded_year": g.FoundedYear,
+	})
+
+	return c.JSON(fiber.Map{"message": "Taarifa za kikundi zimehifadhiwa.", "data": g})
 }
 
 // POST /api/v1/groups/:id/contribution-settings/propose — Mwenyekiti only.

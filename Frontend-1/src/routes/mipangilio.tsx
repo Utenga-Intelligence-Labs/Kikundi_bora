@@ -25,6 +25,7 @@ import {
   Users,
   Search,
   Loader2,
+  Pencil,
   X,
   Trash,
   Database,
@@ -132,44 +133,14 @@ function MipangilioPage() {
         </div>
       )}
       <div className="grid gap-4 lg:grid-cols-2 mt-4">
-        <Card icon={Cog} title="Taarifa za Kikundi">
-          <Row k="Jina la kikundi" v="Money Seeking" />
-          <Row k="Mahali" v="Iringa, Tanzania" />
-          <Row k="Mwaka ulioanzishwa" v="2024" />
-          {!isChair && !isAdmin && <Row k="Mchango wa kawaida" v={`${mchango} TZS / mwezi`} />}
-          {isChair && editingMchango ? (
-            <div className="flex items-center gap-2 px-4 py-2.5">
-              <span className="text-sm text-muted-foreground">Mchango wa kawaida</span>
-              <div className="flex items-center gap-1.5 ml-auto">
-                <input
-                  type="text"
-                  value={mchangoInput}
-                  onChange={(e) => setMchangoInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && saveMchango()}
-                  className="w-28 rounded-lg border border-input bg-background px-2 py-1 text-sm text-right font-semibold outline-none focus:border-primary"
-                  autoFocus
-                />
-                <span className="text-sm text-muted-foreground">TZS / mwezi</span>
-                <button onClick={saveMchango} className="rounded-lg bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Hifadhi</button>
-                <button onClick={() => setEditingMchango(false)} className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-muted">Ghairi</button>
-              </div>
-            </div>
-          ) : isChair ? (
-            <div
-              className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/50"
-              onClick={() => {
-                setMchangoInput(mchango.replace(/,/g, ""));
-                setEditingMchango(true);
-              }}
-            >
-              <span className="text-sm text-muted-foreground">Mchango wa kawaida</span>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold">{mchango} TZS / mwezi</span>
-                <Cog className="h-3.5 w-3.5 text-muted-foreground" />
-              </div>
-            </div>
-          ) : null}
-        </Card>
+        <GroupProfileCard
+          mchango={mchango}
+          editingMchango={editingMchango}
+          mchangoInput={mchangoInput}
+          setMchangoInput={setMchangoInput}
+          saveMchango={saveMchango}
+          setEditingMchango={setEditingMchango}
+        />
 
         {!isAdmin && (
           <Card icon={Bell} title="Arifa">
@@ -638,6 +609,192 @@ function LoanCommitteeManagement() {
           </div>
         </div>
       )}
+    </Card>
+  );
+}
+
+// ==================== GROUP PROFILE (Taarifa za Kikundi) ====================
+// API-backed group metadata. Editable by Msimamizi (admin) + Mwenyekiti
+// (chair) via PATCH /groups/:id/profile. Lugha/Sarafu/Eneo stay read-only
+// app constants (not group data).
+function GroupProfileCard({
+  mchango,
+  editingMchango,
+  mchangoInput,
+  setMchangoInput,
+  saveMchango,
+  setEditingMchango,
+}: {
+  mchango: string;
+  editingMchango: boolean;
+  mchangoInput: string;
+  setMchangoInput: (v: string) => void;
+  saveMchango: () => void;
+  setEditingMchango: (v: boolean) => void;
+}) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const isChair = user?.role === "chair";
+  const isAdmin = user?.role === "admin";
+  const canEditProfile = isChair || isAdmin;
+
+  const { data: grp, isLoading } = useQuery({
+    queryKey: ["groups", "current"],
+    queryFn: groupsApi.current,
+  });
+  const group = grp?.data;
+
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState("");
+  const [location, setLocation] = useState("");
+  const [foundedYear, setFoundedYear] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const startEdit = () => {
+    setName(group?.name ?? "");
+    setLocation(group?.location ?? "");
+    setFoundedYear(group?.founded_year != null ? String(group.founded_year) : "");
+    setError(null);
+    setEditing(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload: { name?: string; location?: string; founded_year?: number } = {
+        name: name.trim(),
+        location: location.trim(),
+      };
+      if (foundedYear.trim()) payload.founded_year = parseInt(foundedYear.trim(), 10);
+      return groupsApi.updateProfile(group!.id, payload);
+    },
+    onSuccess: () => {
+      setEditing(false);
+      setError(null);
+      qc.invalidateQueries({ queryKey: ["groups"] });
+    },
+    onError: (e: Error) => setError(e.message),
+  });
+
+  const yearNum = parseInt(foundedYear.trim(), 10);
+  const yearValid =
+    foundedYear.trim() === "" ||
+    (Number.isInteger(yearNum) && yearNum >= 1900 && yearNum <= new Date().getFullYear());
+  const canSave =
+    name.trim().length >= 2 && name.trim().length <= 150 && location.trim().length <= 150 && yearValid;
+
+  return (
+    <Card icon={Cog} title="Taarifa za Kikundi">
+      {isLoading ? (
+        <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Inapakia...
+        </div>
+      ) : !editing ? (
+        <>
+          <div className="flex items-center justify-between px-4 py-2.5">
+            <span className="text-sm text-muted-foreground">Jina la kikundi</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">{group?.name ?? "—"}</span>
+              {canEditProfile && (
+                <button
+                  onClick={startEdit}
+                  aria-label="Hariri taarifa za kikundi"
+                  className="grid h-7 w-7 place-items-center rounded-lg border border-border hover:bg-muted"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+          <Row k="Mahali" v={group?.location || "— Haijawekwa"} />
+          <Row k="Mwaka ulioanzishwa" v={group?.founded_year != null ? String(group.founded_year) : "— Haijawekwa"} />
+        </>
+      ) : (
+        <div className="space-y-3 px-4 py-3">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Jina la kikundi</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={150}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              autoFocus
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Mahali</span>
+            <input
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              maxLength={150}
+              placeholder="Iringa, Tanzania"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Mwaka ulioanzishwa</span>
+            <input
+              value={foundedYear}
+              onChange={(e) => setFoundedYear(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+              placeholder="2024"
+              inputMode="numeric"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          {!yearValid && (
+            <p className="text-xs text-destructive">Mwaka lazima uwe kati ya 1900 na {new Date().getFullYear()}.</p>
+          )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={!canSave || saveMutation.isPending}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Hifadhi
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-muted"
+            >
+              Ghairi
+            </button>
+          </div>
+        </div>
+      )}
+      {!isChair && !isAdmin && <Row k="Mchango wa kawaida" v={`${mchango} TZS / mwezi`} />}
+      {isChair && editingMchango ? (
+        <div className="flex items-center gap-2 px-4 py-2.5">
+          <span className="text-sm text-muted-foreground">Mchango wa kawaida</span>
+          <div className="flex items-center gap-1.5 ml-auto">
+            <input
+              type="text"
+              value={mchangoInput}
+              onChange={(e) => setMchangoInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && saveMchango()}
+              className="w-28 rounded-lg border border-input bg-background px-2 py-1 text-sm text-right font-semibold outline-none focus:border-primary"
+              autoFocus
+            />
+            <span className="text-sm text-muted-foreground">TZS / mwezi</span>
+            <button onClick={saveMchango} className="rounded-lg bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Hifadhi</button>
+            <button onClick={() => setEditingMchango(false)} className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-muted">Ghairi</button>
+          </div>
+        </div>
+      ) : isChair ? (
+        <div
+          className="flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-muted/50"
+          onClick={() => {
+            setMchangoInput(mchango.replace(/,/g, ""));
+            setEditingMchango(true);
+          }}
+        >
+          <span className="text-sm text-muted-foreground">Mchango wa kawaida</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold">{mchango} TZS / mwezi</span>
+            <Cog className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }

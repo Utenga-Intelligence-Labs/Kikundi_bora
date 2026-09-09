@@ -178,6 +178,10 @@ func main() {
 	// Chair proposes; only secretary approval applies changes.
 	groups := protected.Group("/groups")
 	groups.Get("/current", groupSettingsHandler.GetCurrent)
+	// Group profile metadata (name/location/founded year): direct edit by
+	// Mwenyekiti + Msimamizi. Separate from the contribution-settings
+	// proposal flow (chair propose + secretary approve).
+	groups.Patch("/:id/profile", middleware.RequireRoles(models.RoleChair, models.RoleAdmin), groupSettingsHandler.UpdateProfile)
 	// Role-scoped group dashboard summaries (leadership + admin only)
 	groups.Get("/:id/dashboard-summary",
 		middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary),

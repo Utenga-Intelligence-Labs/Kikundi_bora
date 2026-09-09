@@ -7,6 +7,8 @@ export type ContributionInterval = "weekly" | "monthly" | "semi_annual" | "yearl
 export interface GroupInfo {
   id: string;
   name: string;
+  location?: string | null;
+  founded_year?: number | null;
   contribution_interval: ContributionInterval;
   contribution_due_date?: string | null;
   fixed_contribution_amount?: string | null;
@@ -83,5 +85,12 @@ export const groupsApi = {
     api.post<{ message: string; data: GroupSettingProposal }>(
       `/groups/${groupId}/contribution-settings/reject`,
       { reason }
+    ),
+
+  /** Mwenyekiti (chair) + Msimamizi (admin) only — group profile metadata. */
+  updateProfile: (groupId: string, data: { name?: string; location?: string; founded_year?: number }) =>
+    api.patch<{ message: string; data: GroupInfo }>(
+      `/groups/${groupId}/profile`,
+      data
     ),
 };
