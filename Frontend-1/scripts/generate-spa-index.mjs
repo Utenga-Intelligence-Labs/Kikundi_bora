@@ -23,8 +23,26 @@ if (!fs.existsSync(assetsDir)) {
 // all window.$_TSR boot data. Serving it as index.html is the whole story.
 const shellPath = path.join(clientDir, "_shell.html");
 if (fs.existsSync(shellPath)) {
-  fs.copyFileSync(shellPath, path.join(clientDir, "index.html"));
-  console.log(`SPA shell → index.html (copied from _shell.html)`);
+  let html = fs.readFileSync(shellPath, "utf8");
+  const inlineScripts = [];
+  const scriptRegex = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  let idx = 0;
+  while ((match = scriptRegex.exec(html)) !== null) {
+    const fullTag = match[0];
+    const content = match[1].trim();
+    if (!content) continue;
+    const assetName = idx === 0 ? "tsr-scroll-restoration.js" : `tsr-inline-${idx}.js`;
+    const assetPath = path.join(assetsDir, assetName);
+    fs.writeFileSync(assetPath, content + "\n");
+    const attrs = fullTag.match(/^<script([^>]*)>/)[1];
+    const replacement = `<script${attrs} src="/assets/${assetName}"></script>`;
+    html = html.replace(fullTag, replacement);
+    inlineScripts.push(assetName);
+    idx++;
+  }
+  fs.writeFileSync(path.join(clientDir, "index.html"), html);
+  console.log(`SPA shell → index.html (externalized ${inlineScripts.length} inline scripts: ${inlineScripts.join(", ")})`);
   process.exit(0);
 }
 
