@@ -84,6 +84,20 @@ function UkaguziMkopoPage() {
   }
 
   const { data: loan, reviews, contributions, previous_loans, outstanding_balance } = loanData;
+  // Backend now sends the known roster + who is still missing ("bado").
+  // Fallback: derive from reviews when backend fields are absent (old build).
+  const pendingList =
+    loanData.pending_reviewers ??
+    (loanData.committee_members ?? [])
+      .filter(
+        (m) =>
+          !reviews?.some(
+            (r) =>
+              r.reviewer_id === m.user_id &&
+              (r.decision === "APPROVE" || r.decision === "REJECT"),
+          ),
+      )
+      .map((m) => ({ user_id: m.user_id, user_name: m.user_name ?? m.user_id }));
 
   // Check if current user already reviewed
   const myReview = reviews?.find((r) => r.reviewer_id === user?.id);
@@ -108,7 +122,7 @@ function UkaguziMkopoPage() {
 
   const approvedCount = reviews?.filter((r) => r.decision === "APPROVE").length ?? 0;
   const rejectedCount = reviews?.filter((r) => r.decision === "REJECT").length ?? 0;
-  const pendingCount = reviews?.filter((r) => r.decision === "PENDING").length ?? 0;
+  const pendingCount = pendingList.length;
 
   return (
     <AppShell
@@ -293,6 +307,22 @@ function UkaguziMkopoPage() {
                   )}
                 </div>
               ))}
+              {pendingList.map((p) => (
+                <div
+                  key={`pending-${p.user_id}`}
+                  className="flex items-center justify-between rounded-lg border border-dashed border-border px-4 py-3"
+                >
+                  <p className="font-semibold text-sm">{p.user_name}</p>
+                  <span className="chip bg-muted text-muted-foreground text-[10px]">
+                    Bado hajapitia
+                  </span>
+                </div>
+              ))}
+              {reviews?.length === 0 && pendingList.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Hakuna ukaguzi bado.
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -315,13 +345,20 @@ function UkaguziMkopoPage() {
                 <span className="text-muted-foreground">Bado hawajapitia</span>
                 <span className="font-semibold">{pendingCount}</span>
               </div>
+              {pendingList.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {pendingList.map((p) => p.user_name).join(", ")}
+                </p>
+              )}
               <div className="h-1.5 mt-2 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full bg-success transition-all"
                   style={{
                     width: `${
-                      reviews && reviews.length > 0
-                        ? (approvedCount / reviews.length) * 100
+                      approvedCount + rejectedCount + pendingCount > 0
+                        ? (approvedCount /
+                            (approvedCount + rejectedCount + pendingCount)) *
+                          100
                         : 0
                     }%`,
                   }}

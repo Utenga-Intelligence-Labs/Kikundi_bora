@@ -96,12 +96,12 @@ function MikopoPage() {
     >
       {!myMemberId && (
         <div className="card-surface mb-5 p-4">
-          <p className="text-sm">Hujasajiliwa kama mwanachama bado.</p>
+          <p className="text-sm">Kamilisha taarifa zako kwenye wasifu ili uanze kuomba mikopo.</p>
           <Link
             to="/wasifu"
             className="mt-2 inline-block text-sm font-semibold text-primary"
           >
-            Jisajili sasa →
+            Nenda kwenye Wasifu →
           </Link>
         </div>
       )}

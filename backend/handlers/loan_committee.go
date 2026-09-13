@@ -339,6 +339,7 @@ func (h *LoanCommitteeHandler) GetLoan(c *fiber.Ctx) error {
 		Scan(&outstandingBalance)
 
 	var reviewResponses []models.LoanReviewResponse
+	decided := make(map[string]struct{})
 	for _, r := range reviews {
 		rp := models.LoanReviewResponse{
 			ID:         r.ID,
@@ -355,6 +356,27 @@ func (h *LoanCommitteeHandler) GetLoan(c *fiber.Ctx) error {
 			rp.ReviewedAt = &t
 		}
 		reviewResponses = append(reviewResponses, rp)
+		if r.Decision == models.ReviewApprove || r.Decision == models.ReviewReject {
+			decided[r.ReviewerID] = struct{}{}
+		}
+	}
+
+	// Committee roster (eligible voters) minus borrower — borrower cannot
+	// review own loan, so they are excluded from "bado" (else the count
+	// deadlocks). Pending = roster members with no APPROVE/REJECT yet.
+	var borrowerMember models.Member
+	var borrowerUserID string
+	if err := database.DB.Select("id, user_id").First(&borrowerMember, "id = ?", loan.MemberID).Error; err == nil {
+		if borrowerMember.UserID != nil {
+			borrowerUserID = *borrowerMember.UserID
+		}
+	}
+	roster := h.committeeRoster(database.DB, borrowerUserID)
+	pendingReviewers := make([]map[string]string, 0)
+	for _, m := range roster {
+		if _, ok := decided[m["user_id"]]; !ok {
+			pendingReviewers = append(pendingReviewers, m)
+		}
 	}
 
 	return c.JSON(fiber.Map{
@@ -363,6 +385,8 @@ func (h *LoanCommitteeHandler) GetLoan(c *fiber.Ctx) error {
 		"contributions":       contributions,
 		"previous_loans":      previousLoans,
 		"outstanding_balance": outstandingBalance,
+		"committee_members":   roster,
+		"pending_reviewers":   pendingReviewers,
 	})
 }
 
@@ -461,6 +485,73 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		}
 	}
 
+	// SYNC: committee APPROVE mirrors to the parallel chain stage so both
+	// pages agree (ukaguzi ↔ uongozi). Leadership roles sign their chain
+	// slot too; appointed bodi members satisfy the bodi slot directly.
+	// Runs before the unanimous check so partial approvals already show.
+	if decision == models.ReviewApprove {
+		switch role {
+		case models.RoleTreasurer:
+			if loan.HazinaApprovedAt == nil {
+				loan.HazinaApprovedBy = &userID
+				loan.HazinaApprovedAt = &now
+			}
+		case models.RoleSecretary:
+			if loan.KatibuApprovedAt == nil {
+				loan.KatibuApprovedBy = &userID
+				loan.KatibuApprovedAt = &now
+			}
+		case models.RoleChair:
+			if loan.MwenyekitiApprovedAt == nil {
+				loan.MwenyekitiApprovedBy = &userID
+				loan.MwenyekitiApprovedAt = &now
+			}
+		default:
+			if loan.BodiApprovedAt == nil {
+				loan.BodiApprovedBy = &userID
+				loan.BodiApprovedAt = &now
+			}
+		}
+		if err := tx.Save(&loan).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"message": "Imeshindikana kusawazisha idhini",
+			})
+		}
+		// Parallel finalize: all four slots signed → APPROVED immediately,
+		// wherever the last signature came from.
+		if loan.HazinaApprovedAt != nil && loan.KatibuApprovedAt != nil &&
+			loan.BodiApprovedAt != nil && loan.MwenyekitiApprovedAt != nil {
+			loan.Status = models.LoanApproved
+			if loan.ApprovedAmount == nil {
+				loan.ApprovedAmount = &loan.Amount
+			}
+			loan.ReviewedBy = &userID
+			loan.ReviewedAt = &now
+			if err := tx.Save(&loan).Error; err != nil {
+				tx.Rollback()
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"message": "Imeshindikana kukamilisha idhini",
+				})
+			}
+			if err := tx.Commit().Error; err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"message": "Imeshindikana kukamilisha idhini",
+				})
+			}
+			services.LogAudit(c, &userID, models.AuditLoanReview, "loans", &loan.ID,
+				map[string]interface{}{"status": string(models.LoanUnderReview)},
+				map[string]interface{}{"status": string(models.LoanApproved), "via": "committee_sync"},
+			)
+			services.NotifyRole(models.RoleTreasurer, models.NotifLoanApproved, "Mkopo Umeidhinishwa — Toa Fedha",
+				"Mkopo wa TZS "+formatMoney(loan.Amount)+" umekamilika idhini zote. Toa fedha (Toa Mkopo).", "")
+			return c.JSON(fiber.Map{
+				"message": "Ukaguzi umehifadhiwa. Idhini zote zimekamilika — mkopo umeidhinishwa.",
+				"data":    loan,
+			})
+		}
+	}
+
 	if decision == models.ReviewReject {
 		reason := "Umekataliwa na kamati ya mikopo"
 		if req.Comments != nil && *req.Comments != "" {
@@ -517,15 +608,25 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		Count(&approveCount)
 
 	if approveCount >= totalCommittee {
-		// Committee unanimous → this satisfies the BODI stage of the
-		// sequential chain (Hazina → Katibu → Bodi → Mwenyekiti). It does
-		// NOT finalize the loan: Mwenyekiti still gives the final approval
-		// via POST /uongozi/mikopo/:id/approve. Status returns to PENDING
-		// so the chain can continue.
-		loan.Status = models.LoanPending
+		// Committee unanimous satisfies the BODI slot. Parallel rule:
+		// finalize APPROVED only when ALL chain slots are done (the SYNC
+		// mirror above may already have filled hazina/katibu/mwenyekiti
+		// from leadership reviews); otherwise back to PENDING awaiting
+		// the remaining chain signatures.
 		if loan.BodiApprovedAt == nil {
 			loan.BodiApprovedBy = &userID
 			loan.BodiApprovedAt = &now
+		}
+		if loan.HazinaApprovedAt != nil && loan.KatibuApprovedAt != nil &&
+			loan.BodiApprovedAt != nil && loan.MwenyekitiApprovedAt != nil {
+			loan.Status = models.LoanApproved
+			if loan.ApprovedAmount == nil {
+				loan.ApprovedAmount = &loan.Amount
+			}
+			loan.ReviewedBy = &userID
+			loan.ReviewedAt = &now
+		} else {
+			loan.Status = models.LoanPending
 		}
 		if err := tx.Save(&loan).Error; err != nil {
 			tx.Rollback()
@@ -539,6 +640,18 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 			})
 		}
 
+		if loan.Status == models.LoanApproved {
+			services.LogAudit(c, &userID, models.AuditLoanReview, "loans", &loan.ID,
+				map[string]interface{}{"status": string(models.LoanUnderReview)},
+				map[string]interface{}{"status": string(models.LoanApproved), "via": "committee_unanimous"},
+			)
+			services.NotifyRole(models.RoleTreasurer, models.NotifLoanApproved, "Mkopo Umeidhinishwa — Toa Fedha",
+				"Mkopo wa TZS "+formatMoney(loan.Amount)+" umekamilika idhini zote. Toa fedha (Toa Mkopo).", "")
+			return c.JSON(fiber.Map{
+				"message": "Ukaguzi umehifadhiwa. Kamati nzima imeidhinisha na idhini zote zimekamilika — mkopo umeidhinishwa.",
+				"data":    loan,
+			})
+		}
 		services.LogAudit(c, &userID, models.AuditLoanReview, "loans", &loan.ID,
 			map[string]interface{}{"status": string(models.LoanUnderReview)},
 			map[string]interface{}{"status": string(models.LoanPending), "stage": "bodi_done"},
@@ -831,6 +944,54 @@ func (h *LoanCommitteeHandler) isEligibleCommitteeVoter(db *gorm.DB, userID stri
 		Where("user_id = ? AND is_active = TRUE", userID).
 		Count(&appointed)
 	return appointed > 0
+}
+
+// committeeRoster returns distinct eligible voters with names, optionally
+// excluding one user (borrower). Used for the "bado" (pending reviewers) list.
+func (h *LoanCommitteeHandler) committeeRoster(db *gorm.DB, excludeUserID string) []map[string]string {
+	if db == nil {
+		db = database.DB
+	}
+	eligible := make(map[string]struct{})
+
+	var positions []models.UserPosition
+	db.Where("position_type IN ? AND is_active = TRUE", leadershipPositions).Find(&positions)
+	for _, p := range positions {
+		eligible[p.UserID] = struct{}{}
+	}
+
+	var leaders []models.User
+	db.Where("role IN ? AND status = ? AND deleted_at IS NULL AND is_active = TRUE",
+		[]models.Role{models.RoleChair, models.RoleSecretary, models.RoleTreasurer},
+		models.UserStatusActive,
+	).Select("id").Find(&leaders)
+	for _, u := range leaders {
+		eligible[u.ID] = struct{}{}
+	}
+
+	var appointed []models.LoanCommitteeMember
+	db.Where("is_active = TRUE").Find(&appointed)
+	for _, a := range appointed {
+		eligible[a.UserID] = struct{}{}
+	}
+
+	if excludeUserID != "" {
+		delete(eligible, excludeUserID)
+	}
+	if len(eligible) == 0 {
+		return []map[string]string{}
+	}
+	ids := make([]string, 0, len(eligible))
+	for id := range eligible {
+		ids = append(ids, id)
+	}
+	var users []models.User
+	db.Where("id IN ?", ids).Select("id, name").Find(&users)
+	out := make([]map[string]string, 0, len(users))
+	for _, u := range users {
+		out = append(out, map[string]string{"user_id": u.ID, "user_name": u.Name})
+	}
+	return out
 }
 
 // countActiveCommitteeMembers returns distinct eligible voters (positions ∪ role leaders ∪ appointed).

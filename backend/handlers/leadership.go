@@ -350,6 +350,22 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		loan.BodiApprovedAt = &now
 	}
 
+	// SYNC: chain signature mirrors to committee reviews so the ukaguzi
+	// page counts it (uongozi ↔ ukaguzi agree). Upsert APPROVE; never
+	// overwrite an existing REJECT (rejection already finalized the loan,
+	// and this handler only runs on PENDING/UNDER_REVIEW anyway).
+	var cr models.LoanReview
+	if err := tx.Where("loan_id = ? AND reviewer_id = ?", loan.ID, userID).First(&cr).Error; err != nil {
+		tx.Create(&models.LoanReview{
+			LoanID: loan.ID, ReviewerID: userID,
+			Decision: models.ReviewApprove, ReviewedAt: &now,
+		})
+	} else if cr.Decision == models.ReviewPending {
+		cr.Decision = models.ReviewApprove
+		cr.ReviewedAt = &now
+		tx.Save(&cr)
+	}
+
 	// Finalize only when ALL four have signed.
 	if loanAllStagesDone(&loan) {
 		loan.Status = models.LoanApproved

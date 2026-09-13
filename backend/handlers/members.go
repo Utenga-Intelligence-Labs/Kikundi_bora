@@ -597,7 +597,7 @@ func (h *MemberHandler) ToggleActive(c *fiber.Ctx) error {
 	services.LogAudit(c, &userID, models.AuditUpdate, "members", &member.ID,
 		nil, map[string]interface{}{"is_active": member.IsActive})
 
-	msg := "Mwanachama ameilishwa."
+	msg := "Mwanachama ameamilishwa."
 	if !member.IsActive {
 		msg = "Mwanachama amezimwa."
 	}

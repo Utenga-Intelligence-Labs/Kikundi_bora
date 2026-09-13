@@ -4,8 +4,8 @@ import { AppShell } from "@/components/AppShell";
 import { useAuth } from "@/lib/auth-provider";
 import { requireAuth } from "@/lib/role-guards";
 import { roleMap, type Jukumu } from "@/api/types";
-import { useMembers, useCreateMember } from "@/hooks/use-members";
-import { User, Phone, Shield, KeyRound, Check, Palette, Camera, Trash2, MapPin, IdCard, Loader2 } from "lucide-react";
+import { useMembers } from "@/hooks/use-members";
+import { User, Phone, Shield, KeyRound, Check, Palette, Camera, Trash2, MapPin, Loader2 } from "lucide-react";
 import { initials } from "@/lib/utils";
 import { authApi } from "@/api/auth";
 import { uploadApi } from "@/api/upload";
@@ -25,7 +25,6 @@ function WasifuPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const { data: membersData } = useMembers({ page: 1, limit: 1, user_id: user ? String(user.id) : undefined });
-  const createMember = useCreateMember();
   const jukumuLabel: Jukumu = user ? (roleMap[user.role] ?? "Mwanachama") : "Mwanachama";
 
   // Form state — synced with user data via useEffect
@@ -115,17 +114,10 @@ function WasifuPage() {
     }
   };
 
-  const becomeMember = async () => {
-    try {
-      await createMember.mutateAsync({
-        full_name: jina || user.name,
-        phone: simu || user.phone,
-        address: anwani || undefined,
-        joined_at: new Date().toISOString().slice(0, 10),
-      });
-    } catch { /* handled by RQ */ }
-  };
-
+  // NOTE: self-registration as member was removed — tayari ni mwanachama.
+  // Plain members cannot POST /members (backend 403: chair/secretary/
+  // treasurer only), so the old button only produced an error. Missing
+  // member rows are linked by Katibu; here the user just completes details.
 
   return (
     <AppShell title="Wasifu wangu" subtitle="Hariri taarifa zako za akaunti">
@@ -169,9 +161,11 @@ function WasifuPage() {
               me ? (
                 <p className="mt-2 text-xs text-success">Mwanachama #{me.member_no}</p>
               ) : (
-                <button onClick={becomeMember} disabled={createMember.isPending} className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-50">
-                  <IdCard className="h-3.5 w-3.5" /> Jisajili kama mwanachama
-                </button>
+                <p className="mt-3 rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+                  Tayari ni mwanachama? Kamilisha taarifa zako hapa kwenye
+                  wasifu — ukikosa rekodi ya umember, wasiliana na Katibu
+                  akuunganishe.
+                </p>
               )
             )}
           </div>
