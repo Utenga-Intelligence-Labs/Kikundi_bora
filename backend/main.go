@@ -178,6 +178,10 @@ func main() {
 	// Chair proposes; only secretary approval applies changes.
 	groups := protected.Group("/groups")
 	groups.Get("/current", groupSettingsHandler.GetCurrent)
+	// Group profile metadata (name/location/founded year): direct edit by
+	// Mwenyekiti + Msimamizi. Separate from the contribution-settings
+	// proposal flow (chair propose + secretary approve).
+	groups.Patch("/:id/profile", middleware.RequireRoles(models.RoleChair, models.RoleAdmin), groupSettingsHandler.UpdateProfile)
 	// Role-scoped group dashboard summaries (leadership + admin only)
 	groups.Get("/:id/dashboard-summary",
 		middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary),
@@ -454,15 +458,20 @@ func main() {
 	michango.Post("/:id/confirm", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), memberContribHandler.Confirm)
 	michango.Post("/:id/reject", middleware.RequireRoles(models.RoleChair, models.RoleTreasurer), memberContribHandler.Reject)
 
-	// Leadership routes (dual plane — members with leadership roles)
+	// Leadership routes (dual plane — members with leadership roles).
+	// NOTE: do NOT attach RequireLeadership via uongozi.Use() — Fiber matches
+	// Use-middleware by path prefix, so it would also run on
+	// /uongozi/mikopo/* below (registered on `protected` on purpose) and
+	// block appointed bodi members (role=member, no leadership position).
+	// The guard is attached per-route instead.
 	uongozi := protected.Group("/uongozi")
-	uongozi.Use(middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary))
+	leadershipOnly := middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary)
 
-	uongozi.Get("/dashboard", leadershipHandler.Dashboard)
-	uongozi.Get("/quick-stats", leadershipHandler.QuickStats)
-	uongozi.Post("/announcements", announcementHandler.Broadcast)
-	uongozi.Get("/ripoti", leadershipHandler.Reports)
-	uongozi.Get("/wanachama", memberHandler.List)
+	uongozi.Get("/dashboard", leadershipOnly, leadershipHandler.Dashboard)
+	uongozi.Get("/quick-stats", leadershipOnly, leadershipHandler.QuickStats)
+	uongozi.Post("/announcements", leadershipOnly, announcementHandler.Broadcast)
+	uongozi.Get("/ripoti", leadershipOnly, leadershipHandler.Reports)
+	uongozi.Get("/wanachama", leadershipOnly, memberHandler.List)
 
 	// BUG-2 fix: the loan-approval chain routes live OUTSIDE the uongozi
 	// leadership group (its RequireLeadership middleware would block appointed

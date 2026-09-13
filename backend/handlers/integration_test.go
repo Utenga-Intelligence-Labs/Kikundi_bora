@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"kikundibora/config"
 	"kikundibora/database"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func fullTestApp() *fiber.App {
@@ -211,25 +213,27 @@ func TestLoanLifecycleHTTP(t *testing.T) {
 loanID := hExtract(t, d, "data")
 	t.Logf("Loan: %s", loanID)
 
-	// Step 2: Committee review — 3 leaders approve (satisfies the BODI stage)
+	// Appoint bodi FIRST so unanimous needs 4 (3 leaders + asha).
+	code, _ = hPost(t, app, "/api/v1/loan-committee/members", map[string]interface{}{
+		"user_id": hGetUserID(t, "asha@kikundi.tz"),
+	}, chair)
+	bodiTok := hLogin(t, app, "asha@kikundi.tz", "demo123")
+
+	// Step 2: Committee review — 3 leaders approve (SYNC mirrors to chain
+	// slots; BODI slot still missing → stays PENDING, not APPROVED).
 	review := map[string]interface{}{"decision": "APPROVE"}
 	for _, tok := range []string{chair, treasurer, secretary} {
 		code, _ = hPost(t, app, "/api/v1/loan-committee/loans/"+loanID+"/review", review, tok)
 		if code != 200 {
-			t.Logf("  review %d", code)
+			t.Fatalf("committee review: %d", code)
 		}
 	}
 
-	// Step 3: Sequential chain — Hazina → Katibu → Mwenyekiti finalizes
-	chainApprove := func(tok string) {
-		code, d = hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, tok)
-		if code != 200 {
-			t.Fatalf("chain approve: %d %s", code, d)
-		}
+	// Step 3: Parallel chain — bodi signs the last slot → 4/4 APPROVED.
+	code, d = hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, bodiTok)
+	if code != 200 {
+		t.Fatalf("chain bodi approve: %d %s", code, d)
 	}
-	chainApprove(treasurer)
-	chainApprove(secretary)
-	chainApprove(chair)
 
 	// Verify APPROVED
 	var loan models.Loan
@@ -474,15 +478,32 @@ func TestCommitteeReviewFlow(t *testing.T) {
 	}, chair)
 	t.Logf("Appoint member: %d", code)
 
-	_, d := hGet(t, app, "/api/v1/members", chair)
-	var ml struct{ Data []struct{ ID string `json:"id"` } `json:"data"` }
-	json.Unmarshal(d, &ml)
-	memberID := ml.Data[0].ID
+	// Neutral borrower outside the committee so self-review guard never blocks
+	// unanimous vote (borrower must not review own loan).
+	neemaEmail := "neema2@kikundi.tz"
+	neemaHash, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.MinCost)
+	neemaUser := models.User{
+		Name: "Neema Borrower", Email: &neemaEmail, Phone: "0718888888",
+		Password: string(neemaHash), Role: models.RoleMember,
+		Status: models.UserStatusActive, IsActive: true,
+	}
+	if err := database.DB.Create(&neemaUser).Error; err != nil {
+		t.Fatalf("create neutral user: %v", err)
+	}
+	neemaMember := models.Member{
+		MemberNo: "KKK-NEUTRAL-02", FullName: "Neema Borrower", Phone: "0718888888",
+		UserID: &neemaUser.ID, IsActive: true, ApprovalStatus: "approved",
+		JoinedAt: time.Now(), RegisteredBy: neemaUser.ID,
+	}
+	if err := database.DB.Create(&neemaMember).Error; err != nil {
+		t.Fatalf("create neutral member: %v", err)
+	}
+	borrower := hLogin(t, app, neemaEmail, "demo123")
 	fundTreasury(500000) // apply requires treasury coverage
-	code, d = hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
-		"member_id": memberID, "amount": 100000.0, "purpose": "Test", "due_date": "2026-12-31",
-	}, chair)
-loanID := hExtract(t, d, "data")
+	code, d := hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
+		"member_id": neemaMember.ID, "amount": 100000.0, "purpose": "Test", "due_date": "2026-12-31",
+	}, borrower)
+	loanID := hExtract(t, d, "data")
 
 	// Try review by non-committee member (asha is committee now though — use a different non-member)
 	// Actually asha IS now committee, so normal member can't review. Skip this sub-test.
@@ -495,30 +516,21 @@ loanID := hExtract(t, d, "data")
 		t.Logf("  review: %d", code)
 	}
 
-	// Verify: back to PENDING with the bodi stage satisfied — NOT approved
-	// (final approval belongs to Mwenyekiti via the sequential chain).
+	// SYNC: unanimous committee by all 4 leaders mirrors to all chain slots,
+	// so parallel rule finalizes APPROVED immediately (no separate chain
+	// round needed). Bodi slot must be satisfied too.
 	var loan models.Loan
 	database.DB.First(&loan, "id = ?", loanID)
-	if loan.Status != models.LoanPending {
-		t.Errorf("expected PENDING after unanimous committee (bodi stage only), got %s", loan.Status)
+	if loan.Status != models.LoanApproved {
+		t.Errorf("expected APPROVED after unanimous committee (sync finalizes 4/4), got %s", loan.Status)
 	}
 	if loan.BodiApprovedAt == nil {
 		t.Errorf("expected bodi_approved_at set by unanimous committee")
 	}
-
-	// Complete the sequential chain: Hazina → Katibu → Mwenyekiti finalize
-	// (bodi stage was satisfied by the unanimous committee decision).
-	for _, tok := range []string{treasurer, secretary, chair} {
-		code, d = hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, tok)
-		if code != 200 {
-			t.Fatalf("chain approve: %d %s", code, d)
-		}
+	if loan.HazinaApprovedAt == nil || loan.KatibuApprovedAt == nil || loan.MwenyekitiApprovedAt == nil {
+		t.Errorf("expected all chain slots mirrored from committee reviews")
 	}
-	database.DB.First(&loan, "id = ?", loanID)
-	if loan.Status != models.LoanApproved {
-		t.Errorf("expected APPROVED after chair finalize, got %s", loan.Status)
-	}
-	t.Logf("Committee review → bodi done → chain finalize: %s", loan.Status)
+	t.Logf("Committee review sync → APPROVED: %s", loan.Status)
 }
 
 func hGetUserID(t *testing.T, email string) string {

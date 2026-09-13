@@ -45,12 +45,19 @@ export interface LoanCommitteeHistoryRow {
   reviewed_at: string;
 }
 
+export interface CommitteeReviewer {
+  user_id: string;
+  user_name: string;
+}
+
 export interface LoanDetailResponse {
   data: Loan;
   reviews: LoanReview[];
   contributions: unknown[];
   previous_loans: Loan[];
   outstanding_balance: number;
+  committee_members?: CommitteeReviewer[];
+  pending_reviewers?: CommitteeReviewer[];
 }
 
 export interface CommitteeActivityReport {

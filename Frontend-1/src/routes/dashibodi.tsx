@@ -412,11 +412,11 @@ function MemberView({
       <div className="card-surface p-6 text-center">
         <AlertCircle className="mx-auto h-10 w-10 text-warning" />
         <h2 className="mt-3 font-display text-lg font-bold">
-          Jisajili kama mwanachama
+          Kamilisha wasifu wako
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Karibu <span className="font-semibold">{userName}</span> — kamilisha
-          usajili wako kupitia ukurasa wa wasifu ili uweze kuomba mikopo na
+          taarifa zako kwenye ukurasa wa wasifu ili uweze kuomba mikopo na
           kuona michango yako.
         </p>
         <Link

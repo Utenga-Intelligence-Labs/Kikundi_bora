@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"time"
 
 	"kikundibora/database"
@@ -86,17 +87,22 @@ func (h *LeadershipHandler) QuickStats(c *fiber.Ctx) error {
 	})
 }
 
-// PendingLoans returns loans in the sequential approval chain
-// (Hazina → Katibu → Bodi → Mwenyekiti) with a computed stage per loan:
-//   - awaiting_role: "hazina" | "katibu" | "bodi" | "mwenyekiti" — whose turn it is
-//   - my_turn: whether the CALLING role is the one whose turn it is
+// PendingLoans returns loans in the parallel approval set
+// (Hazina + Katibu + Bodi + Mwenyekiti — kila mtu aidhinisha kwa muda
+// wake, mkopo hautoki mpaka WOTE waidhinishe):
+//   - awaiting_role: first still-missing stage (compat display only)
+//   - my_turn: whether the CALLER's own stage is still pending
 //
 // Supports ?my_turn=true for the role-scoped "loans awaiting MY action" view.
 // GET /api/v1/uongozi/mikopo/pending
+// NOTE: must include UNDER_REVIEW — committee review flips PENDING→
+// UNDER_REVIEW on first vote, and Hazina/Katibu chain stages must still
+// see + act on those loans. Filtering PENDING only made the queue go
+// empty for Mweka Hazina ("sioni mkopo uliombwa").
 func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 	var loans []models.Loan
 	if err := database.DB.
-		Where("status = ?", models.LoanPending).
+		Where("status IN ?", []models.LoanStatus{models.LoanPending, models.LoanUnderReview}).
 		Preload("Member", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, member_no, full_name, phone")
 		}).
@@ -108,13 +114,19 @@ func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 	}
 
 	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
 	myStage := loanStageForRole(role)
+	// Appointed bodi members have role=member: resolve their stage too.
+	if myStage == "bodi" || (role == models.RoleMember && isAppointedBodi(userID)) {
+		myStage = "bodi"
+	}
 	myTurnOnly := c.Query("my_turn") == "true"
 
 	out := make([]map[string]interface{}, 0, len(loans))
 	for _, loan := range loans {
 		stage := loanAwaitingStage(&loan)
-		if myTurnOnly && (myStage == "" || stage != myStage) {
+		mine := myStage != "" && loanStagePending(&loan, myStage)
+		if myTurnOnly && !mine {
 			continue
 		}
 		out = append(out, map[string]interface{}{
@@ -127,7 +139,7 @@ func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 			"applied_at":    loan.AppliedAt,
 			"member":        loan.Member,
 			"awaiting_role": stage,
-			"my_turn":       myStage != "" && stage == myStage,
+			"my_turn":       mine,
 			// Approval trail timestamps (the pipeline chips in the UI)
 			"hazina_approved_at":      loan.HazinaApprovedAt,
 			"katibu_approved_at":      loan.KatibuApprovedAt,
@@ -142,8 +154,7 @@ func (h *LeadershipHandler) PendingLoans(c *fiber.Ctx) error {
 	})
 }
 
-// loanAwaitingStage computes which sequential-approval stage a PENDING loan
-// is currently waiting at, from the trail timestamps.
+// loanAwaitingStage returns the first still-missing stage (display compat).
 func loanAwaitingStage(l *models.Loan) string {
 	switch {
 	case l.HazinaApprovedAt == nil:
@@ -155,6 +166,50 @@ func loanAwaitingStage(l *models.Loan) string {
 	default:
 		return "mwenyekiti"
 	}
+}
+
+// loanStagePending reports whether the given parallel stage is still missing.
+func loanStagePending(l *models.Loan, stage string) bool {
+	switch stage {
+	case "hazina":
+		return l.HazinaApprovedAt == nil
+	case "katibu":
+		return l.KatibuApprovedAt == nil
+	case "bodi":
+		return l.BodiApprovedAt == nil
+	case "mwenyekiti":
+		return l.MwenyekitiApprovedAt == nil
+	default:
+		return false
+	}
+}
+
+// loanAllStagesDone reports whether Hazina+Katibu+Bodi+Mwenyekiti all signed.
+func loanAllStagesDone(l *models.Loan) bool {
+	return l.HazinaApprovedAt != nil && l.KatibuApprovedAt != nil &&
+		l.BodiApprovedAt != nil && l.MwenyekitiApprovedAt != nil
+}
+
+// loanPendingStages lists still-missing stages for messages/notifications.
+func loanPendingStages(l *models.Loan) []string {
+	var out []string
+	for _, s := range []string{"hazina", "katibu", "bodi", "mwenyekiti"} {
+		if loanStagePending(l, s) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func isAppointedBodi(userID string) bool {
+	if userID == "" {
+		return false
+	}
+	var n int64
+	database.DB.Model(&models.LoanCommitteeMember{}).
+		Where("user_id = ? AND is_active = TRUE", userID).
+		Count(&n)
+	return n > 0
 }
 
 // loanStageForRole maps a caller's role to its sequential stage
@@ -234,14 +289,19 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"message": "Mkopo haujapatikana"})
 	}
 
-	if loan.Status != models.LoanPending {
+	if loan.Status != models.LoanPending && loan.Status != models.LoanUnderReview {
 		tx.Rollback()
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mkopo huu hauwezi kuidhinishwa. Hali yake: " + string(loan.Status)})
 	}
 
+	// NOTE: borrower MAY sign at own stage (e.g. Mwenyekiti akiomba kama
+	// mwanachama afanye sign-off). Parallel rule: kila mtu aidhinisha kwa
+	// muda wake, mkopo hautoki (APPROVED) mpaka WOTE waidhinishe.
+
 	now := time.Now()
 
-	// Enforce sequential order: Hazina → Katibu → Bodi Member → Mwenyekiti
+	// Parallel approvals: no order gate — each role signs own stage anytime.
+	// Loan finalizes (APPROVED) only when ALL four stages are done.
 	switch role {
 	case models.RoleTreasurer:
 		if loan.HazinaApprovedAt != nil {
@@ -252,10 +312,6 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		loan.HazinaApprovedAt = &now
 
 	case models.RoleSecretary:
-		if loan.HazinaApprovedAt == nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina lazima aidhinishe kwanza kabla ya Katibu"})
-		}
 		if loan.KatibuApprovedAt != nil {
 			tx.Rollback()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Katibu tayari ameidhinisha mkopo huu"})
@@ -264,36 +320,20 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		loan.KatibuApprovedAt = &now
 
 	case models.RoleChair:
-		if loan.HazinaApprovedAt == nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina lazima aidhinishe kwanza kabla ya Mwenyekiti"})
-		}
-		if loan.KatibuApprovedAt == nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Katibu lazima aidhinishe kwanza kabla ya Mwenyekiti"})
-		}
-		if loan.BodiApprovedAt == nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Bodi ya mikopo lazima iidhinishe kwanza kabla ya Mwenyekiti"})
-		}
 		if loan.MwenyekitiApprovedAt != nil {
 			tx.Rollback()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Mwenyekiti tayari ameidhinisha mkopo huu"})
 		}
 		loan.MwenyekitiApprovedBy = &userID
 		loan.MwenyekitiApprovedAt = &now
-
-		// Final approval: all four have approved
-		loan.Status = models.LoanApproved
-		loan.ApprovedAmount = &loan.Amount
+		// Chair's amount counts as proposed figure even before others finish.
 		if req.ApprovedAmount.GreaterThan(decimal.Zero) {
-			loan.ApprovedAmount = &req.ApprovedAmount
+			amt := req.ApprovedAmount
+			loan.ApprovedAmount = &amt
 		}
-		loan.ReviewedBy = &userID
-		loan.ReviewedAt = &now
 
 	default:
-		// Bodi member (appointed committee member) — must come after Katibu and before Mwenyekiti
+		// Bodi member (appointed committee member) — parallel, anytime.
 		var isCommittee bool
 		database.DB.Model(&models.LoanCommitteeMember{}).
 			Where("user_id = ? AND is_active = TRUE", userID).
@@ -302,20 +342,42 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 			tx.Rollback()
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"message": "Huna ruhusa ya kuidhinisha mkopo"})
 		}
-		if loan.HazinaApprovedAt == nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Hazina lazima aidhinishe kwanza"})
-		}
-		if loan.KatibuApprovedAt == nil {
-			tx.Rollback()
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Katibu lazima aidhinishe kwanza"})
-		}
 		if loan.BodiApprovedAt != nil {
 			tx.Rollback()
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"message": "Bodi tayari imeidhinisha mkopo huu"})
 		}
 		loan.BodiApprovedBy = &userID
 		loan.BodiApprovedAt = &now
+	}
+
+	// SYNC: chain signature mirrors to committee reviews so the ukaguzi
+	// page counts it (uongozi ↔ ukaguzi agree). Upsert APPROVE; never
+	// overwrite an existing REJECT (rejection already finalized the loan,
+	// and this handler only runs on PENDING/UNDER_REVIEW anyway).
+	var cr models.LoanReview
+	if err := tx.Where("loan_id = ? AND reviewer_id = ?", loan.ID, userID).First(&cr).Error; err != nil {
+		tx.Create(&models.LoanReview{
+			LoanID: loan.ID, ReviewerID: userID,
+			Decision: models.ReviewApprove, ReviewedAt: &now,
+		})
+	} else if cr.Decision == models.ReviewPending {
+		cr.Decision = models.ReviewApprove
+		cr.ReviewedAt = &now
+		tx.Save(&cr)
+	}
+
+	// Finalize only when ALL four have signed.
+	if loanAllStagesDone(&loan) {
+		loan.Status = models.LoanApproved
+		if loan.ApprovedAmount == nil {
+			loan.ApprovedAmount = &loan.Amount
+		}
+		if req.ApprovedAmount.GreaterThan(decimal.Zero) {
+			amt := req.ApprovedAmount
+			loan.ApprovedAmount = &amt
+		}
+		loan.ReviewedBy = &userID
+		loan.ReviewedAt = &now
 	}
 
 	if err := tx.Save(&loan).Error; err != nil {
@@ -331,21 +393,21 @@ func (h *LeadershipHandler) ApproveLoan(c *fiber.Ctx) error {
 		"status": string(loan.Status), "role": string(role),
 	})
 
-	// Route the request to the next stage: ping whoever is now on turn.
-	stageMsg := map[string]string{
-		"hazina":     "Imehifadhiwa. Sasa inasubiri idhini ya Katibu.",
-		"katibu":     "Imehifadhiwa. Sasa inasubiri ukaguzi wa Bodi ya Mikopo.",
-		"bodi":       "Imehifadhiwa. Sasa inasubiri idhini ya mwisho ya Mwenyekiti.",
-	}[loanAwaitingStage(&loan)]
-	if loan.Status == models.LoanPending {
-		notifyLoanStage(loanAwaitingStage(&loan), &loan)
-	} else {
+	// Parallel: ping every still-pending stage; finalize only when none remain.
+	stageMsg := ""
+	if loan.Status == models.LoanApproved {
 		stageMsg = "Mkopo umekamilika idhini zote. Mweka Hazina atautolea fedha."
-		// Final stage reached: tell the borrower + treasury (disbursement).
+		// All four signed: tell the borrower + treasury (disbursement).
 		notifyLoanApplicantUser(&loan, models.NotifLoanApproved, "Mkopo Umeidhinishwa",
-			"Mkopo wako wa TZS "+formatMoney(loan.Amount)+" umefika mwisho wa mfuatano wa idhini. Utatolewa fedha na Mweka Hazina.")
+			"Mkopo wako wa TZS "+formatMoney(loan.Amount)+" umekamilika idhini zote. Utatolewa fedha na Mweka Hazina.")
 		services.NotifyRole(models.RoleTreasurer, models.NotifLoanApproved, "Mkopo Umeidhinishwa — Toa Fedha",
 			"Mkopo wa TZS "+formatMoney(loan.Amount)+" umekamilika idhini zote. Toa fedha (Toa Mkopo).", "")
+	} else {
+		pending := loanPendingStages(&loan)
+		stageMsg = "Imehifadhiwa. Bado idhini za: " + strings.Join(pending, ", ") + "."
+		for _, s := range pending {
+			notifyLoanStage(s, &loan)
+		}
 	}
 
 	return c.JSON(fiber.Map{"message": stageMsg, "data": loan})

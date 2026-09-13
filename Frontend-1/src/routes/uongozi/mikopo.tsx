@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth-provider";
-import { tokenStorage } from "@/lib/auth-storage";
 import { requireAuth } from "@/lib/role-guards";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsCommitteeMember } from "@/hooks/use-loan-committee";
+import { loanCommitteeApi } from "@/api/loan-committee";
 import { useDisburseLoan } from "@/hooks/use-loans";
 import { loansApi } from "@/api/loans";
 import { useMembers } from "@/hooks/use-members";
@@ -76,28 +76,28 @@ function MikopoPage() {
     );
   }
 
-  const { data: loans, isLoading } = useQuery({
+  const { data: loans, isLoading, error: loansError } = useQuery({
     queryKey: ["uongozi", "mikopo", "pending"],
+    // FIX: use the shared api client so the JWT is attached via
+    // api.configure(getToken) instead of a hand-rolled fetch that sent
+    // "Bearer null" when sessionStorage was empty (per-tab) and swallowed
+    // the real 401 message ("Token ya ukaguzi haijapatikana").
     queryFn: async () => {
-      const token = tokenStorage.get();
-      const base =
-        import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/v1";
-      const res = await fetch(`${base}/uongozi/mikopo/pending`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Imeshindikana");
-      const data = await res.json();
-      return data.data as Loan[];
+      const res = await loansApi.pendingApproval(false);
+      return res.data as Loan[];
     },
   });
 
   const { data: membersData } = useMembers({ limit: 50 });
 
-  // Fully-approved loans awaiting disbursement (Mweka Hazina's job)
+  // Fully-approved loans awaiting disbursement (Mweka Hazina's job).
+  // FIX: visible to all leadership/bodi so Mwenyekiti sees where his
+  // approved loan went ("haonekani" confusion). Only Hazina gets the button.
+  const canSeeApproved = isHazina || isKatibu || isMwenyekiti || isBodi;
   const { data: approvedLoansData } = useQuery({
     queryKey: ["uongozi", "mikopo", "approved"],
     queryFn: () => loansApi.list({ status: "APPROVED", limit: 50 }),
-    enabled: isHazina,
+    enabled: canSeeApproved,
   });
   const approvedLoans = (approvedLoansData?.data ?? []).filter(
     (l) => l.status === "APPROVED",
@@ -112,20 +112,11 @@ function MikopoPage() {
       loanId: string;
       amount: string | number;
     }) => {
-      const token = tokenStorage.get();
-      const base =
-        import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/v1";
-      const res = await fetch(`${base}/uongozi/mikopo/${loanId}/approve`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ approved_amount: amount }),
-      });
-      if (!res.ok)
-        throw new Error((await res.json()).message || "Imeshindikana");
-      return res.json();
+      const n = Number(amount);
+      return loansApi.chainApprove(
+        loanId,
+        Number.isFinite(n) && n > 0 ? { approved_amount: n } : undefined,
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["uongozi", "mikopo"] });
@@ -140,22 +131,7 @@ function MikopoPage() {
   });
 
   const appointMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const token = tokenStorage.get();
-      const base =
-        import.meta.env.VITE_API_URL ?? "http://localhost:8080/api/v1";
-      const res = await fetch(`${base}/loan-committee/members`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ user_id: userId }),
-      });
-      if (!res.ok)
-        throw new Error((await res.json()).message || "Imeshindikana");
-      return res.json();
-    },
+    mutationFn: async (userId: string) => loanCommitteeApi.appointMember(userId),
     onSuccess: () => {
       setShowBodiPopup(false);
       setSelectedMember("");
@@ -204,37 +180,32 @@ function MikopoPage() {
     });
   };
 
+  // Parallel: kila mtu aidhinisha kwa muda wake — hakuna "anasubiri X".
+  // Label inaonyesha waliomaliza / waliobaki.
   const getApprovalStep = (loan: Loan) => {
-    if (loan.mwenyekiti_approved_at)
-      return { step: 4, label: "Mwenyekiti ameidhinisha", done: true };
-    if (loan.bodi_approved_at)
-      return { step: 4, label: "Anasubiri Mwenyekiti", done: false };
-    if (loan.katibu_approved_at)
-      return { step: 3, label: "Anasubiri Bodi", done: false };
-    if (loan.hazina_approved_at)
-      return { step: 2, label: "Anasubiri Katibu", done: false };
-    return { step: 1, label: "Anasubiri Hazina", done: false };
+    const done = [
+      loan.hazina_approved_at,
+      loan.katibu_approved_at,
+      loan.bodi_approved_at,
+      loan.mwenyekiti_approved_at,
+    ].filter(Boolean).length;
+    const missing: string[] = [];
+    if (!loan.hazina_approved_at) missing.push("Hazina");
+    if (!loan.katibu_approved_at) missing.push("Katibu");
+    if (!loan.bodi_approved_at) missing.push("Bodi");
+    if (!loan.mwenyekiti_approved_at) missing.push("Mwenyekiti");
+    if (missing.length === 0)
+      return { step: 4, label: "Wote wameidhinisha", done: true };
+    return { step: done, label: `Bado: ${missing.join(", ")} (${done}/4)`, done: false };
   };
 
   const canApprove = (loan: Loan) => {
+    // Parallel — kila mtu asaini stage yake wakati wowote, bila kusubiriana.
+    // Mkopo hautoki mpaka wote waidhinishe (backend ndiyo hufinalize).
     if (isHazina && !loan.hazina_approved_at) return true;
-    if (isKatibu && loan.hazina_approved_at && !loan.katibu_approved_at)
-      return true;
-    if (
-      isBodi &&
-      loan.hazina_approved_at &&
-      loan.katibu_approved_at &&
-      !loan.bodi_approved_at
-    )
-      return true;
-    if (
-      isMwenyekiti &&
-      loan.hazina_approved_at &&
-      loan.katibu_approved_at &&
-      loan.bodi_approved_at &&
-      !loan.mwenyekiti_approved_at
-    )
-      return true;
+    if (isKatibu && !loan.katibu_approved_at) return true;
+    if (isBodi && !loan.bodi_approved_at) return true;
+    if (isMwenyekiti && !loan.mwenyekiti_approved_at) return true;
     return false;
   };
 
@@ -246,7 +217,7 @@ function MikopoPage() {
   return (
     <AppShell
       title="Idhinisha Mikopo"
-      subtitle="Mfuatano: Hazina → Katibu → Bodi → Mwenyekiti"
+      subtitle="Kila mtu aidhinisha kwa muda wake — mkopo hautoki mpaka wote (4/4) waidhinishe"
       action={
         /* BUG-3 fix: appointing to the loan board is MWENYEKITI's action —
          it used to be shown to katibu, which was wrong. */
@@ -263,6 +234,13 @@ function MikopoPage() {
       {isLoading ? (
         <div className="card-surface animate-pulse p-6">
           <div className="h-4 w-1/3 rounded bg-muted" />
+        </div>
+      ) : loansError ? (
+        <div className="card-surface p-12 text-center">
+          <p className="font-semibold text-destructive">Imeshindikana kupakia mikopo</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {(loansError as Error).message}. Tafadhali ingia tena kama inaendelea.
+          </p>
         </div>
       ) : pendingLoans.length === 0 ? (
         <div className="card-surface p-12 text-center">
@@ -367,13 +345,13 @@ function MikopoPage() {
         </div>
       )}
 
-      {/* Approved loans awaiting disbursement — Mweka Hazina */}
-      {isHazina && approvedLoans.length > 0 && (
+      {/* Approved loans awaiting disbursement — Mweka Hazina acts, others observe */}
+      {canSeeApproved && approvedLoans.length > 0 && (
         <>
           <div className="mt-7 mb-3 flex items-center gap-2">
             <Banknote className="h-4 w-4 text-success" />
             <h2 className="font-display text-base font-semibold">
-              Mikopo Zilizoidhinishwa — Toa Fedha ({approvedLoans.length})
+              Mikopo Zilizoidhinishwa — {isHazina ? "Toa Fedha" : "Inasubiri Mweka Hazina"} ({approvedLoans.length})
             </h2>
           </div>
           <div className="space-y-3">
@@ -395,6 +373,7 @@ function MikopoPage() {
                       : ""}
                   </p>
                 </div>
+                {isHazina ? (
                 <button
                   onClick={() =>
                     showModal({
@@ -424,6 +403,11 @@ function MikopoPage() {
                 >
                   <Wallet className="h-4 w-4" /> Toa Fedha
                 </button>
+                ) : (
+                  <span className="shrink-0 rounded-lg bg-muted px-3 py-2 text-xs font-semibold text-muted-foreground">
+                    Inasubiri Mweka Hazina
+                  </span>
+                )}
               </div>
             ))}
           </div>

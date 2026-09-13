@@ -10,7 +10,12 @@ import (
 	"kikundibora/models"
 
 	"github.com/shopspring/decimal"
+	"golang.org/x/crypto/bcrypt"
 )
+
+func hashTestPassword(pw string) ([]byte, error) {
+	return bcrypt.GenerateFromPassword([]byte(pw), bcrypt.MinCost)
+}
 
 // TestLoanChainHandoff proves the sequential loan-approval queue-to-queue
 // handoff: a loan appears only in the CURRENT stage-holder's my_turn queue,
@@ -33,16 +38,33 @@ func TestLoanChainHandoff(t *testing.T) {
 		t.Fatalf("appoint bodi member: %d %s", code, body)
 	}
 
-	// Asha's own member applies for a loan.
-	var ashaUser models.User
-	database.DB.Where("email = ?", "asha@kikundi.tz").First(&ashaUser)
-	var ashaMember models.Member
-	database.DB.Where("user_id = ?", ashaUser.ID).First(&ashaMember)
+	// Neutral borrower (plain member, NOT in approval chain) so no approver
+	// ever signs own loan. Asha stays purely as bodi voter.
+	neemaEmail := "neema@kikundi.tz"
+	neemaPass := "demo123"
+	neemaHash, _ := hashTestPassword(neemaPass)
+	neemaUser := models.User{
+		Name: "Neema Neutral", Email: &neemaEmail, Phone: "0719999999",
+		Password: string(neemaHash), Role: models.RoleMember,
+		Status: models.UserStatusActive, IsActive: true,
+	}
+	if err := database.DB.Create(&neemaUser).Error; err != nil {
+		t.Fatalf("create neutral user: %v", err)
+	}
+	neutralMember := models.Member{
+		MemberNo: "M-NEUTRAL-01", FullName: "Neema Neutral", Phone: "0719999999",
+		IsActive: true, ApprovalStatus: "approved", UserID: &neemaUser.ID,
+		JoinedAt: time.Now(), RegisteredBy: neemaUser.ID,
+	}
+	if err := database.DB.Create(&neutralMember).Error; err != nil {
+		t.Fatalf("create neutral member: %v", err)
+	}
+	borrowerTok := hLogin(t, app, neemaEmail, neemaPass)
 	fundTreasury(500000)
 
 	code, d := hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
-		"member_id": ashaMember.ID, "amount": 100000.0, "purpose": "Biashara", "due_date": "2026-12-31",
-	}, bodiTok)
+		"member_id": neutralMember.ID, "amount": 100000.0, "purpose": "Biashara", "due_date": "2026-12-31",
+	}, borrowerTok)
 	if code != 201 {
 		t.Fatalf("apply: %d %s", code, d)
 	}
@@ -89,60 +111,46 @@ func TestLoanChainHandoff(t *testing.T) {
 		return hPost(t, app, "/api/v1/uongozi/mikopo/"+loanID+"/approve", map[string]interface{}{}, token)
 	}
 
-	// Stage 1: hazina's turn — visible ONLY to mweka hazina.
-	if stage := stageOf(treasurer, loanID); stage != "hazina" {
-		t.Fatalf("initial stage: want hazina, got %q", stage)
+	// Parallel: fresh loan is in EVERY approver's my_turn queue at once —
+	// no "anasubiri X" gate. Anyone may sign in any order.
+	for _, tc := range []struct {
+		name string
+		tok  string
+	}{
+		{"hazina", treasurer}, {"katibu", secretary}, {"bodi", bodiTok}, {"mwenyekiti", chair},
+	} {
+		if !myTurnContains(tc.tok, loanID) {
+			t.Errorf("%s's my_turn queue should contain the fresh loan (parallel)", tc.name)
+		}
 	}
-	if !myTurnContains(treasurer, loanID) {
-		t.Error("hazina's my_turn queue should contain the fresh loan")
-	}
-	if myTurnContains(secretary, loanID) {
-		t.Error("katibu's my_turn queue must NOT contain the loan before hazina approves")
-	}
-	if myTurnContains(chair, loanID) {
-		t.Error("mwenyekiti's my_turn queue must NOT contain the loan before hazina approves")
-	}
+	_ = stageOf
 
-	// Only the stage-holder can act.
-	if code, _ = chainApprove(secretary); code == 200 {
-		t.Fatal("katibu must not be able to approve at the hazina stage")
-	}
-	if code, d = chainApprove(treasurer); code != 200 {
-		t.Fatalf("hazina approve: %d %s", code, d)
-	}
-
-	// Stage 2: katibu's turn — handoff proven (was NOT there before).
-	if stage := stageOf(secretary, loanID); stage != "katibu" {
-		t.Fatalf("after hazina: want katibu stage, got %q", stage)
-	}
-	if !myTurnContains(secretary, loanID) {
-		t.Error("katibu's my_turn queue should contain the loan after hazina approves")
-	}
-	if myTurnContains(treasurer, loanID) {
-		t.Error("hazina's my_turn queue must no longer contain the loan")
-	}
-	if code, _ = chainApprove(treasurer); code == 200 {
-		t.Fatal("double hazina approve must fail")
-	}
+	// Scrambled order: katibu first — must succeed (no order gate).
 	if code, d = chainApprove(secretary); code != 200 {
-		t.Fatalf("katibu approve: %d %s", code, d)
+		t.Fatalf("katibu approve (parallel, any order): %d %s", code, d)
 	}
-
-	// Stage 3: bodi's turn.
-	if !myTurnContains(bodiTok, loanID) {
-		t.Error("bodi member's my_turn queue should contain the loan after katibu approves")
+	// Double sign by same stage must still fail.
+	if code, _ = chainApprove(secretary); code == 200 {
+		t.Fatal("double katibu approve must fail")
 	}
-	if myTurnContains(secretary, loanID) {
-		t.Error("katibu's my_turn queue must no longer contain the loan after katibu approves")
+	// Partial (1/4) must NOT finalize.
+	var mid models.Loan
+	database.DB.First(&mid, "id = ?", loanID)
+	if mid.Status == models.LoanApproved {
+		t.Fatal("loan must not be APPROVED after only 1/4 parallel approvals")
 	}
 	if code, d = chainApprove(bodiTok); code != 200 {
 		t.Fatalf("bodi approve: %d %s", code, d)
 	}
-
-	// Stage 4: mwenyekiti's turn → final APPROVED.
-	if !myTurnContains(chair, loanID) {
-		t.Error("mwenyekiti's my_turn queue should contain the loan after bodi approves")
+	if code, d = chainApprove(treasurer); code != 200 {
+		t.Fatalf("hazina approve: %d %s", code, d)
 	}
+	// Partial (3/4) must NOT finalize.
+	database.DB.First(&mid, "id = ?", loanID)
+	if mid.Status == models.LoanApproved {
+		t.Fatal("loan must not be APPROVED after only 3/4 parallel approvals")
+	}
+	// 4th sign (mwenyekiti) → final APPROVED.
 	if code, d = chainApprove(chair); code != 200 {
 		t.Fatalf("chair approve: %d %s", code, d)
 	}
@@ -174,7 +182,7 @@ func TestLoanChainHandoff(t *testing.T) {
 	if code != 403 {
 		t.Errorf("borrower-confirm as chair: want 403, got %d", code)
 	}
-	code, d = hPatch(t, app, "/api/v1/loans/"+loanID+"/confirm-received", bodiTok, nil)
+	code, d = hPatch(t, app, "/api/v1/loans/"+loanID+"/confirm-received", borrowerTok, nil)
 	if code != 200 {
 		t.Fatalf("borrower-confirm as borrower: %d %s", code, d)
 	}
@@ -182,7 +190,7 @@ func TestLoanChainHandoff(t *testing.T) {
 	if loan.BorrowerConfirmedAt == nil {
 		t.Error("borrower_confirmed_at should be set after confirm")
 	}
-	code, _ = hPatch(t, app, "/api/v1/loans/"+loanID+"/confirm-received", bodiTok, nil)
+	code, _ = hPatch(t, app, "/api/v1/loans/"+loanID+"/confirm-received", borrowerTok, nil)
 	if code != 409 {
 		t.Errorf("double borrower-confirm: want 409, got %d", code)
 	}

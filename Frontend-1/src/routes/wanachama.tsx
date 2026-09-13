@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/AppShell";
-import { useMembers, useCreateMember, useUpdateMember, useChairCreateLogin, useToggleMemberActive } from "@/hooks/use-members";
+import { useMembers, useMember, useCreateMember, useUpdateMember, useChairCreateLogin, useToggleMemberActive } from "@/hooks/use-members";
 import { useChairResetPassword } from "@/hooks/use-user-management";
 import { useAuth } from "@/lib/auth-provider";
 import { hasRole, blockAdminFromPage, requireAuth } from "@/lib/role-guards";
@@ -21,7 +21,7 @@ import {
   PaginationEllipsis,
 } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, UserPlus, Phone, X, Loader2, Pencil, KeyRound, Clock, Send } from "lucide-react";
+import { Search, UserPlus, Phone, X, Loader2, Pencil, KeyRound, Clock, Send, Power, Eye, UserCheck, UserX } from "lucide-react";
 
 export const Route = createFileRoute("/wanachama")({
   head: () => ({
@@ -44,9 +44,11 @@ function WanachamaPage() {
   const limit = 20;
   const debouncedQ = useDebounce(q, 300);
   const [open, setOpen] = useState(false);
-  const [editMember, setEditMember] = useState<typeof members[number] | null>(null);
+  const [editMember, setEditMember] = useState<{ id: string; full_name: string; phone: string; address?: string; is_active: boolean; member_no: string; user_id?: string } | null>(null);
   const [resetMember, setResetMember] = useState<typeof members[number] | null>(null);
   const [lifecycleMember, setLifecycleMember] = useState<{ id: string; full_name: string; is_active: boolean } | null>(null);
+  const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const isChair = hasRole(user, "chair");
   const isSecretary = hasRole(user, "secretary");
   const resetPwd = useChairResetPassword();
@@ -151,11 +153,27 @@ function WanachamaPage() {
         </div>
       )}
 
+      {toggleError && (
+        <div className="card-surface mt-4 flex items-center justify-between gap-3 border-destructive/30 p-4">
+          <p className="text-sm text-destructive">{toggleError}</p>
+          <button
+            onClick={() => setToggleError(null)}
+            className="rounded-lg p-1.5 hover:bg-muted"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {!isLoading && !error && (
         <>
           <div className="mt-4 space-y-2.5">
             {members.map((w) => (
-              <div key={w.id} className="card-surface flex items-center gap-3 p-3.5">
+              <div
+                key={w.id}
+                onClick={() => setDetailMemberId(w.id)}
+                className="card-surface flex cursor-pointer items-center gap-3 p-3.5 transition-colors hover:border-primary/40"
+              >
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/10 font-display font-bold text-primary">
                   {w.full_name.split(" ").map((x) => x[0]).slice(0, 2).join("")}
                 </div>
@@ -165,6 +183,11 @@ function WanachamaPage() {
                     <span className={`chip text-[10px] ${w.is_active ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive"}`}>
                       {w.is_active ? "Hai" : "Hahai"}
                     </span>
+                    {w.approval_status === "pending" && (
+                      <span className="chip bg-amber-100 text-[10px] text-amber-700">
+                        Inasubiri Katibu
+                      </span>
+                    )}
                   </div>
                   <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{w.phone}</span>
@@ -172,7 +195,14 @@ function WanachamaPage() {
                   </div>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">Alijiunga {tarehe(w.joined_at)}</p>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setDetailMemberId(w.id)}
+                    title="Tazama maelezo zaidi"
+                    className="rounded-lg p-1.5 text-primary hover:bg-primary/10"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
                   {isChair && w.user_id && (
                     <button
                       onClick={() => { setResetMember(w); setResetMsg(null); }}
@@ -203,19 +233,24 @@ function WanachamaPage() {
                   {isSecretary && (
                     <button
                       onClick={() => {
+                        setToggleError(null);
                         if (w.is_active) {
                           setLifecycleMember({ id: w.id, full_name: w.full_name, is_active: w.is_active });
                         } else {
-                          toggleActive.mutate(w.id);
+                          toggleActive.mutate(w.id, {
+                            onError: (e) => setToggleError(e instanceof Error ? e.message : "Imeshindikana kuamilisha"),
+                          });
                         }
                       }}
                       disabled={toggleActive.isPending}
-                      className={`text-xs font-medium disabled:opacity-50 rounded-lg px-2.5 py-1.5 ${
+                      title={w.is_active ? "Zima mwanachama (Katibu)" : "Amilisha mwanachama (Katibu)"}
+                      className={`inline-flex items-center gap-1 text-xs font-semibold disabled:opacity-50 rounded-lg px-2.5 py-1.5 ${
                         w.is_active
-                          ? "text-destructive hover:bg-destructive/10"
-                          : "text-success hover:bg-success/10"
+                          ? "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                          : "bg-success/15 text-success hover:bg-success/25"
                       }`}
                     >
+                      {w.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                       {w.is_active ? "Zima" : "Amilisha"}
                     </button>
                   )}
@@ -266,6 +301,24 @@ function WanachamaPage() {
       )}
 
       {open && <FormDialog onClose={() => setOpen(false)} />}
+      {detailMemberId && (
+        <MemberDetailsDialog
+          memberId={detailMemberId}
+          onClose={() => setDetailMemberId(null)}
+          onEdit={(m) => { setDetailMemberId(null); setEditMember(m); }}
+          onToggleRequest={(m) => {
+            setDetailMemberId(null);
+            if (m.is_active) {
+              setLifecycleMember({ id: m.id, full_name: m.full_name, is_active: m.is_active });
+            } else {
+              setToggleError(null);
+              toggleActive.mutate(m.id, {
+                onError: (e) => setToggleError(e instanceof Error ? e.message : "Imeshindikana kuamilisha"),
+              });
+            }
+          }}
+        />
+      )}
       {editMember && (
         <EditMemberDialog
           member={editMember}
@@ -295,12 +348,16 @@ function WanachamaPage() {
                 disabled={toggleActive.isPending}
                 onClick={() => {
                   toggleActive.mutate(lifecycleMember.id, {
-                    onSettled: () => setLifecycleMember(null),
+                    onSuccess: () => setLifecycleMember(null),
+                    onError: (e) => {
+                      setToggleError(e instanceof Error ? e.message : "Imeshindikana kuzima");
+                      setLifecycleMember(null);
+                    },
                   });
                 }}
                 className="flex-1 rounded-xl bg-destructive py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {updateMember.isPending ? "Inafanyika..." : "Ndio, zima"}
+                {toggleActive.isPending ? "Inafanyika..." : "Ndio, zima"}
               </button>
             </div>
           </div>
@@ -383,6 +440,109 @@ export function buildCreateMemberPayload(
     return { ...base, backdate_arrears: true, backdate_from_cycle: opts.backdateFrom };
   }
   return { ...base };
+}
+
+function MemberDetailsDialog({
+  memberId,
+  onClose,
+  onEdit,
+  onToggleRequest,
+}: {
+  memberId: string;
+  onClose: () => void;
+  onEdit: (m: { id: string; full_name: string; phone: string; address?: string; is_active: boolean; member_no: string; user_id?: string }) => void;
+  onToggleRequest: (m: { id: string; full_name: string; is_active: boolean }) => void;
+}) {
+  const { user } = useAuth();
+  const { data: full, isLoading, error } = useMember(memberId);
+  const isChair = hasRole(user, "chair");
+  const isSecretary = hasRole(user, "secretary");
+  // GET /members/:id returns the member row directly (not wrapped in {data}).
+  const m = (full ?? null) as null | (Record<string, string | boolean | undefined> & {
+    id: string; full_name: string; member_no: string; phone: string;
+    is_active: boolean; user_id?: string;
+  });
+
+  const rows: Array<[string, string]> = m
+    ? [
+        ["Namba ya mwanachama", String(m.member_no ?? "—")],
+        ["Simu", String(m.phone ?? "—")],
+        ["Barua pepe", String(m.email ?? "—")],
+        ["Jinsia", m.gender === "MME" ? "Mwanamume" : m.gender === "MKE" ? "Mwanamke" : "—"],
+        ["Kazi", String(m.occupation ?? "—")],
+        ["Anwani", String(m.address ?? "—")],
+        ["Ndugu wa karibu", String(m.next_of_kin_name ?? "—")],
+        ["Simu ya ndugu", String(m.next_of_kin_phone ?? "—")],
+        ["Alijiunga", m.joined_at ? tarehe(String(m.joined_at)) : "—"],
+        ["Akaunti ya kuingia", m.user_id ? "Ipo" : "Hakuna"],
+      ]
+    : [];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-foreground/40 sm:items-center" onClick={onClose}>
+      <div className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-5 sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="font-display text-lg font-semibold">Maelezo ya Mwanachama</h3>
+          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+        {isLoading && (
+          <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+        )}
+        {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error.message}</p>}
+        {m && (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-primary/10 font-display text-lg font-bold text-primary">
+                {m.full_name.split(" ").map((x) => x[0]).slice(0, 2).join("")}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate font-semibold">{m.full_name}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  <span className={`chip text-[10px] ${m.is_active ? "bg-success/15 text-success" : "bg-destructive/10 text-destructive"}`}>
+                    {m.is_active ? "Hai" : "Hahai"}
+                  </span>
+                  {String(m.approval_status ?? "") === "pending" && (
+                    <span className="chip bg-amber-100 text-[10px] text-amber-700">Inasubiri Katibu</span>
+                  )}
+                  {String(m.approval_status ?? "") === "rejected" && (
+                    <span className="chip bg-destructive/10 text-[10px] text-destructive">Imekataliwa</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <dl className="mt-4 space-y-2 text-sm">
+              {rows.map(([k, v]) => (
+                <div key={k} className="flex items-start justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2">
+                  <dt className="shrink-0 text-muted-foreground">{k}</dt>
+                  <dd className="text-right font-medium break-words">{v}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-4 flex gap-2">
+              {isSecretary && (
+                <button
+                  onClick={() => onToggleRequest({ id: m.id, full_name: m.full_name, is_active: m.is_active })}
+                  className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold ${
+                    m.is_active ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-success/15 text-success hover:bg-success/25"
+                  }`}
+                >
+                  {m.is_active ? <><Power className="h-4 w-4" /> Zima</> : <><Power className="h-4 w-4" /> Amilisha</>}
+                </button>
+              )}
+              {isChair && (
+                <button
+                  onClick={() => onEdit({ id: m.id, full_name: m.full_name, phone: m.phone, address: typeof m.address === "string" ? m.address : undefined, is_active: m.is_active, member_no: m.member_no, user_id: m.user_id })}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border py-2.5 text-sm font-semibold hover:bg-muted"
+                >
+                  <Pencil className="h-4 w-4" /> Hariri
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function FormDialog({ onClose }: { onClose: () => void }) {

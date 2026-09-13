@@ -38,6 +38,11 @@ type Group struct {
 	ID   string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
 	Name string `gorm:"type:varchar(150);not null" json:"name"`
 
+	// Group profile (editable by Mwenyekiti + Msimamizi via PATCH
+	// /groups/:id/profile — NOT part of the contribution proposal flow).
+	Location   *string `gorm:"type:varchar(150)" json:"location,omitempty"`
+	FoundedYear *int   `gorm:"type:int" json:"founded_year,omitempty"`
+
 	// Contribution interval settings — changed ONLY via approved proposals.
 	// contribution_due_date is the day inside the interval when contributions
 	// are expected:

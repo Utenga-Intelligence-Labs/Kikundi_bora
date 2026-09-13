@@ -96,12 +96,12 @@ function MikopoPage() {
     >
       {!myMemberId && (
         <div className="card-surface mb-5 p-4">
-          <p className="text-sm">Hujasajiliwa kama mwanachama bado.</p>
+          <p className="text-sm">Kamilisha taarifa zako kwenye wasifu ili uanze kuomba mikopo.</p>
           <Link
             to="/wasifu"
             className="mt-2 inline-block text-sm font-semibold text-primary"
           >
-            Jisajili sasa →
+            Nenda kwenye Wasifu →
           </Link>
         </div>
       )}
@@ -244,8 +244,9 @@ function MikopoPage() {
               )}
               {l.status === "PENDING" && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Ombi lako linapitiwa: Hazina → Katibu → Bodi → Mwenyekiti
-                  (uonekano wa mfuatano: /uongozi/mikopo).
+                  Ombi lako linapitiwa: kila kiongozi (Hazina, Katibu, Bodi,
+                  Mwenyekiti) ataidhinisha kwa muda wake — mkopo hautoki mpaka
+                  wote waidhinishe.
                 </p>
               )}
             </div>
