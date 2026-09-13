@@ -25,6 +25,30 @@ type Loan struct {
 	Amount           decimal.Decimal  `gorm:"type:decimal(15,2);not null" json:"amount"`
 	ApprovedAmount   *decimal.Decimal `gorm:"type:decimal(15,2)" json:"approved_amount,omitempty"`
 	BalanceRemaining *decimal.Decimal `gorm:"type:decimal(15,2)" json:"balance_remaining,omitempty"`
+
+	// ---- Loan term + interest snapshot (muda + riba) --------------------
+	// TermDays is the approved loan duration in days, anchored at
+	// disbursement: the repayment schedule fits entirely within it and
+	// DueDate == disbursement date + TermDays once disbursed.
+	TermDays int `gorm:"not null;default:0" json:"term_days"`
+	// InterestEnabled is snapshotted from the group's loan_settings at
+	// application time. When false the loan is STRUCTURALLY interest-free:
+	// no rate is stored, no interest calculated, none charged — verifiably
+	// absent, not defaulted to zero.
+	InterestEnabled bool `gorm:"not null;default:false" json:"interest_enabled"`
+	// InterestType is "flat" or "reducing" (models.LoanInterest*), snapshotted
+	// alongside the rate. Empty when InterestEnabled is false.
+	InterestType string `gorm:"type:varchar(20);not null;default:''" json:"interest_type,omitempty"`
+	// ApplicableInterestRate is the MONTHLY percentage snapshotted from group
+	// settings at application time. Later group changes never alter it.
+	// Always zero when InterestEnabled is false.
+	ApplicableInterestRate decimal.Decimal `gorm:"type:decimal(7,2);not null;default:0" json:"applicable_interest_rate"`
+	// InterestAmount is the total interest over the term (0 when interest-free).
+	InterestAmount decimal.Decimal `gorm:"type:decimal(15,2);not null;default:0" json:"interest_amount"`
+	// TotalRepayment = principal (approved) + InterestAmount. BalanceRemaining
+	// tracks THIS total once disbursed, so offsets/repayments are always
+	// interest-inclusive for interest-bearing loans.
+	TotalRepayment decimal.Decimal `gorm:"type:decimal(15,2);not null;default:0" json:"total_repayment"`
 	Purpose          *string          `gorm:"type:text" json:"purpose,omitempty"`
 	DueDate          time.Time        `gorm:"type:date;not null;index" json:"due_date"`
 	Status           LoanStatus       `gorm:"type:varchar(20);not null;default:'PENDING';index" json:"status"`
@@ -56,6 +80,37 @@ type Loan struct {
 	Member    *Member `gorm:"foreignKey:MemberID" json:"member,omitempty"`
 	Reviewer  *User   `gorm:"foreignKey:ReviewedBy" json:"reviewer,omitempty"`
 	Disburser *User   `gorm:"foreignKey:DisbursedBy" json:"disburser,omitempty"`
+}
+
+// Installment status.
+const (
+	InstallmentPending = "PENDING"
+	InstallmentPaid    = "PAID"
+)
+
+// LoanInstallment is one row of a disbursed loan's auto-generated repayment
+// schedule. The whole schedule fits within the loan's TermDays measured from
+// disbursement: installment i is due on disbursement + i*interval, the last
+// exactly on the term end. Interest-free loans carry zero interest component;
+// the sum of TotalAmount across rows equals the loan's TotalRepayment.
+type LoanInstallment struct {
+	ID       string `gorm:"primaryKey;type:uuid;default:gen_random_uuid()" json:"id"`
+	LoanID   string `gorm:"type:uuid;not null;index" json:"loan_id"`
+	Number   int    `gorm:"not null" json:"number"` // 1..N in due order
+	DueDate  time.Time `gorm:"type:date;not null;index" json:"due_date"`
+
+	PrincipalAmount decimal.Decimal `gorm:"type:decimal(15,2);not null" json:"principal_amount"`
+	InterestAmount  decimal.Decimal `gorm:"type:decimal(15,2);not null;default:0" json:"interest_amount"`
+	TotalAmount     decimal.Decimal `gorm:"type:decimal(15,2);not null" json:"total_amount"`
+
+	// PaidAmount tracks allocation from recorded repayments (oldest-due first).
+	PaidAmount decimal.Decimal `gorm:"type:decimal(15,2);not null;default:0" json:"paid_amount"`
+	Status   string           `gorm:"type:varchar(20);not null;default:'PENDING';index" json:"status"`
+
+	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+
+	Loan *Loan `gorm:"foreignKey:LoanID" json:"loan,omitempty"`
 }
 
 type Repayment struct {

@@ -120,6 +120,41 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 		newStatus = models.LoanClosed
 	}
 
+	// Allocate the payment across schedule installments, oldest-due first.
+	// Loans disbursed before schedules existed simply have no rows — the
+	// balance math above still holds.
+	var installments []models.LoanInstallment
+	tx.Where("loan_id = ? AND status = ?", loan.ID, models.InstallmentPending).
+		Order("number ASC").Find(&installments)
+	remaining := req.Amount
+	for i := range installments {
+		if remaining.LessThanOrEqual(decimal.Zero) {
+			break
+		}
+		inst := &installments[i]
+		owed := inst.TotalAmount.Sub(inst.PaidAmount)
+		if owed.LessThanOrEqual(decimal.Zero) {
+			continue
+		}
+		pay := owed
+		if remaining.LessThan(owed) {
+			pay = remaining
+		}
+		inst.PaidAmount = inst.PaidAmount.Add(pay)
+		remaining = remaining.Sub(pay)
+		if inst.PaidAmount.GreaterThanOrEqual(inst.TotalAmount.Sub(decimal.NewFromFloat(0.001))) {
+			inst.Status = models.InstallmentPaid
+		}
+		if err := tx.Save(inst).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": "Imeshindikana kusasisha ratiba ya marejesho"})
+		}
+	}
+
+	// Late flag (not a rejection): payments past the term end are accepted
+	// but explicitly flagged — restructuring/extension is a follow-up action.
+	late := dateOnlyOf(paidAt).After(dateOnlyOf(loan.DueDate))
+
 	repayment := models.Repayment{
 		LoanID:          req.LoanID,
 		MemberID:        loan.MemberID,
@@ -174,6 +209,9 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 	if loanClosed {
 		msg = "Malipo yamerekodiwa. Mkopo umefungwa kikamilifu!"
 	}
+	if late && !loanClosed {
+		msg += " (Malipo yamechelewa — nje ya muda wa mkopo.)"
+	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"message": msg,
@@ -182,5 +220,6 @@ func (h *RepaymentHandler) Record(c *fiber.Ctx) error {
 			BalanceAfter: newBalance,
 			LoanClosed:   loanClosed,
 		},
+		"late": late,
 	})
 }
