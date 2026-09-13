@@ -97,7 +97,12 @@ type ApplyLoanRequest struct {
 	MemberID string          `json:"member_id" validate:"required"`
 	Amount   decimal.Decimal `json:"amount" validate:"required,gt=0"`
 	Purpose  *string         `json:"purpose"`
-	DueDate  string          `json:"due_date" validate:"required"`
+	DueDate  string          `json:"due_date"`
+	// TermDays is the requested loan duration in days. When provided it is
+	// validated against the group's loan-settings window and DueDate is
+	// derived from it. When omitted, the term is derived from DueDate
+	// (legacy clients) and validated the same way.
+	TermDays *int `json:"term_days" validate:"omitempty,gt=0"`
 }
 
 type ApproveLoanRequest struct {

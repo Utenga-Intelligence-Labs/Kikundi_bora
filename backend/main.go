@@ -198,6 +198,16 @@ func main() {
 	settings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Approve)
 	settings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), groupSettingsHandler.Reject)
 
+	// Group loan settings (riba + muda). Same proposal pattern: chair
+	// proposes, secretary approves/rejects. Reads are open to all members
+	// (the application form needs min/max + rate).
+	loanSettingsHandler := handlers.NewLoanSettingsHandler()
+	loanSettings := groups.Group("/:id/loan-settings")
+	loanSettings.Get("/", loanSettingsHandler.Get)
+	loanSettings.Post("/propose", middleware.RequireRoles(models.RoleChair), loanSettingsHandler.Propose)
+	loanSettings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), loanSettingsHandler.Approve)
+	loanSettings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), loanSettingsHandler.Reject)
+
 	// Onboarding: wizard resume status + completion flag (chair), and the
 	// member app-tour "seen" flag. Steps reuse the endpoints above.
 	onboardingHandler := handlers.NewOnboardingHandler()
@@ -300,6 +310,7 @@ func main() {
 	loans.Get("/", loanHandler.List)
 	loans.Get("/portfolio", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), portfolioHandler.Portfolio)
 	loans.Get("/outstanding-report", middleware.RequireLeadership(models.LeadershipChair, models.LeadershipTreasurer, models.LeadershipSecretary), loanHandler.OutstandingReport)
+	loans.Get("/:id/schedule", loanHandler.Schedule)
 	loans.Get("/:id", loanHandler.Get)
 	loans.Post("/apply", loanHandler.Apply)
 	// BUG-2 fix: the ONLY approval path is the sequential chain

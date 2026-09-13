@@ -38,6 +38,8 @@ func fullTestApp() *fiber.App {
 	repayHandler := NewRepaymentHandler()
 	committeeHandler := NewLoanCommitteeHandler()
 	userMgmtHandler := NewUserManagementHandler()
+	loanSettingsHandler := NewLoanSettingsHandler()
+	offsetHandler := NewLoanOffsetHandler()
 
 	api.Post("/auth/login", authHandler.Login)
 
@@ -56,6 +58,7 @@ func fullTestApp() *fiber.App {
 	loans.Post("/apply", loanHandler.Apply)
 	loans.Post("/:id/disburse", middleware.RequirePosition(models.PositionTreasurer), loanHandler.Disburse)
 	loans.Patch("/:id/confirm-received", loanHandler.ConfirmReceived)
+	loans.Get("/:id/offset-preview", middleware.RequireRoles(models.RoleChair, models.RoleSecretary, models.RoleTreasurer), offsetHandler.Preview)
 
 	// Sequential loan-approval chain (BUG-2 fix) — outside the leadership
 	// group so appointed bodi members can act on their turn.
@@ -77,6 +80,13 @@ func fullTestApp() *fiber.App {
 
 	users := protected.Group("/users")
 	users.Post("/create", middleware.RequireRoles(models.RoleChair), userMgmtHandler.CreateUser)
+
+	groups := protected.Group("/groups")
+	loanSettings := groups.Group("/:id/loan-settings")
+	loanSettings.Get("/", loanSettingsHandler.Get)
+	loanSettings.Post("/propose", middleware.RequireRoles(models.RoleChair), loanSettingsHandler.Propose)
+	loanSettings.Post("/approve", middleware.RequireRoles(models.RoleSecretary), loanSettingsHandler.Approve)
+	loanSettings.Post("/reject", middleware.RequireRoles(models.RoleSecretary), loanSettingsHandler.Reject)
 
 	return app
 }
@@ -147,7 +157,9 @@ func cleanAndSeed(t *testing.T) {
 		"DELETE FROM loan_offset_transactions",
 		"DELETE FROM loan_reviews",
 		"DELETE FROM repayments",
+		"DELETE FROM loan_installments",
 		"DELETE FROM loans",
+		"DELETE FROM loan_settings",
 		"DELETE FROM contribution_edits",
 		"DELETE FROM contributions",
 		"DELETE FROM member_contributions",

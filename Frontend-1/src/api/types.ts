@@ -211,15 +211,35 @@ export interface Loan {
   mwenyekiti_approved_at?: string;
   /** BUG-5: set when the borrower confirms receiving the disbursed loan. */
   borrower_confirmed_at?: string;
+  // Loan term + interest snapshot (muda + riba)
+  term_days: number;
+  interest_enabled: boolean;
+  interest_type?: string;
+  applicable_interest_rate: number;
+  interest_amount: number;
+  total_repayment: number;
   member?: Pick<Member, "id" | "member_no" | "full_name" | "phone">;
   reviewer?: Pick<User, "id" | "name" | "role">;
+}
+
+export interface LoanInstallment {
+  id: string;
+  loan_id: string;
+  number: number;
+  due_date: string;
+  principal_amount: number;
+  interest_amount: number;
+  total_amount: number;
+  paid_amount: number;
+  status: "PENDING" | "PAID";
 }
 
 export interface ApplyLoanRequest {
   member_id: string;
   amount: number;
   purpose?: string;
-  due_date: string;
+  due_date?: string;
+  term_days?: number;
 }
 
 export interface ApproveLoanRequest {
@@ -233,6 +253,7 @@ export interface RejectLoanRequest {
 export interface LoanWithRepayments {
   data: Loan;
   repayments: Repayment[];
+  installments?: LoanInstallment[];
 }
 
 export interface OutstandingReportRow {
