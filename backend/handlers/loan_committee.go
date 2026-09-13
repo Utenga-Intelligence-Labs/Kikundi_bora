@@ -402,6 +402,17 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		})
 	}
 
+	// Self-review guard: borrower cannot review own loan.
+	var borrower models.Member
+	if err := tx.Select("id, user_id").First(&borrower, "id = ?", loan.MemberID).Error; err == nil {
+		if borrower.UserID != nil && *borrower.UserID == userID {
+			tx.Rollback()
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"message": "Huwezi kupitia mkopo wako mwenyewe.",
+			})
+		}
+	}
+
 	var existingReview models.LoanReview
 	err := tx.Where("loan_id = ? AND reviewer_id = ?", loan.ID, userID).First(&existingReview).Error
 	if err == nil && existingReview.Decision != models.ReviewPending {
@@ -484,8 +495,22 @@ func (h *LoanCommitteeHandler) SubmitReview(c *fiber.Ctx) error {
 		})
 	}
 
-	// Count eligible voters inside the same locked transaction
+	// Count eligible voters inside the same locked transaction.
+	// Wengine waidhinishe: borrower is excluded from the unanimous
+	// denominator (borrower cannot review own loan above, so requiring
+	// their vote would deadlock the chain).
 	totalCommittee := h.countActiveCommitteeMembers(tx)
+	if borrower.UserID != nil {
+		var bUser models.User
+		if err := tx.Select("id, role").First(&bUser, "id = ?", *borrower.UserID).Error; err == nil {
+			if h.isEligibleCommitteeVoter(tx, bUser.ID, bUser.Role) {
+				totalCommittee--
+				if totalCommittee < 1 {
+					totalCommittee = 1
+				}
+			}
+		}
+	}
 	var approveCount int64
 	tx.Model(&models.LoanReview{}).
 		Where("loan_id = ? AND decision = ?", loan.ID, models.ReviewApprove).

@@ -244,8 +244,9 @@ function MikopoPage() {
               )}
               {l.status === "PENDING" && (
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Ombi lako linapitiwa: Hazina → Katibu → Bodi → Mwenyekiti
-                  (uonekano wa mfuatano: /uongozi/mikopo).
+                  Ombi lako linapitiwa: kila kiongozi (Hazina, Katibu, Bodi,
+                  Mwenyekiti) ataidhinisha kwa muda wake — mkopo hautoki mpaka
+                  wote waidhinishe.
                 </p>
               )}
             </div>

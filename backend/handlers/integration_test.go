@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"kikundibora/config"
 	"kikundibora/database"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/shopspring/decimal"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func fullTestApp() *fiber.App {
@@ -474,15 +476,32 @@ func TestCommitteeReviewFlow(t *testing.T) {
 	}, chair)
 	t.Logf("Appoint member: %d", code)
 
-	_, d := hGet(t, app, "/api/v1/members", chair)
-	var ml struct{ Data []struct{ ID string `json:"id"` } `json:"data"` }
-	json.Unmarshal(d, &ml)
-	memberID := ml.Data[0].ID
+	// Neutral borrower outside the committee so self-review guard never blocks
+	// unanimous vote (borrower must not review own loan).
+	neemaEmail := "neema2@kikundi.tz"
+	neemaHash, _ := bcrypt.GenerateFromPassword([]byte("demo123"), bcrypt.MinCost)
+	neemaUser := models.User{
+		Name: "Neema Borrower", Email: &neemaEmail, Phone: "0718888888",
+		Password: string(neemaHash), Role: models.RoleMember,
+		Status: models.UserStatusActive, IsActive: true,
+	}
+	if err := database.DB.Create(&neemaUser).Error; err != nil {
+		t.Fatalf("create neutral user: %v", err)
+	}
+	neemaMember := models.Member{
+		MemberNo: "KKK-NEUTRAL-02", FullName: "Neema Borrower", Phone: "0718888888",
+		UserID: &neemaUser.ID, IsActive: true, ApprovalStatus: "approved",
+		JoinedAt: time.Now(), RegisteredBy: neemaUser.ID,
+	}
+	if err := database.DB.Create(&neemaMember).Error; err != nil {
+		t.Fatalf("create neutral member: %v", err)
+	}
+	borrower := hLogin(t, app, neemaEmail, "demo123")
 	fundTreasury(500000) // apply requires treasury coverage
-	code, d = hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
-		"member_id": memberID, "amount": 100000.0, "purpose": "Test", "due_date": "2026-12-31",
-	}, chair)
-loanID := hExtract(t, d, "data")
+	code, d := hPost(t, app, "/api/v1/loans/apply", map[string]interface{}{
+		"member_id": neemaMember.ID, "amount": 100000.0, "purpose": "Test", "due_date": "2026-12-31",
+	}, borrower)
+	loanID := hExtract(t, d, "data")
 
 	// Try review by non-committee member (asha is committee now though — use a different non-member)
 	// Actually asha IS now committee, so normal member can't review. Skip this sub-test.
